@@ -51,7 +51,7 @@ import { getDiagnostics } from '@/lib/apiClient';
 import { CATEGORIES, CATEGORY_NAMES, HORIZON, categoryDisplay } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { categoryShares, getYearPercentiles } from '@/lib/shiftMatrix';
-import { computeDriverAttribution, scoredDrivers, signSplit } from '@/lib/driverAttribution';
+import { computeDriverAttribution, signSplit } from '@/lib/driverAttribution';
 import { cellWeightsBasis } from '@/lib/cellWeights';
 import CategoryDetailPanel from './shift/CategoryDetailPanel';
 import type { DiagnosticsResult } from '@/types';
@@ -104,13 +104,10 @@ const ShiftAnalysis: FC<{
   );
   // The drivers' parts of the shift at the score means: the drill-down ranks
   // its drivers with it and the impact filter splits the net with it. It
-  // needs the configuration and every driver fully scored.
-  const attribution = useMemo(() => {
-    const scored = scoredDrivers(drivers);
-    return simulation && config && scored
-      ? computeDriverAttribution({ drivers: scored, categories: CATEGORY_NAMES, config, cellWeights: simulation.cell_weights_used })
-      : null;
-  }, [drivers, config, simulation]);
+  // needs the configuration and the drivers.
+  const attribution = useMemo(() => (simulation && config && drivers.length > 0
+    ? computeDriverAttribution({ drivers, categories: CATEGORY_NAMES, config, cellWeights: simulation.cell_weights_used })
+    : null), [drivers, config, simulation]);
   const filter: ImpactFilter = attribution ? impactFilter : 'total';
 
   const matrix = useMemo<MatrixModel | null>(() => {

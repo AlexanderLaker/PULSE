@@ -22,7 +22,13 @@ META_KEYS = (
 
 
 def missing_keys(results: dict) -> list:
-    return [k for k in REQUIRED_KEYS if k not in (results or {})]
+    """The parts of the contract a stored results bundle lacks: the parts
+    above, the run metadata and the drivers' fingerprint the next run and
+    inputs_since_run compare with."""
+    missing = [k for k in REQUIRED_KEYS if k not in results]
+    meta = results.get("meta") or {}
+    missing += [f"meta.{k}" for k in META_KEYS + ("driver_fingerprint",) if k not in meta]
+    return missing
 
 
 def run_status(run: Optional[dict]) -> dict:
@@ -36,26 +42,20 @@ def run_status(run: Optional[dict]) -> dict:
     return {"has": True, "reason": "ok", "error": None, "latest_run_id": run["id"]}
 
 
-def inputs_since_run(run: dict, drivers) -> Optional[dict]:
+def inputs_since_run(run: dict, drivers) -> dict:
     """How the current drivers differ from the ones the run was computed on.
 
     {"changed", "added", "removed"} as lists of driver ids, all empty while
-    the run still reflects the drivers; None for a run that stored no
-    fingerprint. The dashboard uses it to say that an edit made since the run
-    shows only after the next production run.
+    the run still reflects the drivers. The dashboard uses it to say that an
+    edit made since the run shows only after the next production run.
     """
     from prism.input_drift import changed_drivers, driver_fingerprint
-    stored = (run["results"].get("meta") or {}).get("driver_fingerprint")
-    if not isinstance(stored, dict) or not stored:
-        return None
-    return changed_drivers(driver_fingerprint(drivers), stored)
+    return changed_drivers(driver_fingerprint(drivers), run["results"]["meta"]["driver_fingerprint"])
 
 
-def simulation_payload(run: dict, drivers=None) -> dict:
-    """GET /api/v1/simulation body for a run that passed run_status.
-
-    With the current ``drivers`` it also carries ``inputs_since_run``.
-    """
+def simulation_payload(run: dict, drivers) -> dict:
+    """GET /api/v1/simulation body for a run that passed run_status, compared
+    with the current ``drivers`` (``inputs_since_run``)."""
     results = run["results"]
     meta = results["meta"]
     run_date = run["run_date"]
@@ -68,7 +68,7 @@ def simulation_payload(run: dict, drivers=None) -> dict:
         "run_id": run["id"],
         "run_date": run_date,
         "iterations": run["iterations"],
-        **{k: meta.get(k) for k in META_KEYS},
+        **{k: meta[k] for k in META_KEYS},
     }
-    payload["inputs_since_run"] = inputs_since_run(run, drivers) if drivers is not None else None
+    payload["inputs_since_run"] = inputs_since_run(run, drivers)
     return payload

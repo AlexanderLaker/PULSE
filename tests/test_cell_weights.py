@@ -23,6 +23,7 @@ from prism.config import (CATEGORIES, DEFAULT_CELL_WEIGHTS, DEFAULT_CELL_WEIGHTS
 from prism.config_validation import validate_model_config
 from prism.drivers import Driver, DriverSet
 from prism.engine import MonteCarloEngine
+from support import category_map, region_map
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 RECORD = json.loads((REPO / "data" / "calibration" / "cell_weights_estimate.json").read_text(encoding="utf-8"))
@@ -45,8 +46,8 @@ def _outer(category_weights: dict, region_weights: dict) -> dict:
 def _europe_driver(**overrides) -> DriverSet:
     kwargs = dict(id="eu_only", force="Consumer", name="EU only", direction="Contraction", probability=5,
                   start_year=2025, gp1_pct_affected=0.30, peak_year=2028, diffusion_curve="linear",
-                  uncertainty=3, category_exposure={"Hair: Color": 5}, regional_exposure={"Europe": 5},
-                  vc_epicentre="Marketing")
+                  uncertainty=3, category_exposure=category_map({"Hair: Color": 5}),
+                  regional_exposure=region_map({"Europe": 5}), vc_epicentre="Marketing")
     kwargs.update(overrides)
     return DriverSet(drivers=[Driver(**kwargs)])
 
@@ -87,7 +88,7 @@ class TestRollUpAlgebra:
         W = {c: {r: 0.0 for r in REGIONS} for c in CATEGORIES}
         W["Hair: Color"]["Europe"] = 0.6
         W["Hair: Care"]["Asia"] = 0.4
-        db = _europe_driver(probability=4, gp1_pct_affected=0.20, regional_exposure={"Europe": 5, "Asia": 3})
+        db = _europe_driver(probability=4, gp1_pct_affected=0.20, regional_exposure=region_map({"Europe": 5, "Asia": 3}))
         r = _run(mock_model_config.copy_with(cell_weights=W), db, iterations=300)
         category = r["shift_matrix"]["Hair: Color"]["path"][2030]
         cell = r["regional_shift_matrix"]["Hair: Color"]["Europe"]["path"][2030]

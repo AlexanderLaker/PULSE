@@ -11,7 +11,7 @@ import { EXPANSION_SOFT, NO_VALUE, fmtPct, fmtShift, shiftColor } from '@/lib/fo
 import { S, SHADOW, HEADLINE_FONT, MONO_FONT } from '@/lib/theme';
 import Chip from '@/components/dashboard/Chip';
 import type { Driver, DriverProposal, DriverUpdate, ForceName } from '@/types';
-import { baselineOf, EXPERT_COLOR, REVIEWED_COLOR, type ScoringMode } from './shared';
+import { EXPERT_COLOR, REVIEWED_COLOR, type ScoringMode } from './shared';
 import { ColorDots, DeltaChip } from './scales';
 import { Dash, EditedChip } from './cards';
 import { ExpertInputPanel } from './ExpertRating';
@@ -43,42 +43,42 @@ export const ROW_GRID: Record<ScoringMode, string> = {
 // ── Collapsed-row cells: read-only in every mode; scoring and editing
 //    happen in the expanded panel ──
 const ProbCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverProposal }> = ({ driver, mode, myProposal }) => {
-  const base = baselineOf(driver)?.probability;
+  const base = driver.baseline.probability;
   if (mode === 'list') {
-    const edited = driver.scores_edited && base != null && driver.probability !== base;
+    const edited = driver.scores_edited && driver.probability !== base;
     return (
       <ColorDots value={driver.probability} color={edited ? REVIEWED_COLOR : S.primary}
-        title={base != null ? `Baseline ${base} / 5${edited ? ` · edited to ${driver.probability} / 5` : ''}` : undefined} />
+        title={`Baseline ${base} / 5${edited ? ` · edited to ${driver.probability} / 5` : ''}`} />
     );
   }
   if (mode === 'rating') {
     const my = myProposal?.probability ?? driver.proposal_summary.my?.probability;
     return (
       <ColorDots value={my != null ? Math.round(my) : 0} color={S.primary} muted={my == null}
-        title={base != null ? `Baseline ${base} / 5 · open the driver to score` : 'Open the driver to score'} />
+        title={`Baseline ${base} / 5 · open the driver to score`} />
     );
   }
   const agg = driver.proposal_summary.probability;
-  if (agg?.avg == null) return <Dash />;
-  const delta = base != null ? agg.avg - base : null;
+  if (!agg) return <Dash />;
+  const delta = agg.avg - base;
   return (
     <div className="flex items-center gap-2">
       <ColorDots value={Math.round(agg.avg)} color={EXPERT_COLOR} title={`Expert average ${agg.avg.toFixed(1)} / 5 · ${agg.count} scored`} />
       <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, color: EXPERT_COLOR }}>{agg.avg.toFixed(1)}</span>
-      {delta != null && <DeltaChip value={delta} />}
+      <DeltaChip value={delta} />
     </div>
   );
 };
 
 const Gp1Cell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverProposal }> = ({ driver, mode, myProposal }) => {
-  const base = baselineOf(driver)?.gp1_pct_affected;
+  const base = driver.baseline.gp1_pct_affected;
   const big: React.CSSProperties = { fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: '1.15rem' };
   if (mode === 'list') {
     const cur = driver.gp1_pct_affected;
-    const edited = driver.scores_edited && base != null && Math.round(cur * 100) !== Math.round(base * 100);
+    const edited = driver.scores_edited && Math.round(cur * 100) !== Math.round(base * 100);
     return (
-      <span style={{ ...big, color: edited ? REVIEWED_COLOR : S.onSurface, cursor: base != null ? 'help' : undefined }}
-        title={base != null ? `Baseline ${fmtPct(base, 0)}${edited ? ` · edited to ${fmtPct(cur, 0)}` : ''}` : undefined}>
+      <span style={{ ...big, color: edited ? REVIEWED_COLOR : S.onSurface, cursor: 'help' }}
+        title={`Baseline ${fmtPct(base, 0)}${edited ? ` · edited to ${fmtPct(cur, 0)}` : ''}`}>
         {fmtPct(cur)}
       </span>
     );
@@ -87,19 +87,19 @@ const Gp1Cell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverPropos
     const my = myProposal?.gp1_pct_affected ?? driver.proposal_summary.my?.gp1_pct_affected;
     return (
       <span style={{ ...big, color: my != null ? S.onSurface : S.onSurfaceVariant, cursor: 'help' }}
-        title={base != null ? `Baseline ${fmtPct(base, 0)} · open the driver to score` : 'Open the driver to score'}>
+        title={`Baseline ${fmtPct(base, 0)} · open the driver to score`}>
         {fmtPct(my, 0)}
       </span>
     );
   }
   const agg = driver.proposal_summary.gp1_pct_affected;
-  if (agg?.avg == null) return <Dash />;
-  const delta = base != null ? (agg.avg - base) * 100 : null;
+  if (!agg) return <Dash />;
+  const delta = (agg.avg - base) * 100;
   return (
     <div className="flex items-center gap-2 justify-end">
       <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: '1.05rem', color: EXPERT_COLOR }}
         title={`Expert average ${fmtPct(agg.avg, 0)} · ${agg.count} scored`}>{fmtPct(agg.avg, 0)}</span>
-      {delta != null && <DeltaChip value={delta} unit="pp" digits={0} />}
+      <DeltaChip value={delta} unit="pp" digits={0} />
     </div>
   );
 };
@@ -116,7 +116,7 @@ const RowEndCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverPro
     if (p == null || g == null) {
       return <span style={{ color: S.onSurfaceVariant, fontSize: 13, fontWeight: 700 }}>{NO_VALUE}</span>;
     }
-    const myShift = dirSign * (Math.max(1, Math.min(5, p)) / 6) * g;
+    const myShift = dirSign * (p / 6) * g;
     return (
       <span className="font-bold text-[14px]"
         title={`Your shift = (your prob / 6) × your GP1% × direction = (${Math.round(p)}/6) × ${fmtPct(g, 0)} × ${dirSign > 0 ? '+1' : '−1'}`}

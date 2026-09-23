@@ -204,15 +204,10 @@ describe('ConsumerJourney: stored content and the admin save', () => {
 });
 
 describe('a Strategist Read', () => {
-  it('separates its paragraphs with blank lines, whether written out or escaped', async () => {
+  it('separates its paragraphs with blank lines', async () => {
     const { MarkdownBlock } = await import('@/components/dashboard/journey/tiles');
-    const { unescapeBreaks } = await import('@/components/dashboard/journey/shared');
-    for (const text of ['**One.** First.\n\n**Two.** Second.', '**One.** First.\\n\\n**Two.** Second.']) {
-      const { container, unmount } = render(<MarkdownBlock text={text} />);
-      expect(container.querySelectorAll('p')).toHaveLength(2);
-      expect(container.querySelectorAll('strong')).toHaveLength(2);
-      unmount();
-    }
-    expect(unescapeBreaks('A.\\n\\nB.')).toBe('A.\n\nB.');
+    const { container } = render(<MarkdownBlock text={'**One.** First.\n\n**Two.** Second.'} />);
+    expect(container.querySelectorAll('p')).toHaveLength(2);
+    expect(container.querySelectorAll('strong')).toHaveLength(2);
   });
 });

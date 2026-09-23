@@ -21,7 +21,7 @@ export const RunNotices: FC<{ simulation: SimulationResult; serviceVersion: stri
   simulation, serviceVersion,
 }) => {
   const since = simulation.inputs_since_run;
-  const touched = since ? [...since.changed, ...since.added, ...since.removed] : [];
+  const touched = [...since.changed, ...since.added, ...since.removed];
   const version = simulation.run_meta.model_version;
   const notes: string[] = [];
   if (touched.length) {
@@ -30,7 +30,7 @@ export const RunNotices: FC<{ simulation: SimulationResult; serviceVersion: stri
     notes.push(`${touched.length === 1 ? 'One driver has' : `${touched.length} drivers have`} changed since this run `
       + `(${shown}). The numbers below show the drivers as they were; the next production run takes the changes in.`);
   }
-  if (serviceVersion && version && serviceVersion !== version) {
+  if (serviceVersion && serviceVersion !== version) {
     notes.push(`This run was computed by engine ${version}; the service runs ${serviceVersion}. `
       + 'The numbers follow the current engine after the next production run.');
   }

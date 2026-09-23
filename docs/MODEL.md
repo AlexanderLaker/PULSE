@@ -118,11 +118,11 @@ jittered peak never falls on or before the onset: it stops at the year after
 it. This gives the timing bands their meaning, "arrives a year earlier or
 later".
 
-Every driver carries its own onset, peak year, curve and uncertainty score.
-The engine has no defaults for them: a driver that lacks one, or whose peak
-does not come after its onset, is refused before the first draw
-(`prism/drivers.py`, `simulation_problems`), and so is one without a known
-value-chain epicentre.
+Every driver carries its own onset, peak year, curve and uncertainty score,
+a score for every category and every region, and a value-chain epicentre.
+The engine has no defaults for any of them: a driver that lacks one, or
+whose peak does not come after its onset, is refused before the first draw
+(`prism/drivers.py`, `simulation_problems`).
 
 ### 4. Exposure
 
@@ -132,8 +132,7 @@ x_jcr = (category exposure_jc / 5) x (regional exposure_jr / 5)
 
 Exposure describes the mechanism: where the driver acts and how strongly.
 Whether HCB has business in a cell enters only through the cell weights
-(step 7). A driver with no regional exposure at all is treated as present in
-every region, and the run records an integrity event naming it.
+(step 7). A score of 0 means the driver does not act there.
 
 ### 5. The force sum and the within-force overlap
 
@@ -208,7 +207,7 @@ an integrity event.
   share of the category's gross profit, and the value-chain lens gives it
   wholly to the driver's epicentre stage (propagation along the chain is not
   modelled). Each lens's shares add up to 1, so every lens adds up to the same
-  median. The lenses are attributions of one simulated number, not separate
+  median; a category no driver reaches has a median of zero and no shares. The lenses are attributions of one simulated number, not separate
   simulations, and they use magnitudes: a lens shows how much of a median each
   force, stage or region accounts for, not the direction of its own push. The
   per-driver attribution behind the drill-down and the PRISM Analysis
@@ -228,18 +227,15 @@ an integrity event.
 
 ## Integrity events
 
-A run records what it had to repair, assume or clip, and the dashboard shows
-the list next to the run.
+A run records what it had to repair or clip, and what changed in its inputs,
+and the dashboard shows the list next to the run.
 
 | Event | Raised when |
 |---|---|
 | `input_drift` | on every production run after the first: how the drivers' scores changed since the previous run, or that nothing changed |
 | `correlation_pd_repair`, `cholesky_repair` | the correlation matrix had to be repaired |
-| `regional_exposure_coverage` | a driver without regional exposure was treated as present everywhere |
 | `compounding_floor` | a compounding factor was floored at -100 percent |
-| `vc_attribution_fallback` | no driver reaches a category, so the value-chain lens shows an even split there |
 | `cell_weight_zero_row` | a category has a zero gross-profit share in every region |
-| `cell_weights_fallback` | the cell weights were empty or all zero and a flat grid was used |
 
 The input drift compares a fingerprint of every driver's scoring state
 (probability, GP1 share, direction, force, uncertainty, onset, peak year,

@@ -17,3 +17,27 @@ def load_module(relative_path: str, name: str | None = None):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def database_awaiting_a_migration(path: Path) -> Path:
+    """A SQLite file that holds a table of the schema but no record of any
+    migration: a database from before the migrations, which the code refuses
+    until migration 0001 has run."""
+    import sqlite3
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE simulation_runs (id INTEGER PRIMARY KEY, iterations INTEGER, results TEXT)")
+    conn.commit()
+    conn.close()
+    return path
+
+
+def category_map(scores: dict | None = None) -> dict:
+    """A complete category exposure map: the given scores, 0 in every other category."""
+    from prism.config import CATEGORIES
+    return {c: (scores or {}).get(c, 0) for c in CATEGORIES}
+
+
+def region_map(scores: dict | None = None) -> dict:
+    """A complete regional exposure map: the given scores, 0 in every other region."""
+    from prism.config import REGIONS
+    return {r: (scores or {}).get(r, 0) for r in REGIONS}

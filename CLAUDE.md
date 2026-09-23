@@ -44,6 +44,11 @@ documents in `docs/` explain everything below in full.
   Say so wherever a number built on it is quoted.
 - **The model configuration is code** (`prism/config.py`); the dashboard shows
   it read-only.
+- **A driver is complete or refused.** Every score present and on its scale,
+  every category and region scored: the schema's constraints, the database
+  writes, the API and the engine (`prism/drivers.py`, `simulation_problems`)
+  all refuse anything less. The engine has no defaults and no fallbacks for a
+  driver's inputs; never add one.
 - **Honest display.** One decimal for shifts and shares (docs/DESIGN.md
   names the three exceptions); the portfolio band is the joint percentile; the
   lenses are labelled attribution; sampling quality is the Monte Carlo
@@ -71,7 +76,7 @@ documents in `docs/` explain everything below in full.
 - **Database changes are migrations** under `migrations/`, following
   `0001_driver_schema`: one transaction, a dry run, `--postgres` to touch
   PostgreSQL, an archive of everything dropped, a runbook, tests on SQLite
-  and PostgreSQL.
+  and PostgreSQL, and an entry in `SCHEMA_MIGRATIONS` (`prism/database.py`).
 - **Never run anything against the production database** without the owner
   asking for it. The scripts read `DATABASE_URL` from `.env`, which may be
   production. Never print or copy `.env`.

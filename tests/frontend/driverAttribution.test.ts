@@ -15,7 +15,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {
   computeDriverAttribution, computeMaterializationSchedule, expectedMaterialization,
-  peakJitterFor, scoredDrivers, signSplit, type AttributionResult,
+  peakJitterFor, signSplit, type AttributionResult,
 } from '@/lib/driverAttribution';
 import { BASE_YEAR, YEARS } from '@/lib/format';
 
@@ -120,8 +120,7 @@ describe('materialisation schedule and jitter (ports of prism/config.py)', () =>
     expect(late[2029]).toBe(0.1429);
     expect(late[2034]).toBe(0.8571);
     const m = expectedMaterialization(
-      { id: 'x', force: 'Consumer', normalized_score: 0.1, category_exposure: {}, uncertainty: 5, peak_year: 2026, diffusion_curve: 'linear', start_year: 2025 },
-      YEARS, BASE_YEAR, true,
+      { uncertainty: 5, peak_year: 2026, diffusion_curve: 'linear', start_year: 2025 }, YEARS, BASE_YEAR, true,
     );
     // width 4: offsets -4..+4 all clamp at onset + 1 = 2026 or later; 2026 is
     // fully materialised only for the clamped draws, so the expectation lies
@@ -139,11 +138,9 @@ describe('materialisation schedule and jitter (ports of prism/config.py)', () =>
     expect(peakJitterFor(5, false)).toBe(0);
   });
 
-  it('attributes only when every driver carries the scores the engine needs', () => {
-    const full = { id: 'a', force: 'Consumer' as const, normalized_score: -0.1, category_exposure: {},
-      regional_exposure: {}, uncertainty: 2, peak_year: 2029, diffusion_curve: 'linear' };
-    expect(scoredDrivers([full])).toEqual([full]);
-    expect(scoredDrivers([full, { ...full, id: 'b', uncertainty: null }])).toBeNull();
+  it('refuses what the engine refuses: a peak not after the onset, an unknown curve', () => {
+    expect(() => computeMaterializationSchedule(2027, 'linear', YEARS, BASE_YEAR, 2027)).toThrow('after the onset 2027');
+    expect(() => computeMaterializationSchedule(2030, 'jump', YEARS, BASE_YEAR, 2025)).toThrow('unknown diffusion curve');
   });
 });
 

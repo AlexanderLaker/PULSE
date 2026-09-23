@@ -9,11 +9,18 @@ nothing to it. The dashboard's role table,
 `migrate.py` moves a database onto the current schema in one transaction.
 What it changes is listed in its docstring; in short:
 
+- every driver is checked first. The driver schema stores only drivers the
+  engine can simulate: every score present and on its scale, a peak year
+  after the onset, a value chain and at least one region with an exposure.
+  While a driver fails a check the migration changes nothing and lists every
+  problem (see step 3 of the runbook);
 - the driver tables are created and filled from the previous ones, every row
   and every expert proposal included. Where an admin saved a driver's source
   list in the previous editor, that saved list becomes the driver's sources.
-  Rows of the previous child tables whose driver no longer exists are not
-  copied;
+  An exposure map keeps the taxonomy's names, and a name it lacks gets 0, the
+  value the previous engine read for it. An expert proposal is a draft: a
+  score the API would refuse today is cleared. Rows of the previous child
+  tables whose driver no longer exists are not copied;
 - the value chain becomes one stage per driver. The previous schema stored it
   as eight scores drawn around the stage an expert chose; the migration keeps
   the stage those scores centre on, the one the dashboard showed, for every
@@ -23,11 +30,14 @@ What it changes is listed in its docstring; in short:
   is dropped with `CASCADE`: if a table the migration does not know depends on
   one it drops, it stops and changes nothing;
 - the stored runs get the current key names (`meta.driver_count`,
-  `meta.driver_fingerprint`); no number changes;
+  `meta.driver_fingerprint`), and each driver fingerprint gains the onset
+  years and the exposure maps on the taxonomy's names, so the next production
+  run compares like with like; no number changes;
 - each driver gets its current PRISM Analysis text, and descriptions and
   Consumer Journey tile texts that still hold a previously shipped text get the
   current one. A text an admin has edited is left alone and listed in the
-  report.
+  report. The journey tiles cite drivers under `driverCodes`, and a code that
+  is not a driver of the base is removed.
 
 A new, empty database needs no migration: the API creates the schema on first
 use and seeds the driver base.
@@ -66,6 +76,13 @@ environment from `requirements-dev.txt` and a `.env` whose `DATABASE_URL` (or
    rehearsal branch and its archive file afterwards (the archive holds user
    emails).
 
+   If a driver fails a check, the dry run prints `nothing changed` and one
+   line per problem, exits with code 1 and changes nothing. Correct each
+   problem in production, in the dashboard that is still deployed, or with
+   SQL for a force, a start year or a confidence, which that dashboard cannot
+   edit. Then delete the rehearsal branch and start this step again from a
+   fresh one.
+
 3. **Preview.** Run the dry run against Neon. It performs the whole migration
    inside a transaction, prints the report and rolls back:
 
@@ -77,18 +94,24 @@ environment from `requirements-dev.txt` and a `.env` whose `DATABASE_URL` (or
    `copied` to show 51 drivers with their sources and proposals, the previous
    tables in `dropped_tables`, and 51 in `analysis_updated`. Then read:
 
+   - `exposures`: per driver, the names outside the taxonomy that were
+     dropped and the missing names that were set to 0;
+   - `baselines`: the drivers whose baseline, or a field of it, was taken
+     from their current scores because none was stored;
    - `sources_from_editor`: the drivers whose source list an admin saved in
      the previous editor. That list becomes their sources; each entry shows
      how many rows it has and how many rows the old sources table held;
+   - `proposals`: how many proposals got a value-chain stage, and per
+     proposal the scores cleared because the API would refuse them now (the
+     expert can score them again);
    - `orphans_skipped`: per previous child table, the rows whose driver no
      longer exists. They are not copied; the archive keeps them;
-   - `value_chain`: how many drivers and proposals got a value-chain stage.
-     `drivers_without_one` should be empty: a driver listed there had no
-     value chain stored, and the production run refuses to simulate it until
-     an admin sets its epicentre on the Drivers page;
+   - `runs`: how many stored runs got the current key names and a
+     completed driver fingerprint;
    - `descriptions.edited_left_alone` and `journey.texts_edited_left_alone`:
      each entry is a text an admin changed, which the migration keeps as it
-     is.
+     is; `journey.codes_removed` lists, per tile, the codes that are not
+     drivers of the base.
 
    The migration locks the tables it changes for its whole transaction, so
    while the dry run runs the live dashboard's database reads wait. Run it at
@@ -115,7 +138,9 @@ environment from `requirements-dev.txt` and a `.env` whose `DATABASE_URL` (or
 6. **Check.** `https://prism-hcb.vercel.app/api/v1/health` answers
    `"status": "ok"` with `"driver_count": 51` and `"has_simulation": true`.
    Open the dashboard: the Shift Analysis shows the persisted run with its
-   2035 portfolio median of -5.6 percent.
+   2035 portfolio median of -5.6 percent. Ask everyone who had the dashboard
+   open to reload it: a page loaded before the deploy still runs the
+   previous dashboard, whose reads and saves the current service refuses.
 
 7. **Write a fresh run** so the served run carries the current labels (the
    numbers stay the same, and its input-drift event reports no changes):
@@ -156,7 +181,7 @@ next start.
 | Code | Meaning |
 |---|---|
 | 0 | migrated, or the database was already migrated |
-| 1 | refused: no database, not a database of the previous schema, or `--postgres` missing for a PostgreSQL target |
+| 1 | refused, nothing changed: no database, not a database of the previous schema, `--postgres` missing for a PostgreSQL target, or drivers that need correcting (listed) |
 | 2 | failed and rolled back; the database is unchanged |
 
 ## Files

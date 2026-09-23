@@ -156,25 +156,25 @@ the Drivers page: the edit is written at once, every changed field goes to the
 audit log in the same transaction, and a changed score marks the driver as
 Edited against its baseline. The name, the force and the onset come from the
 base and are not edited on the page, and a peak year must fall after the
-onset. An exposure edit sends only the cells that changed. A stored exposure
-on a name outside the taxonomy cannot be simulated: the next save of the
-driver drops it and logs what it dropped, and that repair alone does not mark
-the driver as Edited. Every driver carries a revision number that each save
-raises; an edit names the revision it was made on, so when two admins (or two
-tabs) edit the same driver, the second save is refused with a request to
-reload instead of silently undoing the first.
+onset. An exposure edit sends only the cells that changed. PRISM stores only
+complete drivers, every score present and on its scale, with a score for
+every category and every region and no name outside the taxonomy, so a
+stored driver can always be simulated. Every driver carries a revision
+number that each save raises; an edit names the revision it was made on, so
+when two admins (or two tabs) edit the same driver, the second save is
+refused with a request to reload instead of silently undoing the first.
 
 Experts propose scores under Expert Rating; a proposal never changes a
-driver. The proposal saves as it is edited, one request at a time per driver
-with the newest draft, and a cell outside the current taxonomy is left out of
-it. Admins see the proposals aggregated under Review & Endorse: the mean of
-the probability, the GP1 share and each exposure cell, the median of the peak
-year and the uncertainty, the most frequent curve, and the value-chain stage
-as a majority vote. They choose per field between keeping the current value,
-the baseline, the expert aggregate and a manual value: a field an expert
-scored starts on the aggregate, a field nobody scored on its current value.
-Endorsing saves the chosen values as an ordinary edit. The next production
-run reports every change as input drift.
+driver and may leave any field unscored. The proposal saves as it is edited,
+one request at a time per driver with the newest draft. Admins see the
+proposals aggregated under Review & Endorse: the mean of the probability, the
+GP1 share and each exposure cell, the median of the peak year and the
+uncertainty, and the curve and the value-chain stage as majority votes. They
+choose per field between keeping the current value, the baseline, the expert
+aggregate and a manual value: a field with an aggregate starts on it, and a
+field nobody scored, or a vote without a majority, starts on its current
+value. Endorsing saves the chosen values as an ordinary edit. The next
+production run reports every change as input drift.
 
 The base file changes when a review changes the reference scores or the
 texts. After an edit to `driver_base.json`:
@@ -187,11 +187,13 @@ texts. After an edit to `driver_base.json`:
    new correction moves the model's numbers, so the same commit carries a new
    `MODEL_VERSION` and the regenerated golden pins (docs/adr/0014);
 3. regenerate the PRISM Analysis as docs/DRIVER_ANALYSIS.md describes;
-4. until migration 0001 has run on every database, a changed description
-   must also be the text its entry in
-   `migrations/0001_driver_schema/descriptions.json` ends on, with the hash
-   of the replaced text added (the migration's tests say which), and the
-   same holds for a Consumer Journey tile text listed in `journey_edits.json`;
+4. until migration 0001 has run on every database, it is what carries a
+   changed description to them: the new text becomes the `text` of the
+   driver's entry in `migrations/0001_driver_schema/descriptions.json` (an
+   entry is added where the driver has none) and the SHA-256 of the text it
+   replaces joins `previous_sha256`. A changed Consumer Journey tile text
+   goes into `journey_edits.json` the same way. The migration's tests check
+   that every entry ends on the shipped text;
 5. commit the regenerated files; CI checks all of them.
 
 A new database picks up the base when it is seeded. An existing database

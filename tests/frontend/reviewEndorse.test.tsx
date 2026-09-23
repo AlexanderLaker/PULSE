@@ -46,10 +46,7 @@ const scorer = (userId: string, name: string, stage: string | null = null) => ({
 function reviewedDriver(): Driver {
   const driver = makeDriver({
     probability: 3, gp1_pct_affected: 0.30, revision: 4, scores_edited: true,
-    proposal_summary: {
-      count: 2, probability: { avg: 4, count: 2 }, gp1_pct_affected: null, peak_year: null,
-      diffusion_curve: null, uncertainty: null, my: null,
-    },
+    proposal_summary: { count: 2, probability: { avg: 4, count: 2 }, gp1_pct_affected: null, my: null },
   });
   PROPOSALS.current = {
     driver_id: driver.id,
@@ -119,6 +116,7 @@ describe('Review & Endorse', () => {
   it('endorses the stage the experts agree on, by name', async () => {
     const driver = reviewedDriver();
     PROPOSALS.current!.scorers = [scorer('ana', 'Ana', 'Marketing'), scorer('ben', 'Ben', 'Marketing')];
+    PROPOSALS.current!.aggregate.vc_epicentre = { mode: 'Marketing', distribution: { Marketing: 2 }, count: 2 };
     await openReview(driver);
     const [, update] = await endorse();
     expect(update.vc_epicentre).toBe('Marketing');
@@ -127,6 +125,8 @@ describe('Review & Endorse', () => {
   it('keeps the current stage when the expert votes tie', async () => {
     const driver = reviewedDriver();
     PROPOSALS.current!.scorers = [scorer('ana', 'Ana', 'Marketing'), scorer('ben', 'Ben', 'Consumer')];
+    // A tie has no majority: the API's aggregate says so with mode null.
+    PROPOSALS.current!.aggregate.vc_epicentre = { mode: null, distribution: { Marketing: 1, Consumer: 1 }, count: 2 };
     await openReview(driver);
     expect(await screen.findByText(/no majority/)).toBeTruthy();
     const [, update] = await endorse();

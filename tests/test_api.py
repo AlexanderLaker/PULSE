@@ -5,7 +5,6 @@ import hmac
 import json
 import os
 import re
-import sqlite3
 import subprocess
 import sys
 import time
@@ -17,13 +16,10 @@ from fastapi.testclient import TestClient
 from prism.api import state
 from prism.api.app import create_app
 from prism.config import CATEGORIES
-from prism.database import PENDING_MIGRATION_MARKERS
-from support import load_module
+from support import database_awaiting_a_migration, load_module
 
 REPO = Path(__file__).resolve().parents[1]
 SECRET = "pytest-secret-" + "x" * 40
-#: The table only a database still awaiting migration 0001 has (prism/database.py).
-AWAITING_0001 = PENDING_MIGRATION_MARKERS["0001_driver_schema"][0]
 
 
 def token(role="viewer", sub="user-1", email="ana@example.com", exp_offset=300, secret=SECRET, **claims) -> str:
@@ -191,7 +187,7 @@ class TestHealthAndDiagnostics:
 
     def test_a_database_awaiting_a_migration_asks_for_it(self, api, monkeypatch, tmp_path):
         awaiting = tmp_path / "awaiting.db"
-        sqlite3.connect(awaiting).execute(f"CREATE TABLE {AWAITING_0001} (id TEXT PRIMARY KEY)").connection.close()
+        database_awaiting_a_migration(awaiting)
         monkeypatch.setenv("PRISM_DB_PATH", str(awaiting))
         state.reset()
         response = api.get("/api/v1/drivers", headers=bearer())
@@ -242,9 +238,14 @@ class TestSimulation:
         assert api.get(path, headers=bearer()).json()["inputs_since_run"] == {
             "changed": ["technology_r01"], "added": [], "removed": []}
 
-    def test_a_run_without_a_fingerprint_names_nothing(self, api, valid_run):
-        persist({**valid_run, "meta": {k: v for k, v in valid_run["meta"].items() if k != "driver_fingerprint"}})
-        assert api.get("/api/v1/simulation", headers=bearer()).json()["inputs_since_run"] is None
+    @pytest.mark.parametrize("key", ["driver_fingerprint", "model_version", "chain_seeds"])
+    def test_a_run_without_its_metadata_is_not_served(self, api, valid_run, key):
+        """The metadata is part of the contract: the run information shows it, and the next run and
+        inputs_since_run compare with the fingerprint."""
+        persist({**valid_run, "meta": {k: v for k, v in valid_run["meta"].items() if k != key}})
+        response = api.get("/api/v1/simulation", headers=bearer())
+        assert response.status_code == 404 and response.json()["detail"]["reason"] == "malformed"
+        assert f"meta.{key}" in response.json()["detail"]["error"]
 
 
 class TestDrivers:
@@ -313,14 +314,14 @@ class TestDrivers:
 
     def test_a_concurrent_save_between_the_check_and_the_write_is_refused(self, api, monkeypatch):
         """The revision check in the API passes, but another save lands before the write: the database refuses."""
-        from prism.database import load_drivers, save_drivers
+        from prism.database import load_drivers
         import prism.database as dbm
         original = dbm.save_driver_edit
 
         def someone_else_first(driver, expected, audit):
             other = next(d for d in load_drivers() if d.id == "consumer_r01")
             other.name = "saved in between"
-            save_drivers([other])
+            original(other, other.revision)
             return original(driver, expected, audit)
         monkeypatch.setattr(dbm, "save_driver_edit", someone_else_first)
         response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"revision": 1, "probability": 4})
@@ -342,7 +343,7 @@ class TestDrivers:
         {"name": "Renamed"}, {"force": "Customer"}, {"start_year": 2026}, {"peak_year": 2025},
         {"category_exposure": {"Hair: Care": "high"}}, {"category_exposure": {"Hair: Colour": 3}},
         {"regional_exposure": {"Latin America": 2}}, {"vc_epicentre": "Retail"}, {"vc_epicentre": None},
-        {"vc_exposure": {"Marketing": 5}},
+        {"value_chain": {"Marketing": 5}},
         {"sources": [{"title": "", "url": ""}]}, {"sources": [{"title": "x", "tier": "Z"}]},
     ])
     def test_invalid_edits_are_refused(self, api, body):
@@ -364,34 +365,13 @@ class TestDrivers:
         assert set(driver["category_exposure"]) == set(CATEGORIES)
 
     def test_a_peak_year_must_come_after_the_onset(self, api):
-        driver = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["id"] == "consumer_r01")
-        onset = max(2025, driver["start_year"])
-        path = "/api/v1/drivers/consumer_r01"
+        """A driver whose onset lies after the base year cannot peak before it."""
+        driver = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["start_year"] >= 2027)
+        onset = driver["start_year"]
+        path = f"/api/v1/drivers/{driver['id']}"
         refused = api.put(path, headers=bearer("admin"), json={"revision": 1, "peak_year": onset})
         assert refused.status_code == 422 and "after the driver's onset" in refused.json()["detail"]
         assert api.put(path, headers=bearer("admin"), json={"revision": 1, "peak_year": onset + 1}).status_code == 200
-
-    def test_a_save_drops_exposures_on_names_outside_the_taxonomy(self, api):
-        """Such a name cannot be simulated; saving the driver repairs it, and the audit log records it."""
-        from prism.database import get_db_connection, load_drivers, save_drivers
-        api.get("/api/v1/drivers", headers=bearer())   # the API creates and seeds the database
-        stored = next(d for d in load_drivers() if d.id == "consumer_r01")
-        stored.category_exposure = {**stored.category_exposure, "Hair: Colour": 3}
-        save_drivers([stored])
-        driver = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["id"] == "consumer_r01")
-        response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"),
-                           json={"revision": driver["revision"], "description": "Checked."})
-        assert response.status_code == 200 and "category_exposure" in response.json()["changed"]
-        repaired = next(d for d in load_drivers() if d.id == "consumer_r01")
-        assert "Hair: Colour" not in repaired.category_exposure
-        assert set(repaired.category_exposure) == set(CATEGORIES)
-        # no score the engine uses changed, so the scores do not count as edited
-        assert repaired.scores_edited is False
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT reason FROM audit_log WHERE action = 'driver_updated' ORDER BY id")
-            reasons = [r[0] for r in cursor.fetchall()]
-        assert reasons == ["description", "category_exposure: names outside the taxonomy dropped: Hair: Colour"]
 
     def test_an_unknown_driver_is_404(self, api):
         response = api.put("/api/v1/drivers/nope", headers=bearer("admin"), json={"revision": 1, "probability": 3})
@@ -399,11 +379,11 @@ class TestDrivers:
 
     def test_a_change_made_elsewhere_reaches_the_next_request(self, api):
         """Another server instance or a script writes the database; the cached drivers follow."""
-        from prism.database import load_drivers, save_drivers
+        from prism.database import load_drivers, save_driver_edit
         api.get("/api/v1/drivers", headers=bearer())
         driver = next(d for d in load_drivers() if d.id == "technology_r01")
         driver.name = "Renamed by a script"
-        save_drivers([driver])
+        save_driver_edit(driver, driver.revision)
         names = {d["id"]: d["name"] for d in api.get("/api/v1/drivers", headers=bearer()).json()}
         assert names["technology_r01"] == "Renamed by a script"
 
@@ -461,24 +441,14 @@ class TestProposals:
         api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"revision": 1, "probability": 4})
         assert len(api.get(path, headers=bearer()).json()["scorers"]) == 1
 
-    def test_a_stored_peak_year_the_engine_cannot_ramp_to_reads_as_unscored(self, api):
-        """A proposal stored with a peak year at or before the onset is shown and
-        aggregated as unscored, so the expert's next save (the whole draft, with
-        peak_year null) clears it instead of being refused."""
-        from prism.database import load_driver_proposals, upsert_driver_proposal
+    def test_a_tie_has_no_majority(self, api):
+        """Categorical votes are counted, never averaged; a tie leaves the choice with the admin."""
         path = "/api/v1/drivers/consumer_r01/proposals"
-        api.get(path, headers=bearer())   # seeds the database
-        upsert_driver_proposal("consumer_r01", "ana", {"probability": 2, "peak_year": 2025}, user_name="Ana")
-        body = api.get(path, headers=bearer(sub="ana")).json()
-        assert body["my"]["peak_year"] is None and body["aggregate"]["peak_year"] is None
-        assert body["scorers"][0]["peak_year"] is None
-        summary = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json()
-                       if d["id"] == "consumer_r01")["proposal_summary"]
-        assert summary["peak_year"] is None
-        draft = {**body["my"], "probability": 4}   # what Expert Rating sends: the whole draft
-        assert api.put(path, headers=bearer(sub="ana"), json=draft).status_code == 200
-        stored = next(r for r in load_driver_proposals("consumer_r01") if r["user_id"] == "ana")
-        assert stored["probability"] == 4 and stored["peak_year"] is None
+        for sub, stage, curve in (("ana", "Marketing", "linear"), ("ben", "Consumer", "s_curve")):
+            api.put(path, headers=bearer(sub=sub), json={"vc_epicentre": stage, "diffusion_curve": curve})
+        aggregate = api.get(path, headers=bearer()).json()["aggregate"]
+        assert aggregate["vc_epicentre"] == {"mode": None, "distribution": {"Marketing": 1, "Consumer": 1}, "count": 2}
+        assert aggregate["diffusion_curve"]["mode"] is None
 
     def test_invalid_proposals(self, api):
         path = "/api/v1/drivers/consumer_r01/proposals"
@@ -486,6 +456,7 @@ class TestProposals:
         assert api.put(path, headers=bearer(), json={"category_exposure": {"Hair: Care": 7}}).status_code == 422
         assert api.put(path, headers=bearer(), json={"regional_exposure": {"Mars": 2}}).status_code == 422
         assert api.put(path, headers=bearer(), json={"probability": 0}).status_code == 422
+        assert api.put(path, headers=bearer(), json={"gp1_pct_affected": 0}).status_code == 422
         assert api.put(path, headers=bearer(), json={"peak_year": 2025}).status_code == 422   # not after the onset
         assert api.put(path, headers=bearer(), json={"user_id": "someone-else"}).status_code == 422
         assert api.put("/api/v1/drivers/nope/proposals", headers=bearer(), json={"probability": 3}).status_code == 404
@@ -536,15 +507,24 @@ class TestJourney:
         {"lhc": "x", "hair": []}, {"lhc": []}, {"lhc": [], "hair": [], "extra": []},
         {"lhc": [{"id": "s", "label": "S", "benefiting": [{"name": "no id"}], "negativelyImpacted": []}], "hair": []},
         {"lhc": [{"id": "s", "label": "S", "benefiting": [], "negativelyImpacted": "none"}], "hair": []},
-        {"lhc": [{"id": "s", "label": "S", "benefiting": [{"id": "t", "name": "a"}, {"id": "t", "name": "b"}],
+        {"lhc": [{"id": "s", "label": "S", "benefiting": [{"id": "t", "name": "a", "driverCodes": []},
+                                                            {"id": "t", "name": "b", "driverCodes": []}],
                   "negativelyImpacted": []}], "hair": []},
-        {"lhc": [{"id": "s", "label": "S", "benefiting": [{"id": "t", "name": "x" * 2_100_000}],
+        {"lhc": [{"id": "s", "label": "S", "benefiting": [{"id": "t", "name": "x" * 2_100_000, "driverCodes": []}],
+                  "negativelyImpacted": []}], "hair": []},
+        {"lhc": [{"id": "s", "label": "S", "benefiting": [{"id": "t", "name": "a"}], "negativelyImpacted": []}],
+         "hair": []},
+        {"lhc": [{"id": "s", "label": "S", "benefiting": [{"id": "t", "name": "a", "driverCodes": ["C-99"]}],
                   "negativelyImpacted": []}], "hair": []},
     ], ids=["not-a-list", "missing-journey", "extra-key", "tile-without-id", "side-not-a-list", "duplicate-tile",
-            "too-large"])
-    def test_a_malformed_body_is_refused(self, api, content):
+            "too-large", "tile-without-codes", "unknown-code"])
+    def test_a_malformed_body_is_refused(self, api, content, request):
         response = api.put("/api/v1/journey", headers=bearer("admin"), json={"base_version": 0, "content": content})
         assert response.status_code == 422
+        reason = {"duplicate-tile": "appears twice", "tile-without-codes": "driver codes",
+                  "unknown-code": "C-99, which are not drivers"}.get(request.node.callspec.id)
+        if reason:
+            assert reason in response.json()["detail"]
 
     def test_the_body_needs_the_base_version(self, api):
         assert api.put("/api/v1/journey", headers=bearer("admin"), json={"content": self.CONTENT}).status_code == 422

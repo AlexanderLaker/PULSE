@@ -182,7 +182,7 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
   const filtered = useMemo<Driver[]>(() => {
     const q = search.trim().toLowerCase();
     return drivers.filter((d) => {
-      if (categoryFilter != null && (d.category_exposure[categoryFilter] ?? 0) <= 0) return false;
+      if (categoryFilter != null && d.category_exposure[categoryFilter] === 0) return false;
       if (!q) return true;
       return (
         d.name.toLowerCase().includes(q) ||

@@ -1,21 +1,21 @@
 /**
  * Values and small helpers the Drivers page's parts share: the diffusion-curve
- * and value-chain labels, the uncertainty label, the colours of the scoring
- * modes and a driver's baseline.
+ * and value-chain labels, the uncertainty label and the colours of the
+ * scoring modes.
  */
-import { CATEGORY_NAMES, EXPANSION, REGIONS } from '@/lib/format';
+import { EXPANSION } from '@/lib/format';
 import { S } from '@/lib/theme';
 import { UNCERTAINTY_LABELS } from '@/lib/uncertainty';
 import { VC_STEPS, stageIndex } from '@/lib/valueChain';
-import type { Driver, DriverProposal, DriverScores, ExposureMap } from '@/types';
 
 // ─── Diffusion curves ─────────────────────────────────────────────
+// The shapes of prism/config.py compute_materialization_schedule.
 export const DIFFUSION_LABELS: Record<string, { label: string; description: string }> = {
   s_curve:       { label: 'S-Curve',       description: 'Logistic: slow start, fast middle, plateau.' },
-  linear:        { label: 'Linear',        description: 'Steady, constant rate of materialization.' },
+  linear:        { label: 'Linear',        description: 'Steady, constant rate of materialisation.' },
   front_loaded:  { label: 'Front-Loaded',  description: 'Fast early impact, flattens over time (√t).' },
   back_loaded:   { label: 'Back-Loaded',   description: 'Slow start, accelerates late (t²).' },
-  step_function: { label: 'Step Function', description: 'Near-zero until ~80%, then sudden jump.' },
+  step_function: { label: 'Step Function', description: 'Near zero until 80 percent of the way to the peak, then a steep rise.' },
 };
 export const curveLabel = (curve: string): string => DIFFUSION_LABELS[curve]?.label ?? curve;
 
@@ -27,7 +27,8 @@ export const curveLabel = (curve: string): string => DIFFUSION_LABELS[curve]?.la
 
 const vcZone = (index: number): string =>
   index <= 3 ? 'upstream' : index === 4 ? 'mid-chain' : 'downstream';
-/** A stage with its part of the chain ("Marketing · downstream"), or "unscored". */
+/** A stage with its part of the chain ("Marketing · downstream"), or "unscored"
+ *  for a proposal that names none. */
 export const vcStageLabel = (step: string | null | undefined): string => {
   const i = stageIndex(step);
   return i < 0 ? 'unscored' : `${VC_STEPS[i]} · ${vcZone(i)}`;
@@ -43,31 +44,8 @@ export const EXPERT_COLOR   = S.expert;    // the expert aggregate: violet
 export const REVIEWED_COLOR = EXPANSION;   // an edited or endorsed value, a finished review: green
 export const DELTA_COLOR    = S.delta;     // the delta chip: gold
 
-/** The scores a driver is compared with: its baseline, or its own scores
- *  while no admin has edited it. Null for an edited driver without a baseline. */
-export const baselineOf = (d: Driver): DriverScores | null => d.baseline ?? (d.scores_edited ? null : d);
-
 // Uncertainty: the labels of the six scores; lib/uncertainty.ts also holds
 // what the engine makes of them (the Beta concentration, the peak-year jitter).
+// A proposal may leave the score empty ("unscored").
 export const uncLabel = (v: number | null | undefined): string =>
-  v == null ? 'unscored' : `${v} · ${UNCERTAINTY_LABELS[Math.max(0, Math.min(5, Math.round(v)))]}`;
-
-const TAXONOMY: Record<'category_exposure' | 'regional_exposure', ReadonlySet<string>> = {
-  category_exposure: new Set(CATEGORY_NAMES),
-  regional_exposure: new Set(REGIONS),
-};
-
-/** A proposal that names only the taxonomy's categories, regions and stages:
- *  the API refuses any other name, so a draft taken from a stored proposal
- *  that holds one could never be saved. */
-export function proposalOnTaxonomy(p: DriverProposal): DriverProposal {
-  const out: DriverProposal = { ...p };
-  for (const field of Object.keys(TAXONOMY) as Array<keyof typeof TAXONOMY>) {
-    const map = p[field];
-    if (map) {
-      out[field] = Object.fromEntries(Object.entries(map).filter(([k]) => TAXONOMY[field].has(k))) as ExposureMap;
-    }
-  }
-  if (p.vc_epicentre != null && stageIndex(p.vc_epicentre) < 0) out.vc_epicentre = null;
-  return out;
-}
+  v == null ? 'unscored' : `${v} · ${UNCERTAINTY_LABELS[Math.round(v)]}`;

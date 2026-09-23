@@ -6,7 +6,6 @@ copy. Every save names the version it was edited from, so an admin never
 overwrites a save made in the meantime without seeing it.
 """
 import json
-import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,8 +13,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from prism.api import state
 from prism.api.auth import identity_from_user, require_admin, require_auth
-
-logger = logging.getLogger(__name__)
+from prism.config import display_code
+from prism.seed_drivers import DRIVERS
 
 router = APIRouter()
 
@@ -23,6 +22,9 @@ router = APIRouter()
 MAX_CONTENT_BYTES = 2_000_000
 JOURNEYS = ("lhc", "hair")
 SIDES = ("benefiting", "negativelyImpacted")
+#: The display codes a tile may cite: the drivers of the driver base, the
+#: codes data/driverCodeMap.ts resolves on the dashboard.
+DRIVER_CODES = frozenset(display_code(d.id, d.force) for d in DRIVERS)
 
 
 class JourneySave(BaseModel):
@@ -38,7 +40,8 @@ def content_problem(content: dict) -> Optional[str]:
 
     The shape is what the dashboard renders: exactly the two journeys, each a
     list of stages with an id, a label and two lists of tiles, every tile an
-    object with a unique string id and a name.
+    object with a unique string id, a name and the list of driver codes it
+    cites, each the code of a driver of the base.
     """
     if set(content) != set(JOURNEYS):
         return "content must hold exactly the journeys lhc and hair"
@@ -65,6 +68,12 @@ def content_problem(content: dict) -> Optional[str]:
                     if tile["id"] in seen:
                         return f"tile id {tile['id']!r} appears twice"
                     seen.add(tile["id"])
+                    codes = tile.get("driverCodes")
+                    if not isinstance(codes, list) or not all(isinstance(c, str) for c in codes):
+                        return f"tile {tile['id']!r} must list its driver codes in driverCodes"
+                    unknown = sorted(set(codes) - DRIVER_CODES)
+                    if unknown:
+                        return f"tile {tile['id']!r} cites {', '.join(unknown)}, which are not drivers"
     return None
 
 
@@ -90,9 +99,9 @@ def put_journey_content(body: JourneySave, user: dict = Depends(require_admin)):
     n_tiles = sum(len(stage[side]) for j in JOURNEYS for stage in body.content[j] for side in SIDES)
 
     def audit(version: int) -> AuditEntry:
-        return AuditEntry("journey_content_updated", "journey", "default",
+        return AuditEntry("journey_content_updated", "journey", "default", user_id,
                           new_value=f"version {version}, {n_tiles} tiles",
-                          reason="Journey content saved in the editor", user_id=user_id)
+                          reason="Journey content saved in the editor")
 
     try:
         version = save_journey_content(body.content, updated_by=str(user.get("email") or user_id),

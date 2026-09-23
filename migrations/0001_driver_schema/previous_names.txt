@@ -6,16 +6,21 @@
 \bPULSE\b
 \bpulse[./]\w
 \b(?:from|import) pulse\b
+# "trend" as an identifier (trend_id, trendCodes, TrendDatabase, seed_trends);
+# the word itself stays in its ordinary sense
+\btrend[A-Z_]
+\bTrend[A-Z]
+seed_trends
 Trends2
 ProfitPoolAnalysis2
 ConsumerJourney2
-seed_trends
-trendCodeMap
 run_50k_prod
-trend_fingerprint
-trend_count
+BayesianMonteCarlo
 strategic_implication
 probability_posterior
 ai_suggestion
 user_override
-trend_base_2026
+vc_exposure
+vc_weights
+vc_decomposition
+vc_epicentre_(?:step_)?of

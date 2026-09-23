@@ -17,7 +17,7 @@ import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import Chip from '@/components/dashboard/Chip';
 import type { Confidence, Direction, Driver, DriverSource, DriverUpdate, ExposureMap } from '@/types';
 import SectionCard from '@/components/dashboard/SectionCard';
-import { baselineOf, curveLabel, DIFFUSION_LABELS, uncLabel, vcStageLabel } from './shared';
+import { curveLabel, DIFFUSION_LABELS, uncLabel, vcStageLabel } from './shared';
 import {
   CategoryExposureGrid, DiffusionGlyph, DotBar, EditableCategoryGrid, EditableRegionGrid,
   EpicentreRail, EpicentreSlider, RegionExposureGrid, UncertaintyPicker,
@@ -56,12 +56,11 @@ const draftOf = (d: Driver): Draft => ({
   sources: d.sources.map(sourceCopy),
 });
 
-/** The cells the draft scores differently from the stored map (a missing
- *  cell scores 0); undefined when there are none. The API changes only the
- *  cells an edit names. */
+/** The cells the draft scores differently from the stored map; undefined when
+ *  there are none. The API changes only the cells an edit names. */
 const changedCells = (draft: ExposureMap, stored: ExposureMap): ExposureMap | undefined => {
   const out: ExposureMap = {};
-  for (const [k, v] of Object.entries(draft)) if ((stored[k] ?? 0) !== v) out[k] = v;
+  for (const [k, v] of Object.entries(draft)) if (stored[k] !== v) out[k] = v;
   return Object.keys(out).length ? out : undefined;
 };
 
@@ -90,14 +89,14 @@ function updateFrom(draft: Draft, d: Driver): DriverUpdate {
   if (category) update.category_exposure = category;
   const regional = changedCells(draft.regional_exposure, d.regional_exposure);
   if (regional) update.regional_exposure = regional;
-  if (draft.vc_epicentre != null && draft.vc_epicentre !== d.vc_epicentre) update.vc_epicentre = draft.vc_epicentre;
+  if (draft.vc_epicentre !== d.vc_epicentre) update.vc_epicentre = draft.vc_epicentre;
   const sources = draft.sources.filter((s) => s.title.trim() || s.url.trim());
   if (!sameSources(sources, d.sources)) update.sources = sources;
   return update;
 }
 
 export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateDriver }) => {
-  const base = baselineOf(driver);
+  const base = driver.baseline;
 
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -376,7 +375,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                     type="number"
                     min={firstPeakYear(driver.start_year)} max={HORIZON} step={1}
                     value={draft.peak_year}
-                    onChange={(e) => edit({ peak_year: parseInt(e.target.value || '2030', 10) })}
+                    onChange={(e) => edit({ peak_year: Number.parseInt(e.target.value, 10) || driver.peak_year })}
                     style={{
                       width: '100%', padding: '8px 10px', borderRadius: 8,
                       border: `1px solid ${S.cardBorder}`,
@@ -428,7 +427,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                   </div>
                 )}
                 <div style={{ fontSize: 11, color: S.mutedText, marginTop: 4 }}>
-                  {DIFFUSION_LABELS[curve]?.description}
+                  {DIFFUSION_LABELS[curve].description}
                 </div>
               </div>
             </div>
@@ -443,7 +442,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
             footnote="0 = fixed by law or contract · 3 = size could be half or double · 5 = the sign could differ. Band width and timing jitter follow this score; the mean stays where probability puts it."
           >
             {isEditing ? (
-              <UncertaintyPicker value={draft.uncertainty} baseline={base?.uncertainty} onChange={(v) => edit({ uncertainty: v })} />
+              <UncertaintyPicker value={draft.uncertainty} baseline={base.uncertainty} onChange={(v) => edit({ uncertainty: v })} />
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <div style={{
@@ -454,9 +453,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                   {uncLabel(driver.uncertainty)}
                 </div>
                 <span style={{ fontSize: 11, color: S.mutedText }}>
-                  {driver.uncertainty == null
-                    ? 'Not scored: the production run refuses this driver until it has a score.'
-                    : `Beta concentration ${UNCERTAINTY_KAPPA[Math.max(0, Math.min(5, driver.uncertainty))]} · peak-year jitter ±${UNCERTAINTY_PEAK_JITTER[Math.max(0, Math.min(5, driver.uncertainty))]} y`}
+                  Beta concentration {UNCERTAINTY_KAPPA[driver.uncertainty]} · peak-year jitter ±{UNCERTAINTY_PEAK_JITTER[driver.uncertainty]} y
                 </span>
               </div>
             )}
@@ -595,15 +592,15 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
           <SectionCard
             title="Value Chain Epicentre" icon={Cpu} accent={S.onTertiaryContainer} info={FIELD_HELP.vc}
             right={
-              <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: vcStage != null ? S.primary : S.mutedText }}>
+              <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: S.primary }}>
                 {vcStageLabel(vcStage)}
               </span>
             }
           >
             {isEditing ? (
-              <EpicentreSlider value={vcStage} baseline={base?.vc_epicentre} onChange={(st) => edit({ vc_epicentre: st })} />
+              <EpicentreSlider value={vcStage} baseline={base.vc_epicentre} onChange={(st) => edit({ vc_epicentre: st })} />
             ) : (
-              <EpicentreRail stage={vcStage} baseline={base?.vc_epicentre} />
+              <EpicentreRail stage={vcStage} baseline={base.vc_epicentre} />
             )}
           </SectionCard>
         </div>

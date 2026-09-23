@@ -14,8 +14,8 @@ the revision of each driver it changes, so an admin editing one of them at
 that moment is asked to reload before saving. Drivers the seed does not
 contain are left alone and listed.
 
-Exit codes: 0 done (or nothing to do); 1 the database has no drivers table
-(a database that still needs a migration says which).
+Exit codes: 0 done (or nothing to do); 1 the database still needs a migration
+(the message names it) or has no drivers table yet.
 """
 from __future__ import annotations
 
@@ -42,15 +42,16 @@ def main(argv: list[str] | None = None) -> int:
     p = placeholder()
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        tables = table_names(cursor)
-        if "drivers" not in tables:
-            migration = pending_migration(tables)
-            hint = f" It needs migration {migration} first: run migrations/{migration}/migrate.py." if migration else ""
-            print(f"{target}: no drivers table, nothing to sync.{hint}")
+        migration = pending_migration(cursor)
+        if migration:
+            print(f"{target}: needs migration {migration} first: run migrations/{migration}/migrate.py.")
+            return 1
+        if "drivers" not in table_names(cursor):
+            print(f"{target}: no drivers table yet, nothing to sync (the API creates and seeds it on first use).")
             return 1
         cursor.execute("SELECT id, analysis FROM drivers ORDER BY id")
         current = {r["id"]: r["analysis"] for r in cursor.fetchall()}
-        stale = sorted(i for i in current if i in seed and (current[i] or "") != seed[i])
+        stale = sorted(i for i in current if i in seed and current[i] != seed[i])
         unknown = sorted(i for i in current if i not in seed)
         missing = sorted(i for i in seed if i not in current)
 
@@ -70,9 +71,9 @@ def main(argv: list[str] | None = None) -> int:
             cursor.execute(f"UPDATE drivers SET analysis = {p}, revision = revision + 1, "
                            f"updated_at = CURRENT_TIMESTAMP WHERE id = {p}",
                            (seed[driver_id], driver_id))
-        insert_audit(cursor, [AuditEntry("analysis_synced", "driver", driver_id,
-                                         reason="PRISM Analysis replaced by the generated text",
-                                         user_id="sync-analysis-cli") for driver_id in stale])
+        insert_audit(cursor, [AuditEntry("analysis_synced", "driver", driver_id, "sync-analysis-cli",
+                                         reason="PRISM Analysis replaced by the generated text")
+                              for driver_id in stale])
     print(f"Updated {len(stale)} driver(s).")
     return 0
 

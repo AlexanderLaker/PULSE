@@ -175,7 +175,7 @@ mistaken for the estimate.
 | 3 | the simulation ran but storing it failed; the dashboard keeps serving the previous run |
 | 4 | the correlation matrix is not positive definite on this driver mix |
 | 5 | the cell-weights file is missing or invalid |
-| 6 | a driver cannot be simulated (an unknown force, direction, curve or value-chain stage, a missing score, a score outside its scale, a peak year not after the onset, an exposure on a name outside the taxonomy, a duplicate id); every problem is listed |
+| 6 | a driver cannot be simulated (an unknown force, direction, curve or value-chain stage, a missing score, a score outside its scale, a peak year not after the onset, a category or region without an exposure score, an exposure on a name outside the taxonomy, a duplicate id); every problem is listed. PRISM stores no such driver, so this points at a change made to the database outside PRISM |
 
 After a run, the Shift Analysis's "About this model" footer shows the new
 run's id, date, master seed, numerics, Monte Carlo standard error, seed
@@ -233,8 +233,10 @@ back as that migration's runbook says.
   PostgreSQL database; every dropped row written to a local archive before
   the commit; the migration recorded in `schema_migrations` and the audit
   log; texts an admin edited reported and left alone; tests on SQLite and
-  PostgreSQL. `prism/database.py` lists the migrations a new database already
-  contains (`SCHEMA_MIGRATIONS`).
+  PostgreSQL. A new migration is added to `SCHEMA_MIGRATIONS` in
+  `prism/database.py`, whose schema then contains its result: a new database
+  records it as done, and the API and the production run refuse a database
+  that has not recorded it (503 and exit code 1, naming the migration).
 - **The cell-weight estimate** is changed in `scripts/build_cell_weights.py`
   (its inputs and grades). Run it to write the record and
   `lib/cellWeightProvenance.ts`, paste the output of `--emit-python` over

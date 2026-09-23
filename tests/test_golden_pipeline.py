@@ -150,16 +150,15 @@ class TestAttributionIdentities:
                     elif abs(median) > 1e-15:
                         assert value != 0.0, (cat, year, step)
 
-    def test_a_category_no_driver_reaches_is_reported(self, mock_model_config, mock_drivers_database):
-        """With no driver in a category, the lens spreads that category's median
-        (zero) evenly over the stages, and an integrity event says so."""
+    def test_a_category_no_driver_reaches_has_zero_in_every_lens(self, mock_model_config, mock_drivers_database):
+        """With no driver in a category, its median is exactly zero, and so is every lens value:
+        the lenses still add up to the row total, and nothing is spread over stages no driver named."""
         db = copy.deepcopy(mock_drivers_database)
         for d in db.drivers:
             d.category_exposure["LHC: IC"] = 0
         r = _run(mock_model_config, db)
-        events = [e for e in r["integrity_events"] if e["type"] == "vc_attribution_fallback"]
-        assert len(events) == 1 and events[0]["severity"] == "warning"
-        assert events[0]["detail"] == {"categories": ["LHC: IC"]} and "LHC: IC" in events[0]["message"]
-        for year, by_cat in r["decompositions"]["vc"].items():
-            assert r["shift_matrix"]["LHC: IC"]["path"][int(year)]["median"] == 0.0
-            assert set(by_cat["LHC: IC"].values()) == {0.0}
+        for lens in ("force", "vc", "region"):
+            for year, by_cat in r["decompositions"][lens].items():
+                assert r["shift_matrix"]["LHC: IC"]["path"][int(year)]["median"] == 0.0
+                assert set(by_cat["LHC: IC"].values()) == {0.0}, (lens, year)
+        assert r["integrity_events"] == []

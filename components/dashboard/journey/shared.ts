@@ -69,11 +69,6 @@ export interface CitedDriver {
   live: Driver | undefined;
 }
 
-/** A Strategist Read with escaped paragraph breaks ("\\n") written out. A text
- *  an admin saved before migration 0001 may still carry them; the reader and
- *  the editor show it with real breaks, and the editor saves it that way. */
-export const unescapeBreaks = (text: string): string => text.replace(/\\n/g, '\n');
-
 /** A tile's name without a trailing parenthetical; the full name stays in the content and in the tooltip. */
 export const displayTileName = (name: string): string => name.replace(/\s*\([^()]*\)\s*$/, '').trim();
 
@@ -107,14 +102,13 @@ const WIDE_STAGE_TILE_THRESHOLD = 10;
 export const stageSpan = (s: JourneyStageDef, journeyKey: JourneyKey): 1 | 2 =>
   (journeyKey === 'lhc' && Math.max(s.benefiting.length, s.negativelyImpacted.length) > WIDE_STAGE_TILE_THRESHOLD ? 2 : 1);
 
-/** The drivers a tile cites, each once; a code outside the code map is not a driver. */
+/** The drivers a tile cites, each once. Every code is a driver of the base:
+ *  the API refuses to store any other (prism/api/routers/journey.py). */
 export const citedDrivers = (tile: JourneyTile, driversById: Map<string, Driver>): CitedDriver[] =>
-  Array.from(new Set(tile.driverCodes))
-    .filter(code => Object.hasOwn(DRIVER_CODE_MAP, code))
-    .map(code => {
-      const info = DRIVER_CODE_MAP[code];
-      return { code, info, live: driversById.get(info.driverId) };
-    });
+  Array.from(new Set(tile.driverCodes)).map(code => {
+    const info = DRIVER_CODE_MAP[code];
+    return { code, info, live: driversById.get(info.driverId) };
+  });
 
 /** The words for a tile's intensity, 1 to 3. */
 export const INTENSITY_LABELS: Record<1 | 2 | 3, string> = { 1: 'Mild', 2: 'Moderate', 3: 'Strong' };

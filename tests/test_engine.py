@@ -5,6 +5,7 @@ import pytest
 from prism.config import CATEGORIES, REGIONS
 from prism.drivers import Driver, DriverSet
 from prism.engine import MonteCarloEngine
+from support import category_map
 
 
 def _single_driver_db(regional, cat="Hair: Color", cat_exp=5, prob=4, gp1=0.10, direction="Contraction",
@@ -12,7 +13,7 @@ def _single_driver_db(regional, cat="Hair: Color", cat_exp=5, prob=4, gp1=0.10, 
     d = Driver(id="d1", force="Consumer", direction=direction, gp1_pct_affected=gp1, probability=prob,
                peak_year=peak_year, diffusion_curve=curve, start_year=start_year, uncertainty=3,
                vc_epicentre="Commercial")
-    d.category_exposure = {cat: cat_exp}
+    d.category_exposure = category_map({cat: cat_exp})
     d.regional_exposure = dict(zip(REGIONS, regional))
     return DriverSet(drivers=[d])
 
@@ -21,7 +22,7 @@ def _global_driver(id_, direction, gp1, probability, exposure=5):
     d = Driver(id=id_, force="Consumer", direction=direction, gp1_pct_affected=gp1, probability=probability,
                peak_year=2028, diffusion_curve="s_curve", start_year=2025, uncertainty=3,
                vc_epicentre="Commercial")
-    d.category_exposure = {"Hair: Color": exposure}
+    d.category_exposure = category_map({"Hair: Color": exposure})
     d.regional_exposure = dict(zip(REGIONS, [5, 5, 5, 5]))
     return d
 
@@ -139,16 +140,19 @@ class TestRegionalShift:
             if cat != "Hair: Color":
                 assert sm[cat]["path"][2030]["median"] == pytest.approx(0.0, abs=1e-12)
 
-    def test_a_driver_without_regions_is_global_and_reported(self, mock_model_config):
+    def test_a_driver_without_regional_exposure_reaches_no_cell(self, mock_model_config):
+        """Exposure 0 in every region is exposure 0 everywhere, as a category score of 0 is: the
+        driver moves nothing, and every lens of the untouched category is zero."""
         r = MonteCarloEngine(self._cfg(mock_model_config)).run(_single_driver_db([0, 0, 0, 0]))
-        events = [e for e in r["integrity_events"] if e["type"] == "regional_exposure_coverage"]
-        assert len(events) == 1 and events[0]["severity"] == "warning"
-        assert events[0]["detail"]["driver_ids"] == ["d1"]
+        assert r["shift_matrix"]["Hair: Color"]["path"][2030]["median"] == 0.0
+        for lens in ("force", "vc", "region"):
+            assert set(r["decompositions"][lens][2030]["Hair: Color"].values()) == {0.0}, lens
+        assert r["integrity_events"] == []
 
-    def test_the_region_lens_counts_a_driver_without_regions_everywhere(self, mock_model_config):
-        """The lens follows the shift: present in every region, so the category's
-        attribution splits by the category's own regional gross-profit mix."""
-        r = MonteCarloEngine(self._cfg(mock_model_config)).run(_single_driver_db([0, 0, 0, 0]))
+    def test_the_region_lens_splits_by_presence_and_the_row_mix(self, mock_model_config):
+        """A driver present everywhere splits its category's attribution by the category's own
+        regional gross-profit mix."""
+        r = MonteCarloEngine(self._cfg(mock_model_config)).run(_single_driver_db([5, 5, 5, 5]))
         row = r["cell_weights_used"]["Hair: Color"]
         lens = r["decompositions"]["region"][2030]["Hair: Color"]
         median = r["shift_matrix"]["Hair: Color"]["path"][2030]["median"]
@@ -175,10 +179,13 @@ class TestDriverChecks:
         ({"peak_year": 2025}, r"peak year 2025 is not a year after the onset \(from 2026\)"),
         ({"start_year": 2027, "peak_year": 2027}, r"peak year 2027 is not a year after the onset \(from 2028\)"),
         ({"start_year": "soon"}, "start year 'soon' is not a year"),
+        ({"start_year": None}, "start year None is not a year"),
         ({"vc_epicentre": None}, "value-chain epicentre None is not one of"),
         ({"vc_epicentre": "Shelf"}, "value-chain epicentre 'Shelf' is not one of"),
-        ({"category_exposure": {"Hair: Colour": 3}}, "not in the taxonomy"),
-        ({"regional_exposure": {"Europe": 7}}, "is not a whole number from 0 to 5"),
+        ({"category_exposure": {**category_map(), "Hair: Colour": 3}}, "'Hair: Colour', which is not in the taxonomy"),
+        ({"regional_exposure": {"Europe": 7, "North America": 0, "Asia": 0, "High Growth": 0}},
+         "is not a whole number from 0 to 5"),
+        ({"regional_exposure": {"Europe": 5}}, "regional_exposure has no score for North America, Asia, High Growth"),
     ])
     def test_the_engine_refuses_it(self, mock_model_config, change, words):
         from prism.drivers import InvalidDriversError
@@ -199,9 +206,10 @@ class TestDriverChecks:
             assert sum(words in p for p in problems) == 1, words
         for words in ("direction None", "probability None", "gp1_pct_affected None"):
             assert sum(words in p for p in problems) == 1, words
-        for words in ("uncertainty None", "diffusion curve None", "peak year None", "value-chain epicentre None"):
+        for words in ("uncertainty None", "diffusion curve None", "start year None", "value-chain epicentre None",
+                      "category_exposure has no score", "regional_exposure has no score"):
             assert sum(words in p for p in problems) == 2, words
-        assert len(problems) == 1 + 4 + 3 + 4 * 2
+        assert len(problems) == 1 + 4 + 3 + 6 * 2
 
     def test_the_driver_base_passes(self):
         from prism.drivers import simulation_problems

@@ -8,7 +8,7 @@ import { Check, Plus, Trash2 } from 'lucide-react';
 import type { JourneyTile } from '@/data/consumerJourney';
 import { DRIVER_CODE_MAP } from '@/data/driverCodeMap';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
-import { currentMonth, INTENSITY_LABELS, type TileEdits, unescapeBreaks } from './shared';
+import { currentMonth, INTENSITY_LABELS, type TileEdits } from './shared';
 
 export const TileEditor: FC<{
   initial: JourneyTile;
@@ -21,7 +21,7 @@ export const TileEditor: FC<{
     intensity: initial.intensity,
     driverNote: initial.driverNote,
     driverCodes: initial.driverCodes.length ? [...initial.driverCodes] : [''],
-    analysis: unescapeBreaks(initial.analysis ?? ''),
+    analysis: initial.analysis ?? '',
   });
 
   const allCodes = useMemo(() => Object.keys(DRIVER_CODE_MAP).sort((a, b) => a.localeCompare(b)), []);

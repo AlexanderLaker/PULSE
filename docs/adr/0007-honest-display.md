@@ -26,7 +26,7 @@ meaningless for independent draws.
   medians), both framed as Monte Carlo noise only; every run stores the
   standard errors of each category's median, P10 and P90. No convergence statistic that is
   meaningless for independent draws is shown.
-- Every run records what it repaired, assumed or clipped, and how the driver
+- Every run records what it repaired or clipped, and how the driver
   scores changed since the previous run (input drift). The dashboard lists
   these next to the run.
 - When the drivers changed after the served run, or the run comes from

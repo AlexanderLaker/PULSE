@@ -3,6 +3,18 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from prism.config import DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS
+from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS
+
+#: The years a peak year can take: after the base year, within the horizon.
+#: The API also refuses a peak year at or before the driver's own onset.
+FIRST_PEAK, LAST_PEAK = DEFAULT_BASE_YEAR + 1, DEFAULT_PATH_YEARS[-1]
+
+
+def one_of(values) -> str:
+    """A regular expression that matches exactly one of the values."""
+    return "^(" + "|".join(values) + ")$"
+
 
 class SourceRef(BaseModel):
     """One piece of evidence behind a driver: a title, a link, or both."""
@@ -35,13 +47,13 @@ class DriverUpdate(BaseModel):
 
     revision: int = Field(..., ge=1)
     description: Optional[str] = Field(None, max_length=20000)
-    direction: Optional[str] = Field(None, pattern="^(Expansion|Contraction)$")
+    direction: Optional[str] = Field(None, pattern=one_of(DIRECTIONS))
     probability: Optional[int] = Field(None, ge=1, le=5)
     gp1_pct_affected: Optional[float] = Field(None, gt=0.0, le=1.0)
-    peak_year: Optional[int] = Field(None, ge=2025, le=2035)
+    peak_year: Optional[int] = Field(None, ge=FIRST_PEAK, le=LAST_PEAK)
     diffusion_curve: Optional[str] = None
     uncertainty: Optional[int] = Field(None, ge=0, le=5)
-    confidence: Optional[str] = Field(None, pattern="^(High|Medium|Low)$")
+    confidence: Optional[str] = Field(None, pattern=one_of(CONFIDENCE_LEVELS))
     category_exposure: Optional[dict] = None
     regional_exposure: Optional[dict] = None
     vc_epicentre: Optional[str] = None
@@ -58,8 +70,8 @@ class ProposalUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     probability: Optional[int] = Field(None, ge=1, le=5)
-    gp1_pct_affected: Optional[float] = Field(None, ge=0.0, le=1.0)
-    peak_year: Optional[int] = Field(None, ge=2025, le=2035)
+    gp1_pct_affected: Optional[float] = Field(None, gt=0.0, le=1.0)
+    peak_year: Optional[int] = Field(None, ge=FIRST_PEAK, le=LAST_PEAK)
     diffusion_curve: Optional[str] = None
     uncertainty: Optional[int] = Field(None, ge=0, le=5)
     category_exposure: Optional[dict] = None

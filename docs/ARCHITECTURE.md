@@ -68,7 +68,7 @@ any of these keys (`prism/api/runs.py`).
 | `cell_weights_used`, `category_weights_used`, `region_weights_used`, `cell_weights_source` | The gross-profit shares the run applied and where they came from |
 | `mc_standard_error` | Bootstrap standard error of each category's terminal-year median, P10 and P90 |
 | `seed_stability` | The terminal-year portfolio median of each chain and their spread |
-| `integrity_events` | Everything the run repaired, assumed or noticed, including the input drift |
+| `integrity_events` | Everything the run repaired or clipped, and the input drift |
 | `meta` | Master seed, chain seeds and chain count, model version, engine, numerics backend (scipy and numpy versions), driver count, overlap-correction source, time of storage, and the drivers' fingerprint for the next run |
 
 docs/MODEL.md explains each quantity.
@@ -224,7 +224,7 @@ quote public market figures as evidence.
 | Table | Written by | Content |
 |---|---|---|
 | `drivers` | seed, admin edits, `sync_analysis.py` | One row per driver: scores (the value-chain epicentre among them), texts, the baseline it was seeded with, whether an admin changed a model field, a revision counter |
-| `driver_category_exposure`, `driver_regional_exposure` | as above | Exposure scores 0 to 5 per category and per region |
+| `driver_category_exposure`, `driver_regional_exposure` | as above | An exposure score 0 to 5 for every category and every region of every driver |
 | `driver_sources` | as above | The evidence behind each driver: title, link, credibility tier and a note |
 | `driver_score_proposals` | experts | One partial proposal per driver and expert |
 | `simulation_runs` | production run | One results bundle per run |
@@ -233,9 +233,14 @@ quote public market figures as evidence.
 | `schema_migrations` | API, migrations | The migrations the schema already contains |
 | `user_roles` | dashboard | Clerk user id, email and role |
 
-A save updates a driver row in place (an upsert) instead of deleting and
-inserting it again, because the expert proposals reference it with
-`ON DELETE CASCADE`.
+A stored driver can always be simulated. The constraints of the schema,
+generated from the taxonomies in `prism/config.py`, require every field the
+engine reads and hold it on its scale, and refuse a force, curve, stage or
+exposure key outside the taxonomy; the functions that write drivers
+(`insert_drivers`, `save_driver_edit`) also refuse one without a score for
+every category and every region, which a constraint cannot express. An
+edit updates the driver row in place instead of deleting and inserting it
+again, because the expert proposals reference it with `ON DELETE CASCADE`.
 
 ## Deployment
 

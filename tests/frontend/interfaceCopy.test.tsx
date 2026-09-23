@@ -40,7 +40,7 @@ function sourceFiles(dirs: string[]): string[] {
   return out;
 }
 
-function trendStrings(file: string, src = fs.readFileSync(file, 'utf8')): string[] {
+function readableMentions(file: string, src = fs.readFileSync(file, 'utf8')): string[] {
   const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true,
     file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const hits: string[] = [];
@@ -71,7 +71,7 @@ describe('the driver vocabulary', () => {
   it('no string a person can read says trend', () => {
     const files = sourceFiles(COPY_DIRS).filter((f) => !f.endsWith('.css'));
     expect(files.length).toBeGreaterThan(25);
-    expect(files.flatMap((f) => trendStrings(f))).toEqual([]);
+    expect(files.flatMap((f) => readableMentions(f))).toEqual([]);
   });
 
   it('the sweep catches readable strings and spares identifiers', () => {
@@ -80,7 +80,7 @@ describe('the driver vocabulary', () => {
       "const TABS = [{ id: 'drivers', label: 'Trends' }];",
       'export const P = () => <span title="Open the trend">Megatrend context</span>;',
     ].join('\n');
-    const hits = trendStrings(path.join(REPO, 'components', 'probe.tsx'), probe);
+    const hits = readableMentions(path.join(REPO, 'components', 'probe.tsx'), probe);
     expect(hits.map((h) => h.replace(/^.*? /, ''))).toEqual(['"Trends"', '"Open the trend"']);
   });
 

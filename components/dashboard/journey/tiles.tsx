@@ -9,14 +9,13 @@ import { LHC_CTX, HAIR_CTX, type JourneyKey, type JourneyTile, type TileType } f
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import {
   type CitedDriver, displayTileName, forceColor, gradeBarOpacity, gradeTint, type Side,
-  TYPE_STYLES, unescapeBreaks,
+  TYPE_STYLES,
 } from './shared';
 
 /** Renders a Strategist Read: **bold** spans and blank-line paragraph breaks. */
 export const MarkdownBlock: FC<{ text: string }> = ({ text }) => {
-  // Paragraphs are separated by a blank line (unescapeBreaks covers a text
-  // saved with escaped ones).
-  const paragraphs = unescapeBreaks(text).split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+  // Paragraphs are separated by a blank line.
+  const paragraphs = text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
   return (
     <>
       {paragraphs.map((para, i) => (

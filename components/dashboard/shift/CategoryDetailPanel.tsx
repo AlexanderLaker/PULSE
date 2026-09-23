@@ -83,7 +83,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
     [category, drivers, attribution, shiftEnd],
   );
   const exposedDrivers = useMemo(
-    () => drivers.filter((d) => (d.category_exposure[category] ?? 0) > 0).length,
+    () => drivers.filter((d) => d.category_exposure[category] > 0).length,
     [category, drivers],
   );
 

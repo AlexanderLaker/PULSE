@@ -33,6 +33,11 @@ const ANALYSIS = [
   'Figures: model attribution on the estimated HCB gross-profit mix. Read as exposure if nobody acts, not as a forecast.',
 ].join('\n\n');
 
+/** A complete category exposure map: 0 everywhere except the cells given. */
+export function categoryMap(cells: Record<string, number> = {}): Record<string, number> {
+  return { ...Object.fromEntries(CATEGORY_NAMES.map((c) => [c, 0])), ...cells };
+}
+
 export function makeDriver(overrides: Partial<Driver> = {}): Driver {
   const scores: DriverScores = {
     probability: 5,
@@ -59,9 +64,7 @@ export function makeDriver(overrides: Partial<Driver> = {}): Driver {
     baseline: { ...scores },
     scores_edited: false,
     revision: 1,
-    proposal_summary: {
-      count: 0, probability: null, gp1_pct_affected: null, peak_year: null, diffusion_curve: null, uncertainty: null, my: null,
-    },
+    proposal_summary: { count: 0, probability: null, gp1_pct_affected: null, my: null },
     ...overrides,
   };
 }

@@ -22,7 +22,7 @@ export async function recordRoleChange(change: {
   try {
     await getSQL()`
       INSERT INTO audit_log (action, entity_type, entity_id, old_value, new_value, reason, user_id)
-      VALUES ('role_change', 'user', ${change.userId}, ${change.from ?? 'null'}, ${change.to}, ${change.via},
+      VALUES ('role_change', 'user', ${change.userId}, ${change.from}, ${change.to}, ${change.via},
               ${change.actor})
     `;
   } catch (err) {

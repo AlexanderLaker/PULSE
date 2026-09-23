@@ -12,19 +12,18 @@ that drift never goes unnoticed.
 """
 from __future__ import annotations
 
-import json
 from typing import Optional
 
 from prism.config import VC_STEPS
 
 #: Fingerprint fields beyond probability, GP1 share and direction: a driver
-#: moved to another force, its exposures, onset, peak year, curve or uncertainty.
+#: moved to another force, its exposures, value-chain epicentre, onset, peak
+#: year, curve or uncertainty.
 STRUCTURE_KEYS = ("f", "ce", "ve", "re", "s", "pk", "dc", "u")
 
 
-def _exposure_map(m) -> dict:
+def _exposure_map(m: dict) -> dict:
     """JSON-stable, rounded copy of an exposure dict (sorted keys)."""
-    m = m or {}
     return {str(k): round(float(v), 4) for k, v in sorted(m.items())}
 
 
@@ -36,28 +35,27 @@ def driver_fingerprint(drivers) -> dict:
     1-based position in VC_STEPS, s onset year, pk peak year, dc diffusion
     curve, u uncertainty.
     """
-    fp = {}
-    for d in drivers:
-        fp[str(d.id)] = {
-            "p": int(d.probability) if d.probability is not None else None,
-            "g": round(float(d.gp1_pct_affected), 6) if d.gp1_pct_affected is not None else None,
+    return {
+        str(d.id): {
+            "p": int(d.probability),
+            "g": round(float(d.gp1_pct_affected), 6),
             "d": str(d.direction),
             "f": str(d.force),
             "ce": _exposure_map(d.category_exposure),
-            "ve": VC_STEPS.index(d.vc_epicentre) + 1 if d.vc_epicentre in VC_STEPS else None,
+            "ve": VC_STEPS.index(d.vc_epicentre) + 1,
             "re": _exposure_map(d.regional_exposure),
-            "s": int(d.start_year) if d.start_year is not None else None,
-            "pk": int(d.peak_year or 0),
-            "dc": str(d.diffusion_curve or ""),
-            "u": int(d.uncertainty) if d.uncertainty is not None else None,
+            "s": int(d.start_year),
+            "pk": int(d.peak_year),
+            "dc": str(d.diffusion_curve),
+            "u": int(d.uncertainty),
         }
-    return fp
+        for d in drivers
+    }
 
 
 def _differs(a: dict, b: dict) -> bool:
     """Whether two drivers' fingerprints differ in anything that moves the simulation."""
-    return (any(a.get(k) != b.get(k) for k in ("p", "g", "d"))
-            or any(key in a and key in b and a[key] != b[key] for key in STRUCTURE_KEYS))
+    return any(a[k] != b[k] for k in ("p", "g", "d") + STRUCTURE_KEYS)
 
 
 def changed_drivers(current_fp: dict, previous_fp: dict) -> dict:
@@ -74,8 +72,7 @@ def _force_balance(fp: dict) -> dict:
     """Per-force net direction: number of expansion minus contraction drivers."""
     bal: dict = {}
     for rec in fp.values():
-        f = rec.get("f") or "?"
-        bal[f] = bal.get(f, 0) + (1 if rec.get("d") == "Expansion" else -1)
+        bal[rec["f"]] = bal.get(rec["f"], 0) + (1 if rec["d"] == "Expansion" else -1)
     return bal
 
 
@@ -89,8 +86,7 @@ def compute_input_drift_event(
 
     Returns None when there is nothing to compare against (the first run).
     Returns an info event when nothing changed: the absence of drift is worth
-    recording too. A structural key is compared only when both fingerprints
-    carry it: a stored fingerprint without a key has nothing to say about it.
+    recording too.
     """
     if not previous_fp:
         return None
@@ -102,13 +98,13 @@ def compute_input_drift_event(
     prob_changes, gp1_changes, direction_flips, structure_changes = [], [], [], []
     for did in sorted(curr_ids & prev_ids):
         a, b = previous_fp[did], current_fp[did]
-        if a.get("p") != b.get("p"):
+        if a["p"] != b["p"]:
             prob_changes.append(did)
-        if a.get("g") != b.get("g"):
+        if a["g"] != b["g"]:
             gp1_changes.append(did)
-        if a.get("d") != b.get("d"):
+        if a["d"] != b["d"]:
             direction_flips.append(did)
-        if any(key in a and key in b and a[key] != b[key] for key in STRUCTURE_KEYS):
+        if any(a[key] != b[key] for key in STRUCTURE_KEYS):
             structure_changes.append(did)
 
     scores_changed = sorted(set(prob_changes) | set(gp1_changes))
@@ -143,7 +139,8 @@ def compute_input_drift_event(
         }
 
     struct_txt = (f", {len(structure_changes)} structural change(s) "
-                  f"(force, exposures, onset, peak year, curve or uncertainty)" if structure_changes else "")
+                  f"(force, exposures, value-chain epicentre, onset, peak year, curve or uncertainty)"
+                  if structure_changes else "")
     add_rm_txt = f", {len(added)} driver(s) added, {len(removed)} removed" if (added or removed) else ""
     bal_txt = ("; per-force balance change: " + ", ".join(f"{f} {d:+d}" for f, d in balance_delta.items())
                if balance_delta else "")
@@ -167,13 +164,9 @@ def compute_input_drift_event(
 
 
 def previous_fingerprint(latest_run: Optional[dict]) -> tuple:
-    """(fingerprint, run id, run date) of a persisted run, or (None, None, None)."""
+    """(fingerprint, run id, run date) of a persisted run (database.load_latest_run),
+    or (None, None, None) before the first run."""
     if not latest_run:
         return None, None, None
-    results = latest_run.get("results")
-    if isinstance(results, str):
-        results = json.loads(results)
-    meta = (results or {}).get("meta") or {}
-    run_date = latest_run.get("run_date")
-    run_date = str(run_date)[:19] if run_date else None
-    return meta.get("driver_fingerprint"), latest_run.get("id"), run_date
+    fingerprint = latest_run["results"]["meta"]["driver_fingerprint"]
+    return fingerprint, latest_run["id"], str(latest_run["run_date"])[:19]

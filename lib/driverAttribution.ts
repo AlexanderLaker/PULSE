@@ -36,29 +36,19 @@ import { FORCES, REGIONS } from '@/lib/format';
 import { UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import type { ForceName } from '@/types';
 
-/** A driver as the decomposition reads it: every score present, as the engine requires. */
+/** A driver as the decomposition reads it: the scores GET /api/v1/drivers serves. */
 export interface AttributionDriver {
   id: string;
   force: ForceName;
   /** Beta-prior mean x GP1 share x direction sign (the API's normalized_score). */
   normalized_score: number;
+  /** A score 0 to 5 for every category and every region. */
   category_exposure: Record<string, number>;
-  regional_exposure?: Record<string, number>;
+  regional_exposure: Record<string, number>;
   uncertainty: number;
   peak_year: number;
   diffusion_curve: string;
-  /** Null: the base year. */
-  start_year?: number | null;
-}
-
-/** The drivers as the decomposition reads them, or null when one of them misses
- *  a score: the production run refuses such a driver, so there is nothing to
- *  attribute, and the page says so instead of ranking the drivers another way. */
-export function scoredDrivers<
-  D extends { uncertainty: number | null; peak_year: number | null; diffusion_curve: string | null },
->(drivers: D[]): Array<D & AttributionDriver> | null {
-  const complete = drivers.every((d) => d.uncertainty != null && d.peak_year != null && !!d.diffusion_curve);
-  return complete ? (drivers as Array<D & AttributionDriver>) : null;
+  start_year: number;
 }
 
 /** The parameters the decomposition reads, as GET /api/v1/config serves them. */
@@ -116,30 +106,30 @@ function roundHalfEven4(x: number): number {
 /**
  * The port of prism/config.py compute_materialization_schedule: the share of
  * a driver's full effect present in each path year, year -> fraction in [0, 1].
+ * The onset is the later of the base year and the start year; the peak comes
+ * after it.
  */
 export function computeMaterializationSchedule(
-  peakYear: number, diffusionCurve: string, years: number[], baseYear: number, startYear?: number | null,
+  peakYear: number, diffusionCurve: string, years: number[], baseYear: number, startYear: number,
 ): Record<number, number> {
-  const onset = startYear == null ? baseYear : Math.max(baseYear, Math.trunc(startYear));
-  const last = years[years.length - 1];
-  const py = peakYear && peakYear > onset ? peakYear : (last > onset ? last : onset + 1);
+  const onset = Math.max(baseYear, startYear);
+  if (peakYear <= onset) throw new Error(`peak year ${peakYear} does not come after the onset ${onset}`);
   const schedule: Record<number, number> = {};
   for (const year of years) {
-    if (year >= py) { schedule[year] = 1.0; continue; }
+    if (year >= peakYear) { schedule[year] = 1.0; continue; }
     if (year <= onset) { schedule[year] = 0.0; continue; }
-    const span = Math.max(py - onset, 1);
-    const t = Math.max(0.0, Math.min(1.0, (year - onset) / span));
+    const t = (year - onset) / (peakYear - onset);
     let frac: number;
     if (diffusionCurve === 'linear') frac = t;
     else if (diffusionCurve === 'front_loaded') frac = Math.sqrt(t);
     else if (diffusionCurve === 'back_loaded') frac = t * t;
     else if (diffusionCurve === 'step_function') frac = t < 0.8 ? 0.05 : 0.05 + ((t - 0.8) / 0.2) * 0.95;
-    else {
+    else if (diffusionCurve === 's_curve') {
       frac = 1.0 / (1.0 + Math.exp(-12 * (t - 0.5)));
       const f0 = 1.0 / (1.0 + Math.exp(-12 * (0 - 0.5)));
       const f1 = 1.0 / (1.0 + Math.exp(-12 * (1 - 0.5)));
       frac = (frac - f0) / (f1 - f0);
-    }
+    } else throw new Error(`unknown diffusion curve ${diffusionCurve}`);
     schedule[year] = roundHalfEven4(Math.max(0.0, Math.min(1.0, frac)));
   }
   return schedule;
@@ -147,9 +137,7 @@ export function computeMaterializationSchedule(
 
 /** The port of prism/config.py peak_jitter_for: the width the uncertainty score sets, 0 with the jitter off. */
 export function peakJitterFor(uncertainty: number, jitterOn: boolean): number {
-  if (!jitterOn) return 0;
-  const u = Math.max(0, Math.min(5, Math.trunc(uncertainty)));
-  return UNCERTAINTY_PEAK_JITTER[u];
+  return jitterOn ? UNCERTAINTY_PEAK_JITTER[uncertainty] : 0;
 }
 
 /**
@@ -158,33 +146,24 @@ export function peakJitterFor(uncertainty: number, jitterOn: boolean): number {
  * peak clamped at onset + 1 exactly as the engine's peak_schedule_table does.
  */
 export function expectedMaterialization(
-  d: AttributionDriver, years: number[], baseYear: number, jitterOn: boolean,
+  d: Pick<AttributionDriver, 'uncertainty' | 'peak_year' | 'diffusion_curve' | 'start_year'>,
+  years: number[], baseYear: number, jitterOn: boolean,
 ): number[] {
   const jt = peakJitterFor(d.uncertainty, jitterOn);
   const offsets: number[] = [];
   for (let o = -jt; o <= jt; o++) offsets.push(o);
   const weights = offsets.map((o) => (jt <= 0 ? 1 : Math.max(0, jt + 1 - Math.abs(o))));
   const wsum = weights.reduce((a, b) => a + b, 0);
-  const sy = d.start_year == null ? null : Math.trunc(d.start_year);
-  const onset = sy == null ? baseYear : Math.max(baseYear, sy);
+  const onset = Math.max(baseYear, d.start_year);
   const byYear = years.map(() => 0);
   offsets.forEach((off, k) => {
     const w = weights[k] / wsum;
     if (w === 0) return;
     const pk = Math.max(d.peak_year + off, onset + 1);
-    const sched = computeMaterializationSchedule(pk, d.diffusion_curve, years, baseYear, sy);
+    const sched = computeMaterializationSchedule(pk, d.diffusion_curve, years, baseYear, d.start_year);
     years.forEach((yr, i) => { byYear[i] += w * sched[yr]; });
   });
   return byYear;
-}
-
-/** An exposure score as the engine reads it: min(x, 5) / 5, a missing or
- *  non-numeric score as 0 (the engine does not floor a negative score either;
- *  scores are validated to 0..5 before they reach it). */
-function clamp5(v: number | undefined): number {
-  const x = Number(v ?? 0);
-  if (!isFinite(x)) return 0;
-  return Math.min(x, 5) / 5;
 }
 
 /**
@@ -203,16 +182,12 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
   const att = FORCES.map((f) => config.per_force_attenuation[f]);
   const fidx = drivers.map((d) => FORCES.indexOf(d.force));
 
-  // Composite cell exposure; a driver without regional scores counts as
-  // present in every region, as in the engine.
+  // Composite cell exposure: (category exposure / 5) x (regional exposure / 5).
   const E: number[][] = drivers.map((d) => {
-    const reg = d.regional_exposure ?? {};
-    let rv = REGIONS.map((r) => clamp5(reg[r]));
-    if (rv.reduce((a, b) => a + b, 0) <= 0) rv = REGIONS.map(() => 1);
+    const rv = REGIONS.map((r) => d.regional_exposure[r] / 5);
     const row = new Array<number>(nCell).fill(0);
     categories.forEach((cat, c) => {
-      const ce = clamp5(d.category_exposure[cat]);
-      if (ce <= 0) return;
+      const ce = d.category_exposure[cat] / 5;
       for (let r = 0; r < nReg; r++) row[c * nReg + r] = ce * rv[r];
     });
     return row;
@@ -262,13 +237,13 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
     }
   }
 
-  // Roll-up weights: w over all cells (portfolio), wn within each category's row.
+  // Roll-up weights: w over all cells (portfolio), wn within each category's
+  // row; a category without gross profit in any region averages its cells, as
+  // the engine's row_normalized_cell_weights does.
   const W = new Array<number>(nCell).fill(0);
-  categories.forEach((cat, c) => REGIONS.forEach((r, ri) => {
-    W[c * nReg + ri] = Math.max(0, Number(cellWeights[cat]?.[r] ?? 0));
-  }));
+  categories.forEach((cat, c) => REGIONS.forEach((r, ri) => { W[c * nReg + ri] = cellWeights[cat][r]; }));
   const wTotal = W.reduce((a, b) => a + b, 0);
-  const w = wTotal > 0 ? W.map((v) => v / wTotal) : W.map(() => 1 / nCell);
+  const w = W.map((v) => v / wTotal);
   const wn = new Array<number>(nCell).fill(0);
   categories.forEach((_, c) => {
     let rowSum = 0;

@@ -11,6 +11,7 @@ database the tests may create and drop schemas in).
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -24,7 +25,8 @@ from urllib.parse import quote
 
 import pytest
 
-from prism.config import VC_STEPS
+from prism.config import CATEGORIES, VC_STEPS
+from prism.input_drift import driver_fingerprint
 from prism.seed_drivers import DRIVERS
 from support import load_module
 
@@ -175,7 +177,10 @@ DESCRIPTION_EDITS = {
 }
 STORED_DESCRIPTION = {"consumer_r01": PREVIOUS_DESCRIPTION, "consumer_r04": ADMIN_DESCRIPTION}
 FIRST_RUN = {
-    "meta": {"trend_count": 51, "trend_fingerprint": {"consumer_r01": {"p": 5}}, "model_version": "2.12.0"},
+    "meta": {"trend_count": 51, "model_version": "2.12.0", "trend_fingerprint": {
+        "consumer_r01": {"p": 5, "ce": {"Hair: Color": 3, "LHC: HSC (old)": 2},
+                         "re": {"Europe": 5.0, "North America": 0.0, "Asia": 0.0, "High Growth": 0.0}},
+        "retired_r99": {"p": 2, "ce": {"Hair: Care": 1}}}},
     "integrity_events": [
         {"type": "input_drift", "message": "no changes", "detail": {"trend_ids": ["consumer_r01"]}},
         {"type": "vc_epicentre_coverage", "detail": {"unscored_trend_ids": ["technology_r01"]}},
@@ -183,6 +188,30 @@ FIRST_RUN = {
     ],
     "totals": {"portfolio": {"2035": {"median": -0.0558}}},
 }
+
+
+def previous_release_run() -> dict:
+    """A results bundle with every part the previous release's production run
+    stored, over the drivers fill_previous_database stores (consumer_r02 with
+    the admin's probability), fingerprinted as that release did: without the
+    onset years."""
+    drivers = copy.deepcopy(DRIVERS)
+    for d in drivers:
+        if d.id == "consumer_r02":
+            d.probability = 4
+    fingerprint = {driver_id: {k: v for k, v in entry.items() if k != "s"}
+                   for driver_id, entry in driver_fingerprint(drivers).items()}
+    parts = ("shift_matrix", "regional_shift_matrix", "region_weights_used", "cell_weights_used",
+             "category_weights_used", "decompositions", "totals", "vc_decomposition", "mc_standard_error",
+             "seed_stability")
+    return {**{k: {} for k in parts}, "cell_weights_source": "ESTIMATE, not Henkel P&L", "integrity_events": [],
+            "meta": {"engine_fidelity": "scipy", "numerics_backend": "scipy 1.14.1, numpy 2.1.3", "seed": 42,
+                     "chain_seeds": [42, 1000045, 2000048], "chains": 3, "model_version": "2.12.0",
+                     "engine_name": "beta_copula", "vc_attribution_basis": "epicentre",
+                     "region_weights_used": {}, "cell_weights_used": {}, "category_weights_used": {},
+                     "cell_weights_source": "ESTIMATE, not Henkel P&L", "trend_count": 51,
+                     "attenuation_source": "calibrated_v3.12_september2026",
+                     "persisted_at_utc": "2026-09-13T23:04:39+00:00", "trend_fingerprint": fingerprint}}
 
 
 def fill_previous_database(conn, p: str, serial: str, json_type: str = "TEXT", older: bool = False) -> None:
@@ -301,6 +330,21 @@ def query(path: Path, sql: str, params=()) -> list:
         conn.close()
 
 
+#: The tables the migration creates, with the constraints of the current schema.
+CREATED_TABLES = ("drivers", "driver_category_exposure", "driver_regional_exposure", "driver_sources",
+                  "driver_score_proposals", "schema_migrations")
+
+
+def create_statement(path: Path, table: str) -> str:
+    """The CREATE TABLE statement SQLite keeps for a table, whitespace collapsed."""
+    conn = sqlite3.connect(path)
+    try:
+        [(sql,)] = conn.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)).fetchall()
+    finally:
+        conn.close()
+    return " ".join(sql.split())
+
+
 def sqlite_schema(path: Path) -> dict:
     """Per table: columns, indexes and foreign keys, as SQLite reports them."""
     conn = sqlite3.connect(path)
@@ -335,7 +379,7 @@ def expected_driver(d) -> dict:
     """A seed driver as the migrated database must hold it: its baseline in the
     driver schema's form, with the value-chain stage."""
     out = {f: getattr(d, f) for f in DRIVER_FIELDS}
-    out.update(baseline=None if d.id == "technology_r01" else d.scores(), scores_edited=False)
+    out.update(baseline=d.scores(), scores_edited=False)
     if d.id == "consumer_r02":
         out.update(probability=4, scores_edited=True, sources=MIGRATED_EDITOR_SOURCES)
     if d.id == "consumer_r04":
@@ -368,11 +412,14 @@ class TestMigration:
             "consumer_r02": {"saved_in_editor": len(SEED["consumer_r02"].sources) + 1,
                              "table_rows": len(SEED["consumer_r02"].sources)}}
         assert report["orphans_skipped"] == {}
-        assert report["value_chain"] == {"drivers_with_a_stage": 51, "drivers_without_one": [],
-                                         "proposals_with_a_stage": 1}
+        assert report["exposures"] == {"names_outside_the_taxonomy_dropped": {}, "missing_names_set_to_0": {}}
+        # technology_r01 was stored without a baseline, so it takes its current scores
+        assert report["baselines"] == {"from_the_current_scores": ["technology_r01"],
+                                       "fields_from_the_current_scores": {}}
+        assert report["proposals"] == {"with_a_value_chain_stage": 1, "scores_cleared": {}}
         assert report["analysis_updated"] == 51
         assert report["descriptions"] == {"updated": 1, "already_current": 1, "edited_left_alone": ["consumer_r04"]}
-        assert report["runs_with_renamed_keys"] == 1
+        assert report["runs"] == {"with_renamed_keys": 1, "with_the_fingerprint_completed": 1}
 
         monkeypatch.setenv("PRISM_DB_PATH", str(previous))
         import prism.database as dbm
@@ -384,23 +431,72 @@ class TestMigration:
         ben = dbm.load_driver_proposals("consumer_r02")[0]
         assert ben["uncertainty"] == 3 and ben["vc_epicentre"] is None
 
-    def test_a_driver_without_a_value_chain_is_reported(self, migration, previous, capsys, monkeypatch):
+    def test_drivers_that_need_correcting_stop_the_migration(self, migration, previous, capsys):
+        """The driver schema stores only drivers the engine can simulate; while one cannot be, nothing
+        changes and every problem is listed."""
         conn = sqlite3.connect(previous)
         conn.execute("DELETE FROM trend_vc_exposure WHERE trend_id = 'government_r02'")
         conn.execute("UPDATE trend_vc_exposure SET exposure_score = 0 WHERE trend_id = 'consumer_r05'")
+        conn.execute("UPDATE trend_regional_exposure SET exposure_score = 0 WHERE trend_id = 'consumer_r06'")
+        conn.execute("UPDATE trends SET peak_year = 0 WHERE id = 'technology_r01'")
+        conn.execute("UPDATE trends SET confidence = 'Certain', gp1_pct_affected = 0 WHERE id = 'customer_r01'")
+        conn.execute("UPDATE trend_category_exposure SET exposure_score = 7 "
+                     "WHERE trend_id = 'customer_r02' AND category = 'LHC: IC'")
+        conn.commit()
+        conn.close()
+        before = dump(previous)
+        assert migration.main(["--sqlite", str(previous)]) == 1
+        out = capsys.readouterr().out
+        assert "nothing changed" in out and "the dry run again" in out
+        for line in ("government_r02: no value chain is stored", "consumer_r05: no value chain is stored",
+                     "consumer_r06: no regional exposure is stored; the previous engine simulated such a driver "
+                     "as present in every region",
+                     "technology_r01: peak year 0 is not a year after the onset",
+                     "customer_r01: confidence 'Certain' is not one of High, Medium, Low",
+                     "customer_r01: gp1_pct_affected 0.0 is not a share in (0, 1]",
+                     "customer_r02: category_exposure['LHC: IC'] = 7 is not a whole number from 0 to 5"):
+            assert line in out, line
+        assert "value-chain epicentre None" not in out
+        assert dump(previous) == before and not migration.ARCHIVE_DIR.exists()
+
+    def test_exposure_maps_are_put_on_the_taxonomy(self, migration, previous, capsys, monkeypatch):
+        """A name outside the taxonomy goes and a missing name gets 0; the previous engine read both as
+        0, so no number changes."""
+        conn = sqlite3.connect(previous)
+        conn.execute("INSERT INTO trend_category_exposure VALUES ('consumer_r03', 'Hair: Colour', 4)")
+        conn.execute("DELETE FROM trend_regional_exposure WHERE trend_id = 'consumer_r03' AND region = 'Asia'")
         conn.commit()
         conn.close()
         assert migration.main(["--sqlite", str(previous)]) == 0
         report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])
-        assert report["value_chain"]["drivers_with_a_stage"] == 49
-        assert report["value_chain"]["drivers_without_one"] == ["consumer_r05", "government_r02"]
+        assert report["exposures"] == {"names_outside_the_taxonomy_dropped": {"consumer_r03": ["Hair: Colour"]},
+                                       "missing_names_set_to_0": {"consumer_r03": ["Asia"]}}
         monkeypatch.setenv("PRISM_DB_PATH", str(previous))
         import prism.database as dbm
-        from prism.drivers import simulation_problems
-        drivers = {d.id: d for d in dbm.load_drivers()}
-        assert drivers["government_r02"].vc_epicentre is None and drivers["consumer_r05"].vc_epicentre is None
-        assert any("government_r02" in line and "value-chain epicentre None" in line
-                   for line in simulation_problems(drivers.values()))
+        driver = next(d for d in dbm.load_drivers() if d.id == "consumer_r03")
+        assert set(driver.category_exposure) == set(SEED["consumer_r03"].category_exposure)
+        assert driver.regional_exposure == {**SEED["consumer_r03"].regional_exposure, "Asia": 0}
+
+    def test_a_proposal_keeps_what_the_api_accepts(self, migration, previous, capsys, monkeypatch):
+        """A proposal is a draft: a score the API would refuse today is cleared and named, the rest kept."""
+        conn = sqlite3.connect(previous)
+        conn.execute("INSERT INTO trend_score_proposals (trend_id, user_id, user_name, probability, gp1_pct_affected, "
+                     "peak_year, diffusion_curve, uncertainty, category_exposure, regional_exposure, comment) "
+                     "VALUES ('government_r17', 'cy', NULL, 3, 0, 2028, 'exponential', 9, "
+                     "'{\"Hair: Colour\": 3, \"Hair: Care\": 2}', '{\"Mars\": 5}', 'draft')")
+        conn.commit()
+        conn.close()
+        assert migration.main(["--sqlite", str(previous)]) == 0
+        report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])
+        assert report["proposals"]["scores_cleared"] == {"government_r17/cy": [
+            "gp1_pct_affected", "peak_year", "diffusion_curve", "uncertainty",
+            "category_exposure (1 of 2 cells)", "regional_exposure"]}
+        monkeypatch.setenv("PRISM_DB_PATH", str(previous))
+        import prism.database as dbm
+        [cy] = dbm.load_driver_proposals("government_r17")
+        assert (cy["user_name"], cy["probability"], cy["gp1_pct_affected"], cy["peak_year"]) == ("", 3, None, None)
+        assert cy["category_exposure"] == {"Hair: Care": 2} and cy["regional_exposure"] is None
+        assert cy["comment"] == "draft"
 
     def test_the_schema_is_the_schema_of_a_new_database(self, migration, previous, monkeypatch, tmp_path):
         assert migration.main(["--sqlite", str(previous)]) == 0
@@ -412,6 +508,9 @@ class TestMigration:
         assert set(migrated) == set(new) | {"user_roles"}
         for table in new:
             assert migrated[table] == new[table], table
+        # the tables the migration creates carry the same constraints, word for word
+        for table in CREATED_TABLES:
+            assert create_statement(previous, table) == create_statement(fresh, table), table
         # the API's start-up check passes and leaves the schema as it is
         monkeypatch.setenv("PRISM_DB_PATH", str(previous))
         dbm.init_db()
@@ -423,19 +522,49 @@ class TestMigration:
         rows = query(previous, "SELECT * FROM simulation_runs ORDER BY id")
         assert [set(r) for r in rows] == [{"id", "run_date", "iterations", "results"}] * 3
         first = json.loads(rows[0]["results"])
-        assert first["meta"] == {"driver_count": 51, "driver_fingerprint": {"consumer_r01": {"p": 5}},
-                                 "model_version": "2.12.0"}
+        # each driver's fingerprint gains its onset year, which the previous one did not record, and its
+        # exposure maps move onto the taxonomy's names as the driver's own do; a driver no longer in the
+        # database is left as it was
+        assert first["meta"] == {"driver_count": 51, "model_version": "2.12.0", "driver_fingerprint": {
+            "consumer_r01": {"p": 5, "s": 2025, "ce": {c: (3.0 if c == "Hair: Color" else 0.0) for c in CATEGORIES},
+                             "re": {"Asia": 0.0, "Europe": 5.0, "High Growth": 0.0, "North America": 0.0}},
+            "retired_r99": {"p": 2, "ce": {"Hair: Care": 1}}}}
         assert [e["detail"] for e in first["integrity_events"]] == [
             {"driver_ids": ["consumer_r01"]}, {"unscored_driver_ids": ["technology_r01"]}, None]
         assert first["totals"] == FIRST_RUN["totals"]
         assert rows[1]["results"] == "{not json"
         assert json.loads(rows[2]["results"]) == {"meta": {"driver_count": 51}}
 
+    def test_the_served_run_is_served_after_the_migration(self, migration, previous, monkeypatch):
+        """The run production serves stays served, and the production run after the migration finds the
+        drivers unchanged since that run."""
+        conn = sqlite3.connect(previous)
+        conn.execute("INSERT INTO simulation_runs (iterations, results) VALUES (?, ?)",
+                     (150000, json.dumps(previous_release_run())))
+        conn.commit()
+        conn.close()
+        assert migration.main(["--sqlite", str(previous)]) == 0
+
+        monkeypatch.setenv("PRISM_DB_PATH", str(previous))
+        import prism.database as dbm
+        from prism.api.runs import run_status, simulation_payload
+        from prism.input_drift import compute_input_drift_event, previous_fingerprint
+        run, drivers = dbm.load_latest_run(), dbm.load_drivers()
+        assert run_status(run)["has"] is True
+        payload = simulation_payload(run, drivers)
+        assert payload["inputs_since_run"] == {"changed": [], "added": [], "removed": []}
+        assert payload["run_meta"]["driver_count"] == 51
+        stored, run_id, _ = previous_fingerprint(run)
+        event = compute_input_drift_event(driver_fingerprint(drivers), stored, previous_run_id=run_id)
+        assert event["message"] == (f"Input drift vs run #{run_id}: no changes; "
+                                    "the driver inputs are identical to that run's.")
+
     def test_the_journey_content_is_saved_as_a_new_version(self, migration, previous, capsys):
         assert migration.main(["--sqlite", str(previous)]) == 0
         report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])["journey"]
         assert report == {"stored_content": True, "tiles_renamed": 3, "texts_updated": 2, "texts_already_current": 1,
-                          "texts_edited_left_alone": ["t.c.analysis"], "new_version_saved": True}
+                          "texts_edited_left_alone": ["t.c.analysis"], "texts_with_breaks_written_out": 0,
+                          "codes_removed": {}, "new_version_saved": True}
         rows = query(previous, "SELECT content, updated_by FROM journey_content ORDER BY id")
         assert json.loads(rows[0]["content"]) == STORED_JOURNEY
         assert rows[1]["updated_by"] == "migration 0001_driver_schema"
@@ -447,6 +576,25 @@ class TestMigration:
         assert (a["analysis"], b["analysis"], c["analysis"], d["driverNote"]) == (
             "Current read A.", "Current read B.", "Read an admin wrote.", "Current note D.")
         assert "trendCodes" not in json.dumps(content)
+
+    def test_journey_codes_are_drivers_and_breaks_are_written_out(self, migration, previous, capsys):
+        conn = sqlite3.connect(previous)
+        stored = json.loads(json.dumps(STORED_JOURNEY))
+        a = stored["lhc"][0]["benefiting"][0]
+        a["trendCodes"] = ["C-01", "C-99", "T-06"]
+        a["analysis"] = "**One.** First.\\n\\n**Two.** Second."
+        del stored["hair"][0]["negativelyImpacted"][0]["trendCodes"]
+        conn.execute("INSERT INTO journey_content (content, updated_by) VALUES (?, 'admin@example.com')",
+                     (json.dumps(stored),))
+        conn.commit()
+        conn.close()
+        assert migration.main(["--sqlite", str(previous)]) == 0
+        report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])["journey"]
+        assert report["codes_removed"] == {"t.a": ["C-99", "T-06"]} and report["texts_with_breaks_written_out"] == 1
+        content = json.loads(query(previous, "SELECT content FROM journey_content ORDER BY id DESC LIMIT 1")[0]["content"])
+        a = content["lhc"][0]["benefiting"][0]
+        assert a["driverCodes"] == ["C-01"] and a["analysis"] == "**One.** First.\n\n**Two.** Second."
+        assert content["hair"][0]["negativelyImpacted"][0]["driverCodes"] == []
 
     def test_without_stored_journey_content_nothing_is_written(self, migration, previous, capsys):
         conn = sqlite3.connect(previous)
@@ -616,13 +764,25 @@ class TestHelpers:
         for nothing in (None, {}, {"Marketing": 0, "Consumer": 0}, {"Retail": 5}, [5, 3, 1], "Marketing"):
             assert migration.epicentre_of(nothing) is None, nothing
 
-    def test_a_baseline_carries_the_stage_instead_of_the_profile(self, migration):
-        old = {"probability": 4, "vc_exposure": previous_profile("Supply Chain")}
-        assert json.loads(migration.baseline_of(json.dumps(old))) == {"probability": 4, "vc_epicentre": "Supply Chain"}
-        assert json.loads(migration.baseline_of(old)) == {"probability": 4, "vc_epicentre": "Supply Chain"}   # JSONB
-        assert json.loads(migration.baseline_of('{"vc_exposure": {}}')) == {"vc_epicentre": None}
-        for unchanged in (None, "", '{"probability": 4}', "{not json", "[1, 2]"):
-            assert migration.baseline_of(unchanged) == unchanged, unchanged
+    def test_a_baseline_carries_the_stage_and_every_score(self, migration):
+        scores = SEED["consumer_r01"].scores()
+        old = {**previous_scores(SEED["consumer_r01"]), "probability": 4}
+        old["vc_exposure"] = previous_profile("Supply Chain")
+        expected = {**scores, "probability": 4, "vc_epicentre": "Supply Chain"}
+        assert migration.baseline_of(json.dumps(old), scores) == (expected, "suggestion", [])
+        assert migration.baseline_of(old, scores) == (expected, "suggestion", [])   # a JSONB column
+        # a field the suggestion lacks or leaves empty takes the current score
+        partial = {"probability": 4, "uncertainty": None, "vc_exposure": {}}
+        baseline, source, filled = migration.baseline_of(json.dumps(partial), scores)
+        assert source == "suggestion" and baseline == {**scores, "probability": 4}
+        assert filled == ["gp1_pct_affected", "peak_year", "diffusion_curve", "uncertainty", "category_exposure",
+                          "regional_exposure", "vc_epicentre"]
+        # exposure maps go onto the taxonomy's names
+        odd = {**old, "category_exposure": {"Hair: Colour": 3, "Hair: Care": 2}}
+        assert migration.baseline_of(odd, scores)[0]["category_exposure"] == {c: (2 if c == "Hair: Care" else 0)
+                                                                              for c in scores["category_exposure"]}
+        for unreadable in (None, "", "{not json", "[1, 2]"):
+            assert migration.baseline_of(unreadable, scores) == (scores, "scores", []), unreadable
 
     def test_json_columns_arrive_as_text_or_decoded(self, migration):
         assert migration.json_text({"a": 1}) == '{"a": 1}' and migration.json_text('{"a": 1}') == '{"a": 1}'
@@ -827,7 +987,8 @@ def test_postgres(migration, monkeypatch, capsys, json_type):
         assert migration.main(["--postgres"]) == 0
         report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])
         assert report["copied"]["drivers"] == 51 and report["descriptions"]["edited_left_alone"] == ["consumer_r04"]
-        assert report["journey"]["texts_updated"] == 2 and report["runs_with_renamed_keys"] == 1
+        assert report["journey"]["texts_updated"] == 2 and report["runs"]["with_renamed_keys"] == 1
+        assert report["baselines"]["from_the_current_scores"] == ["technology_r01"]
         assert migration.main(["--postgres"]) == 0 and "already on the driver schema" in capsys.readouterr().out
 
         in_prism(schema_url(fresh_schema_name), "import prism.database as d; d.init_db()")

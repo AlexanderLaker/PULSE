@@ -12,7 +12,7 @@ import { HORIZON, NO_VALUE, firstPeakYear, fmtPct } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import type { Driver, DriverProposal } from '@/types';
 import SectionCard from '@/components/dashboard/SectionCard';
-import { baselineOf, proposalOnTaxonomy, REVIEWED_COLOR, vcStageLabel } from './shared';
+import { REVIEWED_COLOR, vcStageLabel } from './shared';
 import {
   DiffusionPicker, DotBar, EditableCategoryGrid, EditableRegionGrid, EpicentreSlider,
   UncertaintyPicker,
@@ -75,7 +75,7 @@ export const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: strin
   const [hydrated, setHydrated] = useState(false);
   if (loaded && !failed && !hydrated) {
     setHydrated(true);
-    setDraft(proposalOnTaxonomy(data?.my ?? {}));
+    setDraft(data?.my ?? {});
   }
   // `draftRef` is the merge base for `patch` and what the unmount flush
   // saves. `patch` keeps it current while the expert types; refs may not be
@@ -122,7 +122,7 @@ export const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: strin
     flush();
   }, [flush, onMyChange, driver.id]);
 
-  const base = baselineOf(driver);
+  const base = driver.baseline;
   const myVcStage = draft.vc_epicentre ?? null;
   const gp1Int = draft.gp1_pct_affected != null ? Math.round(draft.gp1_pct_affected * 100) : undefined;
   const dist = data?.aggregate.diffusion_curve?.distribution;
@@ -168,28 +168,29 @@ export const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: strin
 
           <SectionCard title="Probability" icon={Zap} info={FIELD_HELP.probability} footnote="1 = Very Unlikely · 3 = Possible · 5 = Almost Certain. Hover the dots for the baseline; click the selected dot again to clear your score.">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-              <span title={base != null ? `Baseline ${base.probability} / 5` : undefined} style={{ cursor: base != null ? 'help' : undefined }}>
+              <span title={`Baseline ${base.probability} / 5`} style={{ cursor: 'help' }}>
                 <DotBar value={draft.probability ?? 0} editable onChange={(v) => patch({ probability: v === draft.probability ? null : v })} />
               </span>
-              <BaselineRef value={base != null ? `${base.probability}/5` : null} />
+              <BaselineRef value={`${base.probability}/5`} />
             </div>
           </SectionCard>
 
           <SectionCard title="Impact: GP1 % exposed" icon={BarChart3} info={FIELD_HELP.gp1} footnote="Share of category GP1 this driver can move at full materialisation.">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <input type="range" min={0} max={100} step={1} value={gp1Int ?? 0}
+              <input type="range" min={1} max={100} step={1} value={gp1Int ?? 1}
                 onChange={(e) => patch({ gp1_pct_affected: parseInt(e.target.value, 10) / 100 })}
-                title={base != null ? `Baseline ${fmtPct(base.gp1_pct_affected, 0)}` : undefined} style={{ flex: 1, cursor: base != null ? 'help' : undefined }} />
-              <input type="number" min={0} max={100} step={1} value={gp1Int ?? ''} placeholder={NO_VALUE}
+                title={`Baseline ${fmtPct(base.gp1_pct_affected, 0)}`} style={{ flex: 1, cursor: 'help' }} />
+              <input type="number" min={1} max={100} step={1} value={gp1Int ?? ''} placeholder={NO_VALUE}
                 aria-label="GP1 percent exposed"
                 onChange={(e) => {
+                  // A share of 0 moves nothing, so an empty field or 0 clears the score.
                   const n = parseInt(e.target.value, 10);
-                  patch({ gp1_pct_affected: Number.isNaN(n) ? null : Math.max(0, Math.min(100, n)) / 100 });
+                  patch({ gp1_pct_affected: Number.isNaN(n) || n <= 0 ? null : Math.min(100, n) / 100 });
                 }}
-                title={base != null ? `Baseline ${fmtPct(base.gp1_pct_affected, 0)}` : undefined}
+                title={`Baseline ${fmtPct(base.gp1_pct_affected, 0)}`}
                 style={{ width: 70, padding: '6px 8px', borderRadius: 8, border: `1px solid ${S.cardBorder}`, backgroundColor: S.surfaceLow, color: S.onSurface, fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 15, textAlign: 'right' }} />
               <span style={{ color: S.mutedText, fontSize: 12 }}>%</span>
-              <BaselineRef value={base != null ? fmtPct(base.gp1_pct_affected, 0) : null} />
+              <BaselineRef value={fmtPct(base.gp1_pct_affected, 0)} />
             </div>
           </SectionCard>
 
@@ -199,13 +200,13 @@ export const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: strin
                 <FieldLabel>Peak Year</FieldLabel>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <ProposalYearInput value={draft.peak_year} min={firstPeakYear(driver.start_year)} onChange={(v) => patch({ peak_year: v })}
-                    title={base != null ? `Baseline ${base.peak_year}` : undefined} />
-                  <BaselineRef value={base != null ? String(base.peak_year) : null} />
+                    title={`Baseline ${base.peak_year}`} />
+                  <BaselineRef value={String(base.peak_year)} />
                 </div>
               </div>
               <div>
                 <FieldLabel>Diffusion Curve</FieldLabel>
-                <DiffusionPicker value={draft.diffusion_curve} baseline={base?.diffusion_curve} distribution={dist}
+                <DiffusionPicker value={draft.diffusion_curve} baseline={base.diffusion_curve} distribution={dist}
                   onChange={(c) => patch({ diffusion_curve: c })} onClear={() => patch({ diffusion_curve: null })} />
               </div>
             </div>
@@ -213,9 +214,9 @@ export const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: strin
 
           <SectionCard title="Uncertainty" icon={Zap} info={FIELD_HELP.uncertainty} footnote="0 = fixed · 3 = half or double · 5 = sign open. Sets the band width and the timing jitter of this driver; the mean stays where probability puts it.">
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-              <UncertaintyPicker value={draft.uncertainty} baseline={base?.uncertainty}
+              <UncertaintyPicker value={draft.uncertainty} baseline={base.uncertainty}
                 onChange={(v) => patch({ uncertainty: v })} onClear={() => patch({ uncertainty: null })} />
-              <BaselineRef value={base?.uncertainty != null ? `${base.uncertainty}/5` : null} />
+              <BaselineRef value={`${base.uncertainty}/5`} />
             </div>
           </SectionCard>
 
@@ -231,11 +232,11 @@ export const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: strin
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <SectionCard title="Category Exposure" icon={Layers} info={FIELD_HELP.category} footnote="Grey = unscored. A cell you leave blank is not part of your proposal; click a selected dot again to clear it.">
             <EditableCategoryGrid clearable exposures={draft.category_exposure ?? {}}
-              onChange={(e) => patch({ category_exposure: Object.keys(e).length ? e : null })} baseline={base?.category_exposure} />
+              onChange={(e) => patch({ category_exposure: Object.keys(e).length ? e : null })} baseline={base.category_exposure} />
           </SectionCard>
           <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer} info={FIELD_HELP.regional}>
             <EditableRegionGrid clearable exposures={draft.regional_exposure ?? {}}
-              onChange={(e) => patch({ regional_exposure: Object.keys(e).length ? e : null })} baseline={base?.regional_exposure} />
+              onChange={(e) => patch({ regional_exposure: Object.keys(e).length ? e : null })} baseline={base.regional_exposure} />
           </SectionCard>
           <SectionCard
             title="Value Chain Epicentre" icon={Cpu} accent={S.onTertiaryContainer} info={FIELD_HELP.vc}
@@ -254,7 +255,7 @@ export const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: strin
             }
             footnote="One choice: the stage where this driver’s impact centres. The value-chain attribution assigns the driver’s whole contribution to this stage; leave it unscored and it is not part of your proposal."
           >
-            <EpicentreSlider value={myVcStage} baseline={base?.vc_epicentre} onChange={(st) => patch({ vc_epicentre: st })} />
+            <EpicentreSlider value={myVcStage} baseline={base.vc_epicentre} onChange={(st) => patch({ vc_epicentre: st })} />
           </SectionCard>
 
           <SectionCard title="Comment" icon={MessageSquare} accent={S.primary} footnote="Optional. Shared with the reviewers under Review &amp; Endorse: explain your reasoning, flag a caveat or note evidence.">

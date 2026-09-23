@@ -98,7 +98,6 @@ def decompose(config: ModelConfig, drivers: list) -> dict:
     # The engine's own composite cell exposure and within-force dampening.
     E = exposure_matrix(drivers)
     damp, n_eff_all = eng.within_force_dampening(drivers, E)
-    regionless = [drv.id for drv in drivers if not any((drv.regional_exposure or {}).values())]
 
     # The schedule averaged over each driver's peak-jitter grid.
     sched, offsets, off_probs = eng.peak_schedule_table(drivers)     # (n, n_off, ny)
@@ -140,8 +139,7 @@ def decompose(config: ModelConfig, drivers: list) -> dict:
         "fw": fw, "att": att, "fidx": fidx, "E": E, "damp": damp, "n_eff": n_eff_all,
         "sched": sched, "offsets": offsets, "off_probs": off_probs, "e_mat": e_mat,
         "A_cell": A_cell, "cell_shift": cell_shift, "W": W, "Wn": Wn,
-        "port": port, "cat_pp": cat_pp, "reg_pp": reg_pp, "regionless": regionless,
-        "s_mean": s_mean,
+        "port": port, "cat_pp": cat_pp, "reg_pp": reg_pp, "s_mean": s_mean,
     }
 
 
@@ -231,13 +229,9 @@ def reference_run(config: ModelConfig, drivers: list, chains: int, iterations: i
     db = DriverSet(drivers=list(drivers))
     eng = MonteCarloEngine(config, seed=PRODUCTION_SEED)
     res = eng.run_multichain(db, n_chains=chains, iterations=iterations)
-    tot = res["totals"]["portfolio"]
-    term = tot.get(TERMINAL_YEAR) or tot.get(str(TERMINAL_YEAR))
-    cats = {}
-    for cat, block in res["shift_matrix"].items():
-        p = block["path"]
-        cell = p.get(TERMINAL_YEAR) or p.get(str(TERMINAL_YEAR))
-        cats[cat] = {k: round(float(cell[k]), 6) for k in ("p10", "median", "p90")}
+    term = res["totals"]["portfolio"][TERMINAL_YEAR]
+    cats = {cat: {k: round(float(block["path"][TERMINAL_YEAR][k]), 6) for k in ("p10", "median", "p90")}
+            for cat, block in res["shift_matrix"].items()}
     return {
         "seed": PRODUCTION_SEED, "chains": chains, "iterations": iterations,
         "pooled_iterations": chains * iterations,
@@ -415,7 +409,6 @@ def build_record(config: ModelConfig, drivers: list, reference: dict, persisted:
             "force_weights": {f: r4(config.force_weights[f]) for f in forces},
             "per_force_attenuation": {f: r4(config.per_force_attenuation[f]) for f in forces},
             "within_force_overlap": {f: r4(config.within_force_overlap[f]) for f in forces},
-            "regionless_drivers": dec["regionless"],
         },
         "reference_run": reference,
         # the production run the reference reproduces (from its QA workbook,
@@ -462,7 +455,7 @@ def build_fixture(config: ModelConfig, drivers: list, dec: dict) -> dict:
             "id": drv.id, "force": drv.force,
             "normalized_score": float(drv.normalized_score),
             "category_exposure": {k: int(v) for k, v in drv.category_exposure.items()},
-            "regional_exposure": {k: int(v) for k, v in (drv.regional_exposure or {}).items()},
+            "regional_exposure": {k: int(v) for k, v in drv.regional_exposure.items()},
             "uncertainty": drv.uncertainty, "peak_year": drv.peak_year,
             "diffusion_curve": drv.diffusion_curve, "start_year": drv.start_year,
         } for drv in drivers],
@@ -470,7 +463,7 @@ def build_fixture(config: ModelConfig, drivers: list, dec: dict) -> dict:
         "config": {
             "force_weights": {f: float(config.force_weights[f]) for f in FORCES},
             "per_force_attenuation": {f: float(config.per_force_attenuation[f]) for f in FORCES},
-            "within_force_overlap": {f: float(config.within_force_overlap.get(f, 0.0)) for f in FORCES},
+            "within_force_overlap": {f: float(config.within_force_overlap[f]) for f in FORCES},
             "base_year": int(config.base_year), "path_years": list(years),
             "peak_year_jitter": bool(config.peak_year_jitter),
         },

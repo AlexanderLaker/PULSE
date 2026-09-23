@@ -12,11 +12,9 @@ import { ApiError } from '@/lib/apiClient';
 import { CATEGORIES, HORIZON, NO_VALUE, REGIONS, firstPeakYear, fmtPct, shortCat } from '@/lib/format';
 import { S, EXPANSION_RGB, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { VC_STEPS, VC_SHORT_LABELS, shortStage } from '@/lib/valueChain';
-import type { Driver, DriverUpdate, ExposureMap, ProposalAgg } from '@/types';
+import type { Driver, DriverUpdate, ExposureMap, MeanAggregate } from '@/types';
 import SectionCard from '@/components/dashboard/SectionCard';
-import {
-  baselineOf, curveLabel, DIFFUSION_LABELS, EXPERT_COLOR, REVIEWED_COLOR, uncLabel, vcPos,
-} from './shared';
+import { curveLabel, DIFFUSION_LABELS, EXPERT_COLOR, REVIEWED_COLOR, uncLabel, vcPos } from './shared';
 import { BaselineMark, ColorDots, DeltaChip, DiffusionGlyph, EditableDots, ReadDots } from './scales';
 import { FIELD_HELP, FieldLabel, ProposalsUnavailable, Val } from './cards';
 import { useDriverProposals } from './useDriverProposals';
@@ -50,10 +48,10 @@ const CompareStack: FC<{ baseline: React.ReactNode; expert: React.ReactNode; who
 // ── One exposure cell: its label, the baseline dots (ink) over the expert
 //    mean (green), and the manual override ──
 /** An exposure cell of the Review panel: its key and label, the baseline
- *  score and the experts' aggregate. */
-interface ExposureRow { key: string; label: string; baseV?: number; curV: number; expert?: ProposalAgg }
+ *  score, the current score and the experts' aggregate. */
+interface ExposureRow { key: string; label: string; baseV: number; curV: number; expert?: MeanAggregate }
 
-const ExposureCompareCell: FC<{ label: string; baseVal?: number; expert?: ProposalAgg; manualVal?: number; onManual: (v: number) => void }> = ({ label, baseVal, expert, manualVal, onManual }) => (
+const ExposureCompareCell: FC<{ label: string; baseVal: number; expert?: MeanAggregate; manualVal?: number; onManual: (v: number) => void }> = ({ label, baseVal, expert, manualVal, onManual }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 7, padding: '9px 11px', border: `1px solid ${S.cardBorder}`, borderRadius: 9, backgroundColor: S.surface }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
       <span style={{ fontSize: 11.5, fontWeight: 700, color: S.onSurface }}>{label}</span>
@@ -93,16 +91,17 @@ const manInput: React.CSSProperties = {
 const Decide: FC<{
   cur: EndorseSource;
   onPick: (s: EndorseSource) => void;
-  baselineOk: boolean; expertOk: boolean;
+  /** Whether an expert scored the field; without one "Expert ø" is off. */
+  expertOk: boolean;
   manual?: React.ReactNode;
   result?: React.ReactNode;
-}> = ({ cur, onPick, baselineOk, expertOk, manual, result }) => (
+}> = ({ cur, onPick, expertOk, manual, result }) => (
   <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${S.surfaceLow}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
     <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: S.mutedText }}>Endorse</span>
     <div style={{ display: 'inline-flex', border: `1px solid ${S.cardBorder}`, borderRadius: 999, overflow: 'hidden' }}>
       {ENDORSE_OPTIONS.map(([k, lab], i) => {
         const on = cur === k;
-        const disabled = (k === 'baseline' && !baselineOk) || (k === 'expert' && !expertOk);
+        const disabled = k === 'expert' && !expertOk;
         const bg = on
           ? (k === 'current' ? S.onSurfaceVariant : k === 'baseline' ? S.onSurface : k === 'expert' ? REVIEWED_COLOR : S.primary)
           : S.surface;
@@ -126,14 +125,14 @@ const Decide: FC<{
 // counted and never averaged (a Supply Chain vote and two Commercial votes
 // must not blend into Marketing). The admin keeps the current stage, endorses
 // the majority or the baseline stage, or clicks any stage on the rail; a tie
-// leaves no majority and stays visible.
+// leaves no majority (the API's aggregate) and stays visible.
 const EpicentreVotePanel: FC<{
-  baseline: string | null;
+  baseline: string;
   /** The driver's stage now. */
-  current: string | null;
+  current: string;
   votes: Array<{ name: string; stage: string }>;
   majority: { stage: string; n: number } | null;
-  endorsed: string | null;
+  endorsed: string;
   onEndorse: (stage: string) => void;
 }> = ({ baseline, current, votes, majority, endorsed, onEndorse }) => {
   const byStage = new Map<string, Array<{ name: string }>>();
@@ -142,10 +141,9 @@ const EpicentreVotePanel: FC<{
     l.push(v);
     byStage.set(v.stage, l);
   }
-  const srcText = endorsed == null ? null
-    : endorsed === current ? 'kept as it is'
+  const srcText = endorsed === current ? 'kept as it is'
     : majority != null && endorsed === majority.stage ? `Expert majority (${majority.n} of ${votes.length})`
-    : baseline != null && endorsed === baseline ? 'Baseline'
+    : endorsed === baseline ? 'Baseline'
     : 'Manual pick';
   const pillStyle = (on: boolean, disabled = false): React.CSSProperties => ({
     border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
@@ -193,12 +191,8 @@ const EpicentreVotePanel: FC<{
             </React.Fragment>
           );
         })}
-        {baseline != null && (
-          <span title={`Baseline · ${baseline}`} style={{ position: 'absolute', top: 64, left: vcPos(baseline), width: 9, height: 9, backgroundColor: S.bg, border: `2px solid ${S.onSurface}`, transform: 'translateX(-50%) rotate(45deg)', cursor: 'help' }} />
-        )}
-        {endorsed != null && (
-          <span title={`Endorsed · ${endorsed}`} style={{ position: 'absolute', top: 47, left: vcPos(endorsed), width: 20, height: 20, borderRadius: 999, backgroundColor: REVIEWED_COLOR, border: `3px solid ${S.surface}`, outline: `1px solid rgba(${EXPANSION_RGB}, 0.45)`, transform: 'translateX(-50%)', pointerEvents: 'none' }} />
-        )}
+        <span title={`Baseline · ${baseline}`} style={{ position: 'absolute', top: 64, left: vcPos(baseline), width: 9, height: 9, backgroundColor: S.bg, border: `2px solid ${S.onSurface}`, transform: 'translateX(-50%) rotate(45deg)', cursor: 'help' }} />
+        <span title={`Endorsed · ${endorsed}`} style={{ position: 'absolute', top: 47, left: vcPos(endorsed), width: 20, height: 20, borderRadius: 999, backgroundColor: REVIEWED_COLOR, border: `3px solid ${S.surface}`, outline: `1px solid rgba(${EXPANSION_RGB}, 0.45)`, transform: 'translateX(-50%)', pointerEvents: 'none' }} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', marginTop: 2 }}>
         {VC_STEPS.map((step, i) => (
@@ -226,20 +220,16 @@ const EpicentreVotePanel: FC<{
         <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: S.mutedText }}>Endorse</span>
         <div style={{ display: 'inline-flex', border: `1px solid ${S.cardBorder}`, borderRadius: 999, overflow: 'hidden' }}>
           <button
-            type="button" disabled={current == null}
-            onClick={() => { if (current != null) onEndorse(current); }}
-            aria-pressed={current != null && endorsed === current}
-            style={{ ...pillStyle(current != null && endorsed === current, current == null), borderRight: `1px solid ${S.cardBorder}` }}
+            type="button" onClick={() => onEndorse(current)} aria-pressed={endorsed === current}
+            style={{ ...pillStyle(endorsed === current), borderRight: `1px solid ${S.cardBorder}` }}
           >
-            {current != null ? `Keep · ${current}` : `Keep ${NO_VALUE}`}
+            Keep · {current}
           </button>
           <button
-            type="button" disabled={baseline == null}
-            onClick={() => { if (baseline != null) onEndorse(baseline); }}
-            aria-pressed={baseline != null && endorsed === baseline}
-            style={{ ...pillStyle(baseline != null && endorsed === baseline, baseline == null), borderRight: `1px solid ${S.cardBorder}` }}
+            type="button" onClick={() => onEndorse(baseline)} aria-pressed={endorsed === baseline}
+            style={{ ...pillStyle(endorsed === baseline), borderRight: `1px solid ${S.cardBorder}` }}
           >
-            {baseline != null ? `Baseline · ${baseline}` : `Baseline ${NO_VALUE}`}
+            Baseline · {baseline}
           </button>
           <button
             type="button" disabled={majority == null}
@@ -253,11 +243,9 @@ const EpicentreVotePanel: FC<{
           </button>
         </div>
         <span style={{ fontSize: 11.5, color: S.mutedText }}>or click a stage on the rail</span>
-        {endorsed != null && srcText && (
-          <span style={{ marginLeft: 'auto', fontSize: 11.5, fontWeight: 800, fontFamily: HEADLINE_FONT, color: S.onSurface }}>
-            → <span style={{ color: REVIEWED_COLOR }}>{endorsed}</span> · {srcText}
-          </span>
-        )}
+        <span style={{ marginLeft: 'auto', fontSize: 11.5, fontWeight: 800, fontFamily: HEADLINE_FONT, color: S.onSurface }}>
+          → <span style={{ color: REVIEWED_COLOR }}>{endorsed}</span> · {srcText}
+        </span>
       </div>
     </div>
   );
@@ -285,31 +273,24 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
   // Every expert's comment from the Expert Rating panel; blank ones are skipped.
   const comments = scorers.filter((s) => (s.comment ?? '').trim().length > 0);
 
-  // The baseline (see baselineOf) and the expert aggregate.
-  const base = baselineOf(driver);
-  const bP = base?.probability, bG = base?.gp1_pct_affected, bPk = base?.peak_year, bCv = base?.diffusion_curve;
-  const bU = base?.uncertainty;
-  const baseCat = base?.category_exposure;
-  const baseReg = base?.regional_exposure;
-  const baseVcStage = base?.vc_epicentre ?? null;
-  const eP = agg?.probability?.avg, eG = agg?.gp1_pct_affected?.avg, ePk = agg?.peak_year?.median, eCv = agg?.diffusion_curve?.mode;
+  // The baseline and the expert aggregate. A categorical field's majority is
+  // the API's: the value with more votes than any other, none on a tie.
+  const base = driver.baseline;
+  const bP = base.probability, bG = base.gp1_pct_affected, bPk = base.peak_year, bCv = base.diffusion_curve;
+  const bU = base.uncertainty;
+  const baseCat = base.category_exposure;
+  const baseReg = base.regional_exposure;
+  const baseVcStage = base.vc_epicentre;
+  const eP = agg?.probability?.avg, eG = agg?.gp1_pct_affected?.avg, ePk = agg?.peak_year?.median;
+  const eCv = agg?.diffusion_curve?.mode ?? undefined;
   const eU = agg?.uncertainty?.median;
   // One value-chain vote per expert who picked a stage.
   const vcVotes = useMemo(
     () => scorers.flatMap((s) => (s.vc_epicentre != null ? [{ name: s.name, stage: s.vc_epicentre }] : [])),
     [scorers],
   );
-  const vcMajority = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const v of vcVotes) counts.set(v.stage, (counts.get(v.stage) ?? 0) + 1);
-    let best: { stage: string; n: number } | null = null;
-    let tied = false;
-    for (const [stage, n] of counts) {
-      if (best == null || n > best.n) { best = { stage, n }; tied = false; }
-      else if (n === best.n) tied = true;
-    }
-    return tied ? null : best;
-  }, [vcVotes]);
+  const vcAgg = agg?.vc_epicentre;
+  const vcMajority = vcAgg?.mode ? { stage: vcAgg.mode, n: vcAgg.distribution[vcAgg.mode] } : null;
   // The stage the driver has now; endorsing it writes nothing.
   const currentVcStage = driver.vc_epicentre;
   const endorsedVcStage = endorsedVc ?? vcMajority?.stage ?? currentVcStage;
@@ -325,7 +306,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
   const expertMap = (cells: ExposureRow[]): ExposureMap | undefined => {
     const out: ExposureMap = {};
     for (const c of cells) {
-      if (c.expert?.avg != null) out[c.key] = Math.round(c.expert.avg);
+      if (c.expert) out[c.key] = Math.round(c.expert.avg);
     }
     return Object.keys(out).length ? out : undefined;
   };
@@ -351,8 +332,8 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
       setMan({
         probability: numStr(eP != null ? Math.round(eP) : driver.probability),
         gp1: numStr(Math.round((eG ?? driver.gp1_pct_affected) * 100)),
-        peak: numStr(ePk != null ? Math.round(ePk) : driver.peak_year || undefined),
-        curve: eCv || driver.diffusion_curve || '',
+        peak: numStr(ePk != null ? Math.round(ePk) : driver.peak_year),
+        curve: eCv ?? driver.diffusion_curve,
         uncertainty: numStr(eU != null ? Math.round(eU) : driver.uncertainty),
       });
     }
@@ -377,14 +358,14 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
   };
   const catCells = CATEGORIES.map((c) => ({
     key: c.name, label: shortCat(c.name), group: c.group,
-    baseV: baseCat == null ? undefined : (baseCat[c.name] ?? 0),
-    curV: driver.category_exposure[c.name] ?? 0,
+    baseV: baseCat[c.name],
+    curV: driver.category_exposure[c.name],
     expert: agg?.category_exposure[c.name],
   }));
   const regCells = REGIONS.map((r) => ({
     key: r, label: r,
-    baseV: baseReg == null ? undefined : (baseReg[r] ?? 0),
-    curV: driver.regional_exposure[r] ?? 0,
+    baseV: baseReg[r],
+    curV: driver.regional_exposure[r],
     expert: agg?.regional_exposure[r],
   }));
   const buildManualMap = (kind: string, cells: ExposureRow[]): ExposureMap | undefined => {
@@ -462,11 +443,11 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
     if (resolved.uncertainty != null) u.uncertainty = resolved.uncertainty;
     const sc = srcOf('category', hasCatE);
     if (sc === 'manual') { const m = buildManualMap('category', catCells); if (m) u.category_exposure = m; }
-    else if (sc === 'baseline') { if (baseCat) u.category_exposure = baseCat; }
+    else if (sc === 'baseline') u.category_exposure = baseCat;
     else if (sc === 'expert') { const c = expertMap(catCells); if (c) u.category_exposure = c; }
     const sr = srcOf('region', hasRegE);
     if (sr === 'manual') { const m = buildManualMap('region', regCells); if (m) u.regional_exposure = m; }
-    else if (sr === 'baseline') { if (baseReg) u.regional_exposure = baseReg; }
+    else if (sr === 'baseline') u.regional_exposure = baseReg;
     else if (sr === 'expert') { const r = expertMap(regCells); if (r) u.regional_exposure = r; }
     if (endorsedVcStage != null && endorsedVcStage !== currentVcStage) u.vc_epicentre = endorsedVcStage;
     try { await updateDriver(driver.id, u); setDone(true); }
@@ -525,9 +506,9 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
 
               <SectionCard title="Probability" icon={Zap} footnote="1 = Very Unlikely · 3 = Possible · 5 = Almost Certain.">
                 <CompareStack who={whoFor('probability')}
-                  baseline={<><ColorDots value={bP ?? 0} color={S.onSurface} /><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, color: S.onSurfaceVariant }}>{bP ?? NO_VALUE}</span></>}
-                  expert={<><ColorDots value={eP != null ? Math.round(eP) : 0} color={REVIEWED_COLOR} /><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, color: REVIEWED_COLOR }}>{eP != null ? eP.toFixed(1) : NO_VALUE}</span>{eP != null && bP != null ? <DeltaChip value={eP - bP} /> : null}</>} />
-                <Decide cur={srcOf('probability', eP != null)} onPick={(s) => setS('probability', s)} baselineOk={bP != null} expertOk={eP != null}
+                  baseline={<><ColorDots value={bP} color={S.onSurface} /><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, color: S.onSurfaceVariant }}>{bP}</span></>}
+                  expert={<><ColorDots value={eP != null ? Math.round(eP) : 0} color={REVIEWED_COLOR} /><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, color: REVIEWED_COLOR }}>{eP != null ? eP.toFixed(1) : NO_VALUE}</span>{eP != null ? <DeltaChip value={eP - bP} /> : null}</>} />
+                <Decide cur={srcOf('probability', eP != null)} onPick={(s) => setS('probability', s)} expertOk={eP != null}
                   manual={<input type="number" min={1} max={5} value={man.probability ?? ''} onChange={(e) => setM('probability', e.target.value)} placeholder="1–5" style={manInput} />}
                   result={resultOf('probability', eP != null, resolved.probability ?? NO_VALUE, driver.probability)} />
               </SectionCard>
@@ -535,8 +516,8 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
               <SectionCard title="Impact: GP1 % exposed" icon={BarChart3} footnote="Share of category GP1 this driver can move at full materialisation.">
                 <CompareStack who={whoFor('gp1_pct_affected')}
                   baseline={<MiniBar v={bG} color={S.onSurface} />}
-                  expert={<><MiniBar v={eG} color={REVIEWED_COLOR} />{eG != null && bG != null ? <DeltaChip value={(eG - bG) * 100} unit="pp" digits={0} /> : null}</>} />
-                <Decide cur={srcOf('gp1', eG != null)} onPick={(s) => setS('gp1', s)} baselineOk={bG != null} expertOk={eG != null}
+                  expert={<><MiniBar v={eG} color={REVIEWED_COLOR} />{eG != null ? <DeltaChip value={(eG - bG) * 100} unit="pp" digits={0} /> : null}</>} />
+                <Decide cur={srcOf('gp1', eG != null)} onPick={(s) => setS('gp1', s)} expertOk={eG != null}
                   manual={<span className="inline-flex items-center gap-1"><input type="number" min={1} max={100} value={man.gp1 ?? ''} onChange={(e) => setM('gp1', e.target.value)} placeholder="%" style={manInput} /><span style={{ fontSize: 12, color: S.mutedText }}>%</span></span>}
                   result={resultOf('gp1', eG != null, fmtPct(resolved.gp1, 0), fmtPct(driver.gp1_pct_affected, 0))} />
               </SectionCard>
@@ -546,33 +527,33 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
                   <div>
                     <FieldLabel>Peak Year</FieldLabel>
                     <CompareStack who={whoFor('peak_year')}
-                      baseline={<Val>{bPk ?? NO_VALUE}</Val>}
-                      expert={<><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{ePk != null ? Math.round(ePk) : NO_VALUE}</span>{ePk != null && bPk != null ? <DeltaChip value={ePk - bPk} unit="y" digits={0} /> : null}</>} />
-                    <Decide cur={srcOf('peak', ePk != null)} onPick={(s) => setS('peak', s)} baselineOk={bPk != null} expertOk={ePk != null}
+                      baseline={<Val>{bPk}</Val>}
+                      expert={<><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{ePk != null ? Math.round(ePk) : NO_VALUE}</span>{ePk != null ? <DeltaChip value={ePk - bPk} unit="y" digits={0} /> : null}</>} />
+                    <Decide cur={srcOf('peak', ePk != null)} onPick={(s) => setS('peak', s)} expertOk={ePk != null}
                       manual={<input type="number" min={firstPeak} max={HORIZON} value={man.peak ?? ''} onChange={(e) => setM('peak', e.target.value)} placeholder="year" style={{ ...manInput, width: 80 }} />}
-                      result={resultOf('peak', ePk != null, resolved.peak ?? NO_VALUE, driver.peak_year || NO_VALUE)} />
+                      result={resultOf('peak', ePk != null, resolved.peak ?? NO_VALUE, driver.peak_year)} />
                   </div>
                   <div>
                     <FieldLabel>Diffusion Curve</FieldLabel>
                     <CompareStack who={whoFor('diffusion_curve')}
-                      baseline={<span className="inline-flex items-center gap-2">{bCv ? <DiffusionGlyph curve={bCv} color={S.onSurface} /> : null}<Val>{bCv ? curveLabel(bCv) : NO_VALUE}</Val></span>}
+                      baseline={<span className="inline-flex items-center gap-2"><DiffusionGlyph curve={bCv} color={S.onSurface} /><Val>{curveLabel(bCv)}</Val></span>}
                       expert={<span className="inline-flex items-center gap-2">{eCv ? <DiffusionGlyph curve={eCv} color={REVIEWED_COLOR} /> : null}<span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{eCv ? curveLabel(eCv) : NO_VALUE}</span>{eCv ? <DeltaChip value={eCv === bCv ? 0 : 1} digits={0} /> : null}</span>} />
-                    <Decide cur={srcOf('curve', !!eCv)} onPick={(s) => setS('curve', s)} baselineOk={!!bCv} expertOk={!!eCv}
+                    <Decide cur={srcOf('curve', !!eCv)} onPick={(s) => setS('curve', s)} expertOk={!!eCv}
                       manual={<select value={man.curve ?? ''} onChange={(e) => setM('curve', e.target.value)} style={{ ...manInput, width: 'auto' }}><option value="">{NO_VALUE}</option>{Object.entries(DIFFUSION_LABELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>}
                       result={resultOf('curve', !!eCv, resolved.curve ? curveLabel(resolved.curve) : NO_VALUE,
-                        driver.diffusion_curve ? curveLabel(driver.diffusion_curve) : NO_VALUE)} />
+                        curveLabel(driver.diffusion_curve))} />
                   </div>
                 </div>
               </SectionCard>
 
               <SectionCard title="Uncertainty" icon={Zap} footnote="0 = fixed · 3 = half or double · 5 = sign open. The expert scores are summarised by their median.">
                 <CompareStack who={whoFor('uncertainty')}
-                  baseline={<Val>{bU != null ? uncLabel(bU) : NO_VALUE}</Val>}
-                  expert={<><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{eU != null ? uncLabel(Math.round(eU)) : NO_VALUE}</span>{eU != null && bU != null ? <DeltaChip value={Math.round(eU) - bU} digits={0} /> : null}</>} />
-                <Decide cur={srcOf('uncertainty', eU != null)} onPick={(s) => setS('uncertainty', s)} baselineOk={bU != null} expertOk={eU != null}
+                  baseline={<Val>{uncLabel(bU)}</Val>}
+                  expert={<><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{eU != null ? uncLabel(Math.round(eU)) : NO_VALUE}</span>{eU != null ? <DeltaChip value={Math.round(eU) - bU} digits={0} /> : null}</>} />
+                <Decide cur={srcOf('uncertainty', eU != null)} onPick={(s) => setS('uncertainty', s)} expertOk={eU != null}
                   manual={<input type="number" min={0} max={5} value={man.uncertainty ?? ''} onChange={(e) => setM('uncertainty', e.target.value)} placeholder="0–5" style={manInput} />}
                   result={resultOf('uncertainty', eU != null, resolved.uncertainty != null ? uncLabel(resolved.uncertainty) : NO_VALUE,
-                    driver.uncertainty != null ? uncLabel(driver.uncertainty) : NO_VALUE)} />
+                    uncLabel(driver.uncertainty))} />
               </SectionCard>
             </div>
 
@@ -587,21 +568,21 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(174px, 1fr))', gap: 10 }}>
                   {catCells.filter((c) => c.group === 'LHC').map((c) => exposureCell('category', c))}
                 </div>
-                <Decide cur={srcOf('category', hasCatE)} onPick={(s) => setS('category', s)} baselineOk={!!baseCat} expertOk={hasCatE}
+                <Decide cur={srcOf('category', hasCatE)} onPick={(s) => setS('category', s)} expertOk={hasCatE}
                   result={EXPOSURE_RESULT[srcOf('category', hasCatE)]} />
               </SectionCard>
               <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(174px, 1fr))', gap: 10 }}>
                   {regCells.map((c) => exposureCell('region', c))}
                 </div>
-                <Decide cur={srcOf('region', hasRegE)} onPick={(s) => setS('region', s)} baselineOk={!!baseReg} expertOk={hasRegE}
+                <Decide cur={srcOf('region', hasRegE)} onPick={(s) => setS('region', s)} expertOk={hasRegE}
                   result={EXPOSURE_RESULT[srcOf('region', hasRegE)]} />
               </SectionCard>
               <SectionCard
                 title="Value Chain Epicentre" icon={Cpu} accent={S.onTertiaryContainer} info={FIELD_HELP.vc}
                 right={
                   <span title="Stages are categories: votes are counted, never averaged" style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, backgroundColor: S.amberContainer, color: S.onAmberContainer, whiteSpace: 'nowrap', cursor: 'help' }}>
-                    {baseVcStage != null ? `Baseline ${shortStage(baseVcStage)}` : `Baseline ${NO_VALUE}`}
+                    Baseline {shortStage(baseVcStage)}
                     {vcMajority != null ? ` · Majority ${shortStage(vcMajority.stage)} ×${vcMajority.n}` : vcVotes.length > 0 ? ' · no majority' : ' · no votes'}
                   </span>
                 }

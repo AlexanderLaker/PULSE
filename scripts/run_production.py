@@ -31,9 +31,11 @@ Exit codes
     3  the simulation ran but persisting it failed; the dashboard keeps the previous run
     4  the correlation matrix is not positive definite on this driver mix (--allow-nonpsd overrides)
     5  the --cell-weights file is missing or invalid
-    6  a driver cannot be simulated (an unknown force, direction or diffusion
-       curve, a missing GP1 share, a score outside its scale, an exposure on a
-       name outside the taxonomy, a duplicate id); every problem is listed
+    6  a driver cannot be simulated (prism.drivers.simulation_problems: a score
+       missing or off its scale, a peak year not after the onset, an exposure
+       map without a score for every category and region); every problem is
+       listed. PRISM stores no such driver, so this points at a change made to
+       the database outside PRISM
 """
 from __future__ import annotations
 
@@ -176,9 +178,8 @@ def main(argv: list[str] | None = None) -> int:
         log.error("These drivers cannot be simulated:")
         for line in problems:
             log.error("  %s", line)
-        log.error("Scores, directions, curves and exposures can be corrected on the Drivers page (saving a driver "
-                  "drops exposures on names outside the taxonomy); an unknown force or a duplicate id needs a fix "
-                  "in the database.")
+        log.error("Scores, timing and exposures can be corrected on the Drivers page; a start year or a force "
+                  "needs a fix in the database.")
         return 6
     from prism.seed_drivers import DRIVERS as SEED
     if len(drivers) != len(SEED):

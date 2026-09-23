@@ -1,13 +1,16 @@
 """Input-drift telemetry: every run compares the driver scores with the previous run's."""
-from prism.config import VC_STEPS
+from prism.config import CATEGORIES, REGIONS, VC_STEPS
 from prism.drivers import Driver
 from prism.input_drift import compute_input_drift_event, driver_fingerprint, previous_fingerprint
 
 
 def _driver(id_, probability=3, gp1=0.1, direction="Expansion", force="Consumer", vc_epicentre=VC_STEPS[5], **kw):
+    scores = dict(start_year=2025, uncertainty=2)
+    scores.update(kw)
     return Driver(id=id_, force=force, probability=probability, gp1_pct_affected=gp1, direction=direction,
-                  category_exposure={"Hair: Care": 3}, regional_exposure={"Europe": 5},
-                  vc_epicentre=vc_epicentre, peak_year=2030, diffusion_curve="s_curve", **kw)
+                  category_exposure={c: 3 if c == "Hair: Care" else 0 for c in CATEGORIES},
+                  regional_exposure={r: 5 if r == "Europe" else 0 for r in REGIONS},
+                  vc_epicentre=vc_epicentre, peak_year=2030, diffusion_curve="s_curve", **scores)
 
 
 def _fp(*drivers):
@@ -49,7 +52,7 @@ def test_structural_changes_are_counted_separately():
 def test_the_onset_year_is_structural():
     event = compute_input_drift_event(_fp(_driver("a", start_year=2029)), _fp(_driver("a", start_year=2027)))
     assert event["detail"]["structure_changes"] == ["a"]
-    assert "(force, exposures, onset, peak year, curve or uncertainty)" in event["message"]
+    assert "(force, exposures, value-chain epicentre, onset, peak year, curve or uncertainty)" in event["message"]
 
 
 def test_a_move_to_another_force_is_structural():
@@ -58,19 +61,14 @@ def test_a_move_to_another_force_is_structural():
     assert event["detail"]["per_force_balance_delta"]
 
 
-def test_a_key_the_previous_fingerprint_lacks_is_not_drift():
-    """Two fingerprints are compared on the structural keys both carry."""
-    previous = _fp(_driver("a"))
-    del previous["a"]["s"]
-    event = compute_input_drift_event(_fp(_driver("a")), previous)
-    assert event["detail"]["structure_changes"] == [] and event["severity"] == "info"
+def test_every_field_that_moves_the_simulation_is_fingerprinted():
+    assert set(_fp(_driver("a"))["a"]) == {"p", "g", "d", "f", "ce", "ve", "re", "s", "pk", "dc", "u"}
 
 
 def test_the_value_chain_stage_is_fingerprinted_by_its_place_in_the_chain():
     """"ve" is the epicentre's position in VC_STEPS, 1 to 8, the value the stored
     runs carry; moving the stage is drift."""
     assert _fp(_driver("a"))["a"]["ve"] == 6
-    assert _fp(_driver("a", vc_epicentre=None))["a"]["ve"] is None
     moved = _fp(_driver("a", vc_epicentre=VC_STEPS[1]))
     assert compute_input_drift_event(moved, _fp(_driver("a")))["detail"]["structure_changes"] == ["a"]
 
@@ -86,5 +84,3 @@ def test_the_previous_fingerprint_is_read_from_the_stored_run():
     fp, run_id, run_date = previous_fingerprint(
         {"id": 10, "run_date": "2026-09-13 23:04:39.081562", "results": {"meta": {"driver_fingerprint": {"x": {"p": 3}}}}})
     assert fp == {"x": {"p": 3}} and run_id == 10 and run_date == "2026-09-13 23:04:39"
-    fp, run_id, _ = previous_fingerprint({"id": 9, "run_date": None, "results": '{"meta": {}}'})
-    assert fp is None and run_id == 9

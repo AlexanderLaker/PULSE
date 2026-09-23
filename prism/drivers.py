@@ -14,15 +14,21 @@ SCORE_FIELDS = ("probability", "gp1_pct_affected", "peak_year", "diffusion_curve
 #: An admin edit to any of them sets ``scores_edited``.
 MODEL_FIELDS = ("direction",) + SCORE_FIELDS
 
+#: The two directions of a driver's effect on gross profit.
+DIRECTIONS = ("Expansion", "Contraction")
+#: How well a driver's present state is evidenced; shown, never simulated.
+CONFIDENCE_LEVELS = ("High", "Medium", "Low")
+
 
 @dataclass
 class Driver:
     """One external driver of the HCB profit pool, with its scores.
 
     No score has a default: a driver that misses one cannot be simulated
-    (simulation_problems says which). ``probability_prior`` and
-    ``normalized_score`` are derived from the scores and cannot be passed in;
-    call ``recompute()`` after changing a score.
+    (simulation_problems says which), and the database stores none without
+    all of them. ``probability_prior`` and ``normalized_score`` are derived
+    from the scores and cannot be passed in; call ``recompute()`` after
+    changing a score.
     """
     id: str                           # e.g. "consumer_r01"; the display code is "C-01"
     force: str                        # one of config.FORCES
@@ -30,14 +36,15 @@ class Driver:
     description: str = ""
     direction: Optional[str] = None   # "Expansion" | "Contraction"
     probability: Optional[int] = None  # 1-5; the Beta prior's mean is probability / 6
-    # Onset: no effect up to this year; None is the base year.
+    # Onset: no effect up to this year, or up to the base year when that is later.
     start_year: Optional[int] = None
     analysis: str = ""                # the PRISM Analysis reading (generated, read-only)
-    category_exposure: dict = field(default_factory=dict)  # {category: 0-5}
-    regional_exposure: dict = field(default_factory=dict)  # {region: 0-5}
+    category_exposure: dict = field(default_factory=dict)  # {category: 0-5}, every category
+    regional_exposure: dict = field(default_factory=dict)  # {region: 0-5}, every region
     vc_epicentre: Optional[str] = None  # the value-chain stage where the impact centres (config.VC_STEPS)
     sources: list = field(default_factory=list)           # [{title, url, tier, note}]
-    confidence: str = "Medium"        # how well the present state is evidenced (display only)
+    # High, Medium or Low: how well the present state is evidenced (display only).
+    confidence: Optional[str] = None
     # Share of the category's gross profit the driver can move at full
     # materialisation, in (0, 1]. There is no default: a driver without it
     # cannot be simulated.
@@ -64,9 +71,9 @@ class Driver:
 
         normalized_score = E[p] x gp1_pct_affected x direction, the
         deterministic counterpart of what the engine samples per iteration.
-        A score simulation_problems() reports (a missing probability, say)
-        gives neutral values here instead of an exception, so the driver can
-        still be listed and corrected; the engine refuses to simulate it.
+        A score simulation_problems() refuses (a missing probability, say)
+        gives neutral values here instead of an exception, so such a driver
+        can still be built and checked.
         """
         from prism.config import beta_prior_for
         try:
@@ -96,15 +103,13 @@ def _score_in_range(value, low: int, high: int) -> bool:
 def simulation_problems(drivers) -> list:
     """Why these drivers cannot be simulated, one line per problem; empty when they can.
 
-    Every check guards against a value the engine would otherwise read with a
-    silent default and turn into confident numbers: an unknown force (it
-    would count as Consumer), a missing or unknown direction (as
-    Contraction), a missing or unknown diffusion curve (as the S-curve), a
-    missing or impossible GP1 share (NaN everywhere), a probability or
-    uncertainty score missing or outside its scale, a peak year missing or not
-    after the onset, a missing or unknown value-chain epicentre, and exposure
-    scores outside 0-5 or on a name outside the taxonomy (never read).
-    Duplicate ids are refused as well.
+    The engine reads every score as it is and guesses none, so every score
+    must be there and on its scale: a known force, direction, diffusion curve
+    and value-chain epicentre; a GP1 share in (0, 1]; a probability from 1 to
+    5 and an uncertainty from 0 to 5; a start year and a peak year after the
+    onset; and a whole-number score from 0 to 5 for every category and every
+    region, under the taxonomy's names only. Duplicate ids are refused as
+    well.
     """
     from prism.config import CATEGORIES, FORCES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS, first_peak_year
     problems = [f"driver id {i!r} appears {n} times" for i, n in Counter(d.id for d in drivers).items() if n > 1]
@@ -112,7 +117,7 @@ def simulation_problems(drivers) -> list:
         where = f"driver {d.id}"
         if d.force not in FORCES:
             problems.append(f"{where}: unknown force {d.force!r}")
-        if d.direction not in ("Expansion", "Contraction"):
+        if d.direction not in DIRECTIONS:
             problems.append(f"{where}: direction {d.direction!r} is neither Expansion nor Contraction")
         if not _score_in_range(d.probability, 1, 5):
             problems.append(f"{where}: probability {d.probability!r} is not a whole number from 1 to 5")
@@ -123,7 +128,7 @@ def simulation_problems(drivers) -> list:
             problems.append(f"{where}: uncertainty {d.uncertainty!r} is not a whole number from 0 to 5")
         if d.diffusion_curve not in VALID_DIFFUSION_CURVES:
             problems.append(f"{where}: diffusion curve {d.diffusion_curve!r} is not one of {VALID_DIFFUSION_CURVES}")
-        if d.start_year is not None and not _score_in_range(d.start_year, 2000, 2100):
+        if not _score_in_range(d.start_year, 2000, 2100):
             problems.append(f"{where}: start year {d.start_year!r} is not a year")
         elif not _score_in_range(d.peak_year, first_peak_year(d.start_year), 2100):
             problems.append(f"{where}: peak year {d.peak_year!r} is not a year after the onset "
@@ -132,7 +137,11 @@ def simulation_problems(drivers) -> list:
             problems.append(f"{where}: value-chain epicentre {d.vc_epicentre!r} is not one of {VC_STEPS}")
         for name, exposure, keys in (("category_exposure", d.category_exposure, CATEGORIES),
                                      ("regional_exposure", d.regional_exposure, REGIONS)):
-            for key, score in (exposure or {}).items():
+            exposure = exposure if isinstance(exposure, dict) else {}
+            missing = [k for k in keys if k not in exposure]
+            if missing:
+                problems.append(f"{where}: {name} has no score for {', '.join(missing)}")
+            for key, score in exposure.items():
                 if key not in keys:
                     problems.append(f"{where}: {name} names {key!r}, which is not in the taxonomy")
                 elif not _score_in_range(score, 0, 5):

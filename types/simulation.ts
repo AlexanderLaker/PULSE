@@ -126,8 +126,8 @@ export interface SimulationPayload {
   integrity_events: IntegrityEvent[];
   seed_stability: SeedStability;
   run_meta: RunMeta;
-  /** The drivers edited since the run was computed; null for a run without a fingerprint. */
-  inputs_since_run: InputsSinceRun | null;
+  /** The drivers edited since the run was computed. */
+  inputs_since_run: InputsSinceRun;
 }
 
 /** How the current drivers differ from the ones the run was computed on (driver ids). */

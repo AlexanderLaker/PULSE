@@ -14,7 +14,7 @@ from pathlib import Path
 
 from prism.config import (CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS,
                           VALID_DIFFUSION_CURVES, VC_STEPS, display_code)
-from prism.drivers import Driver
+from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, Driver
 
 BASE_PATH = Path(__file__).resolve().parents[1] / "data" / "drivers" / "driver_base.json"
 #: The tiers of which every driver needs at least one source.
@@ -38,7 +38,7 @@ def validate(entries: list) -> None:
             problems.append(f"{tag}: unknown force {d['force']!r}")
         elif not m or m.group(1) != d["force"].lower() or d["code"] != display_code(d["id"], d["force"]):
             problems.append(f"{tag}: id {d['id']!r} and code {d['code']!r} do not follow force + number")
-        if d["direction"] not in ("Expansion", "Contraction"):
+        if d["direction"] not in DIRECTIONS:
             problems.append(f"{tag}: direction {d['direction']!r}")
         if not 1 <= d["probability"] <= 5 or not 0 <= d["uncertainty"] <= 5:
             problems.append(f"{tag}: probability or uncertainty out of range")
@@ -49,7 +49,7 @@ def validate(entries: list) -> None:
                             "(the peak comes after the onset)")
         if d["diffusion_curve"] not in VALID_DIFFUSION_CURVES:
             problems.append(f"{tag}: diffusion curve {d['diffusion_curve']!r}")
-        if d["confidence"] not in ("High", "Medium", "Low"):
+        if d["confidence"] not in CONFIDENCE_LEVELS:
             problems.append(f"{tag}: confidence {d['confidence']!r}")
         if set(d["category_exposure"]) != set(CATEGORIES) or set(d["regional_exposure"]) != set(REGIONS):
             problems.append(f"{tag}: category or regional exposure keys differ from the taxonomy")

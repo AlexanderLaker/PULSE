@@ -9,7 +9,8 @@ exposure maps.
 Aggregation across experts:
   - probability, gp1_pct_affected: mean of the scored values (2 decimals) and a count
   - peak_year: median; uncertainty: median rounded half up to a whole score
-  - diffusion_curve, vc_epicentre: the most frequent value and the full vote distribution
+  - diffusion_curve, vc_epicentre: the vote distribution and the majority, the
+    value with more votes than any other (none on a tie)
   - exposure maps: per cell, the mean and the count
   - a field nobody scored aggregates to None
 """
@@ -52,19 +53,18 @@ def _mean2(values: List[float]) -> Optional[Dict[str, Any]]:
 
 
 def _mode_distribution(values: List[Any]) -> Optional[Dict[str, Any]]:
-    """Most-frequent value + the full vote distribution for a categorical
-    field (diffusion_curve, vc_epicentre). Ties broken deterministically by
-    first-seen insertion order so repeated calls are stable."""
+    """The votes on a categorical field (diffusion_curve, vc_epicentre): the
+    distribution and its majority, the value with more votes than any other.
+    A tie has no majority (mode None): the choice stays with the admin."""
     vals = _non_null(values)
     if not vals:
         return None
     dist: Dict[str, int] = {}
     for v in vals:
-        key = str(v)
-        dist[key] = dist.get(key, 0) + 1
-    # Mode: highest count, ties → first inserted (stable).
-    mode = max(dist.items(), key=lambda kv: kv[1])[0]
-    return {"mode": mode, "distribution": dist, "count": len(vals)}
+        dist[str(v)] = dist.get(str(v), 0) + 1
+    top = max(dist.values())
+    leaders = [k for k, n in dist.items() if n == top]
+    return {"mode": leaders[0] if len(leaders) == 1 else None, "distribution": dist, "count": len(vals)}
 
 
 def _aggregate_exposure(rows: List[Dict[str, Any]], field: str) -> Dict[str, Dict[str, Any]]:
@@ -76,17 +76,8 @@ def _aggregate_exposure(rows: List[Dict[str, Any]], field: str) -> Dict[str, Dic
     sums: Dict[str, float] = {}
     counts: Dict[str, int] = {}
     for r in rows:
-        m = r.get(field)
-        if not isinstance(m, dict):
-            continue
-        for k, v in m.items():
-            if v is None:
-                continue
-            try:
-                fv = float(v)
-            except (TypeError, ValueError):
-                continue
-            sums[k] = sums.get(k, 0.0) + fv
+        for k, v in (r.get(field) or {}).items():
+            sums[k] = sums.get(k, 0.0) + float(v)
             counts[k] = counts.get(k, 0) + 1
     return {
         k: {"avg": round(sums[k] / counts[k], 2), "count": counts[k]}
@@ -99,9 +90,7 @@ def _uncertainty_agg(rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     vals = _non_null([r.get("uncertainty") for r in rows])
     if not vals:
         return None
-    med = _median(vals)
-    score = int(max(0, min(5, int(med + 0.5)))) if med is not None else None
-    return {"median": score, "count": len(vals)}
+    return {"median": int(_median(vals) + 0.5), "count": len(vals)}
 
 
 def aggregate_proposals(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -122,6 +111,11 @@ def aggregate_proposals(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     for f in EXPOSURE_FIELDS:
         agg[f] = _aggregate_exposure(rows, f)
     return agg
+
+
+def _own_row(rows: List[Dict[str, Any]], user_id: Optional[str]) -> Optional[Dict[str, Any]]:
+    """The caller's own proposal among the rows, or None."""
+    return next((r for r in rows if user_id is not None and r.get("user_id") == user_id), None)
 
 
 def _my_block(my_row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -170,15 +164,9 @@ def build_proposals_response(
     ``rows`` are all proposals for the driver; ``user_id`` picks the caller's
     own for the ``my`` block.
     """
-    my_row = None
-    if user_id is not None:
-        for r in rows:
-            if r.get("user_id") == user_id:
-                my_row = r
-                break
     return {
         "driver_id": driver_id,
-        "my": _my_block(my_row),
+        "my": _my_block(_own_row(rows, user_id)),
         "aggregate": aggregate_proposals(rows),
         "scorers": _scorer_block(rows),
     }
@@ -188,35 +176,13 @@ def build_proposal_summary(
     rows: List[Dict[str, Any]],
     user_id: Optional[str],
 ) -> Dict[str, Any]:
-    """Compact per-driver summary attached to GET /api/v1/drivers.
-
-    {count, probability, gp1_pct_affected, peak_year, diffusion_curve,
-    uncertainty, my}: headline aggregates with their counts (or None) and the
-    caller's own proposal (or None).
-    """
-    prob = _mean2([r.get("probability") for r in rows])
-    gp1 = _mean2([r.get("gp1_pct_affected") for r in rows])
-
-    peak_vals = _non_null([r.get("peak_year") for r in rows])
-    peak = {"median": _median(peak_vals), "count": len(peak_vals)} if peak_vals else None
-
-    curve_full = _mode_distribution([r.get("diffusion_curve") for r in rows])
-    curve = {"mode": curve_full["mode"], "count": curve_full["count"]} if curve_full else None
-    unc = _uncertainty_agg(rows)
-
-    my_row = None
-    if user_id is not None:
-        for r in rows:
-            if r.get("user_id") == user_id:
-                my_row = r
-                break
-
+    """Compact per-driver summary attached to GET /api/v1/drivers: what the
+    driver table shows. {count, probability, gp1_pct_affected, my}: the number
+    of experts, the two headline means with their counts (or None) and the
+    caller's own proposal (or None)."""
     return {
         "count": len(rows),
-        "probability": prob,
-        "gp1_pct_affected": gp1,
-        "peak_year": peak,
-        "diffusion_curve": curve,
-        "uncertainty": unc,
-        "my": _my_block(my_row),
+        "probability": _mean2([r.get("probability") for r in rows]),
+        "gp1_pct_affected": _mean2([r.get("gp1_pct_affected") for r in rows]),
+        "my": _my_block(_own_row(rows, user_id)),
     }

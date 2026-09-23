@@ -12,7 +12,6 @@ import copy
 import math
 import re
 from dataclasses import dataclass, field, fields
-from typing import Optional
 
 # ── Taxonomies ──────────────────────────────────────────────────────────────
 
@@ -57,10 +56,10 @@ DEFAULT_ITERATIONS = 10_000
 DEFAULT_BASE_YEAR = 2025
 
 
-def first_peak_year(start_year: Optional[int]) -> int:
+def first_peak_year(start_year: int) -> int:
     """The earliest peak year a driver can take: the year after its onset, the
     later of the base year and its start year (lib/format.ts firstPeakYear)."""
-    return max(DEFAULT_BASE_YEAR, start_year or DEFAULT_BASE_YEAR) + 1
+    return max(DEFAULT_BASE_YEAR, start_year) + 1
 
 
 #: The production recipe: every published run (scripts/run_production.py) and
@@ -77,41 +76,37 @@ VALID_DIFFUSION_CURVES = ["s_curve", "linear", "front_loaded", "back_loaded", "s
 def compute_materialization_schedule(
     peak_year: int,
     diffusion_curve: str,
+    start_year: int,
     path_years: list[int] | None = None,
     base_year: int = DEFAULT_BASE_YEAR,
-    start_year: int | None = None,
 ) -> dict[int, float]:
     """Share of a driver's full effect that has materialised in each path year.
 
-    The effect is zero up to the onset, ramps along ``diffusion_curve`` and is
-    complete from ``peak_year`` on. The onset is the later of ``base_year`` and
-    the driver's ``start_year`` (``base_year`` when ``start_year`` is None). A
-    driver's peak comes after its onset (simulation_problems refuses one that
-    does not, and the engine keeps a jittered peak after it); a peak at or
-    before the onset would ramp to the horizon.
+    The effect is zero up to the onset, the later of ``base_year`` and the
+    driver's ``start_year``; it ramps along ``diffusion_curve`` and is complete
+    from ``peak_year`` on, which must come after the onset (simulation_problems
+    refuses a driver whose peak does not, and the engine keeps a jittered peak
+    after it).
 
     Curves: ``linear``; ``front_loaded`` (square root, fast then flat);
     ``back_loaded`` (quadratic, slow then fast); ``step_function`` (5 percent
-    until 80 percent of the way, then a jump); ``s_curve`` (a logistic centred
-    halfway, rescaled to run from 0 to 1).
+    until 80 percent of the way, then a steep linear rise to full);
+    ``s_curve`` (a logistic centred halfway, rescaled to run from 0 to 1).
     """
     years = path_years or DEFAULT_PATH_YEARS
-    onset = base_year if start_year is None else max(int(base_year), int(start_year))
-    if peak_year and peak_year > onset:
-        py = peak_year
-    else:
-        py = years[-1] if years[-1] > onset else onset + 1
+    onset = max(int(base_year), int(start_year))
+    if peak_year <= onset:
+        raise ValueError(f"peak year {peak_year} does not come after the onset {onset}")
 
     schedule = {}
     for year in years:
-        if year >= py:
+        if year >= peak_year:
             schedule[year] = 1.0
             continue
         if year <= onset:
             schedule[year] = 0.0
             continue
-        span = max(py - onset, 1)
-        t = max(0.0, min(1.0, (year - onset) / span))
+        t = (year - onset) / (peak_year - onset)
 
         if diffusion_curve == "linear":
             frac = t
@@ -121,24 +116,15 @@ def compute_materialization_schedule(
             frac = t * t
         elif diffusion_curve == "step_function":
             frac = 0.05 if t < 0.8 else (0.05 + (t - 0.8) / 0.2 * 0.95)
-        else:  # s_curve
+        elif diffusion_curve == "s_curve":
             frac = 1.0 / (1.0 + math.exp(-12 * (t - 0.5)))
             f0 = 1.0 / (1.0 + math.exp(-12 * (0 - 0.5)))
             f1 = 1.0 / (1.0 + math.exp(-12 * (1 - 0.5)))
             frac = (frac - f0) / (f1 - f0)
+        else:
+            raise ValueError(f"unknown diffusion curve {diffusion_curve!r}")
 
         schedule[year] = round(max(0.0, min(1.0, frac)), 4)
-
-    # Every curve is non-decreasing; a schedule that "un-materialises" would
-    # make a category shift reverse without cause, so it is refused outright.
-    ordered = sorted(schedule)
-    for prev_year, curr_year in zip(ordered, ordered[1:]):
-        if schedule[curr_year] < schedule[prev_year]:
-            raise ValueError(
-                f"compute_materialization_schedule produced a non-monotonic schedule for "
-                f"diffusion_curve='{diffusion_curve}', peak_year={peak_year}: "
-                f"{curr_year} ({schedule[curr_year]}) is below {prev_year} ({schedule[prev_year]})."
-            )
     return schedule
 
 
@@ -173,12 +159,12 @@ def beta_prior_for(probability: int, uncertainty: int) -> tuple:
     The prior is structured judgment set from the 1-5 probability score; it is
     never updated from data. Its mean is p/6, and its concentration
     alpha + beta follows the uncertainty score (UNCERTAINTY_KAPPA): score 3
-    gives (p, 6 - p).
+    gives (p, 6 - p). A score outside its scale raises ValueError.
     """
-    p = max(1, min(5, int(probability)))
-    u = max(0, min(5, int(uncertainty)))
-    kappa = float(UNCERTAINTY_KAPPA[u])
-    alpha = max(BETA_PRIOR_FLOOR, kappa * p / 6.0)
+    if probability not in (1, 2, 3, 4, 5) or uncertainty not in UNCERTAINTY_KAPPA:
+        raise ValueError(f"probability {probability!r} or uncertainty {uncertainty!r} is outside its scale")
+    kappa = float(UNCERTAINTY_KAPPA[int(uncertainty)])
+    alpha = max(BETA_PRIOR_FLOOR, kappa * int(probability) / 6.0)
     beta = max(BETA_PRIOR_FLOOR, kappa - alpha)
     return (alpha, beta)
 
@@ -187,9 +173,7 @@ def peak_jitter_for(uncertainty: int, jitter_on: bool) -> int:
     """A driver's peak-year jitter width in years: the width its uncertainty
     score sets (UNCERTAINTY_PEAK_JITTER), or 0 with the jitter switched off
     (ModelConfig.peak_year_jitter)."""
-    if not jitter_on:
-        return 0
-    return int(UNCERTAINTY_PEAK_JITTER[max(0, min(5, int(uncertainty)))])
+    return UNCERTAINTY_PEAK_JITTER[int(uncertainty)] if jitter_on else 0
 
 
 # ── Force weights ───────────────────────────────────────────────────────────
@@ -207,9 +191,10 @@ DEFAULT_FORCE_WEIGHTS = {f: 1.0 / len(FORCES) for f in FORCES}
 # scripts/compute_attenuation.py, which also prints the three blocks below;
 # tests/test_calibration.py holds these constants to that record.
 #
-# Per force, the engine multiplies the force's compounded contribution by its
-# attenuation, 0.5 x (1 - the mean of the force's row in the cross-force
-# matrix over the five other forces). Within a force, same-force contributions are dampened by
+# Per force, the engine multiplies the force's summed contribution in a cell
+# by its attenuation, 0.5 x (1 - the mean of the force's row in the
+# cross-force matrix over the five other forces), before the forces compound.
+# Within a force, same-force contributions are dampened by
 # 1 - overlap x (n_eff - 1) / n_eff, with n_eff the magnitude-weighted
 # effective number of contributing drivers in the cell.
 

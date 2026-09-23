@@ -114,7 +114,7 @@ describe('category drill-down: contributing drivers at the score means', () => {
     expect(within(aside).getByText(/Contributing Drivers/)).toBeTruthy();
 
     const expected = FIXTURE.inputs.drivers
-      .filter((d) => (d.category_exposure[FCN] ?? 0) > 0)
+      .filter((d) => d.category_exposure[FCN] > 0)
       .map((d) => d.id)
       .sort((a, b) => Math.abs(FIXTURE.expected.byDriver[b].category[FCN]['2035'])
         - Math.abs(FIXTURE.expected.byDriver[a].category[FCN]['2035']));

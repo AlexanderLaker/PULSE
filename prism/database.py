@@ -14,6 +14,7 @@ no currency amount is ever stored.
 import json
 import logging
 import os
+import re
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -22,7 +23,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence
 from urllib.parse import urlparse
 
-from prism.drivers import Driver
+from prism.config import CATEGORIES, FORCES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS
+from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, Driver, InvalidDriversError, simulation_problems
 
 logger = logging.getLogger(__name__)
 
@@ -35,13 +37,10 @@ if USE_POSTGRES:
 else:
     import sqlite3
 
-#: Migrations whose result the schema below already contains. init_db records
-#: them on a new database so a migration script never runs on it.
+#: The migrations under migrations/, in order. The schema below contains the
+#: result of all of them; init_db records them on a new database, and every
+#: migration records itself in schema_migrations when it has run.
 SCHEMA_MIGRATIONS = ("0001_driver_schema",)
-
-#: For each migration, the table only a database still awaiting it has (and
-#: the table the migration creates, so a migrated database never matches).
-PENDING_MIGRATION_MARKERS = {"0001_driver_schema": ("trends", "drivers")}
 
 
 class MigrationPendingError(RuntimeError):
@@ -51,14 +50,6 @@ class MigrationPendingError(RuntimeError):
         self.migration = migration
         super().__init__(f"This database needs migration {migration} before this release can use it: run "
                          f"migrations/{migration}/migrate.py (its README is the runbook).")
-
-
-def pending_migration(tables: set) -> Optional[str]:
-    """The migration a database with these tables still needs, or None."""
-    for migration, (marker, created) in PENDING_MIGRATION_MARKERS.items():
-        if marker in tables and created not in tables:
-            return migration
-    return None
 
 
 class DatabaseNotConfiguredError(RuntimeError):
@@ -191,70 +182,81 @@ def _int_or_none(val):
 
 # ── Schema ──────────────────────────────────────────────────────────────────
 
+def one_of(values) -> str:
+    """A SQL list of string literals, for a CHECK (column IN (...)) constraint."""
+    return ", ".join("'" + str(v).replace("'", "''") + "'" for v in values)
+
+
 def _schema() -> List[str]:
+    """The current schema. Every score of a driver is required and checked
+    against its scale and the taxonomy, so a stored driver can always be
+    simulated; a proposal may leave any score empty, but a score it holds is
+    on its scale."""
     serial = "SERIAL PRIMARY KEY" if USE_POSTGRES else "INTEGER PRIMARY KEY AUTOINCREMENT"
     return [
-        """CREATE TABLE IF NOT EXISTS drivers (
+        f"""CREATE TABLE IF NOT EXISTS drivers (
             id TEXT PRIMARY KEY,
-            force TEXT NOT NULL,
+            force TEXT NOT NULL CHECK (force IN ({one_of(FORCES)})),
             name TEXT NOT NULL,
-            description TEXT,
-            direction TEXT,
-            probability INTEGER,
-            start_year INTEGER,
-            peak_year INTEGER,
-            diffusion_curve TEXT,
-            gp1_pct_affected REAL,
-            uncertainty INTEGER,
-            vc_epicentre TEXT,
-            confidence TEXT DEFAULT 'Medium',
-            analysis TEXT,
-            baseline TEXT,
-            scores_edited BOOLEAN DEFAULT FALSE,
+            description TEXT NOT NULL,
+            direction TEXT NOT NULL CHECK (direction IN ({one_of(DIRECTIONS)})),
+            probability INTEGER NOT NULL CHECK (probability BETWEEN 1 AND 5),
+            start_year INTEGER NOT NULL,
+            peak_year INTEGER NOT NULL,
+            diffusion_curve TEXT NOT NULL CHECK (diffusion_curve IN ({one_of(VALID_DIFFUSION_CURVES)})),
+            gp1_pct_affected REAL NOT NULL CHECK (gp1_pct_affected > 0 AND gp1_pct_affected <= 1),
+            uncertainty INTEGER NOT NULL CHECK (uncertainty BETWEEN 0 AND 5),
+            vc_epicentre TEXT NOT NULL CHECK (vc_epicentre IN ({one_of(VC_STEPS)})),
+            confidence TEXT NOT NULL CHECK (confidence IN ({one_of(CONFIDENCE_LEVELS)})),
+            analysis TEXT NOT NULL,
+            baseline TEXT NOT NULL,
+            scores_edited BOOLEAN NOT NULL DEFAULT FALSE,
             revision INTEGER NOT NULL DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""",
-        """CREATE TABLE IF NOT EXISTS driver_category_exposure (
-            driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
-            category TEXT NOT NULL,
-            exposure_score INTEGER,
+        f"""CREATE TABLE IF NOT EXISTS driver_category_exposure (
+            driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
+            category TEXT NOT NULL CHECK (category IN ({one_of(CATEGORIES)})),
+            exposure_score INTEGER NOT NULL CHECK (exposure_score BETWEEN 0 AND 5),
             PRIMARY KEY (driver_id, category)
         )""",
-        """CREATE TABLE IF NOT EXISTS driver_regional_exposure (
-            driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
-            region TEXT NOT NULL,
-            exposure_score INTEGER,
+        f"""CREATE TABLE IF NOT EXISTS driver_regional_exposure (
+            driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
+            region TEXT NOT NULL CHECK (region IN ({one_of(REGIONS)})),
+            exposure_score INTEGER NOT NULL CHECK (exposure_score BETWEEN 0 AND 5),
             PRIMARY KEY (driver_id, region)
         )""",
         f"""CREATE TABLE IF NOT EXISTS driver_sources (
             id {serial},
-            driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
+            driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
             title TEXT NOT NULL,
             url TEXT NOT NULL,
-            tier TEXT DEFAULT '',
-            note TEXT DEFAULT ''
+            tier TEXT NOT NULL,
+            note TEXT NOT NULL
         )""",
         # One row per (driver, expert): any signed-in user can propose scores
         # for a driver; admins endorse by editing the driver itself.
         f"""CREATE TABLE IF NOT EXISTS driver_score_proposals (
             id {serial},
-            driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
+            driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
             user_id TEXT NOT NULL,
-            user_name TEXT,
-            probability INTEGER,
-            gp1_pct_affected REAL,
+            user_name TEXT NOT NULL,
+            probability INTEGER CHECK (probability BETWEEN 1 AND 5),
+            gp1_pct_affected REAL CHECK (gp1_pct_affected > 0 AND gp1_pct_affected <= 1),
             peak_year INTEGER,
-            diffusion_curve TEXT,
-            uncertainty INTEGER,
+            diffusion_curve TEXT CHECK (diffusion_curve IN ({one_of(VALID_DIFFUSION_CURVES)})),
+            uncertainty INTEGER CHECK (uncertainty BETWEEN 0 AND 5),
             category_exposure TEXT,
             regional_exposure TEXT,
-            vc_epicentre TEXT,
+            vc_epicentre TEXT CHECK (vc_epicentre IN ({one_of(VC_STEPS)})),
             comment TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE (driver_id, user_id)
         )""",
         # Append-only versions of the Consumer Journey content; the newest row wins.
+        # Migration 0001 keeps the next three tables as it finds them, so their
+        # definitions here are the ones a migrated database has.
         f"""CREATE TABLE IF NOT EXISTS journey_content (
             id {serial},
             content TEXT NOT NULL,
@@ -298,6 +300,32 @@ def table_names(cursor) -> set:
     return {_row(r)["name"] for r in cursor.fetchall()}
 
 
+def schema_tables() -> set:
+    """The tables the schema creates."""
+    return {m.group(1) for statement in _schema()
+            for m in [re.match(r"\s*CREATE TABLE IF NOT EXISTS (\w+)", statement)] if m}
+
+
+def pending_migration(cursor) -> Optional[str]:
+    """The first migration the connected database still needs, or None.
+
+    A database lists the migrations it has had in schema_migrations. One that
+    holds tables of this schema but no such list predates the migrations and
+    needs all of them; one without any table of this schema is new, and
+    init_db creates the schema and records every migration. (The dashboard's
+    own table, user_roles, is not part of the schema.)
+    """
+    tables = table_names(cursor)
+    if "schema_migrations" in tables:
+        cursor.execute("SELECT version FROM schema_migrations")
+        done = {_row(r)["version"] for r in cursor.fetchall()}
+    elif tables & schema_tables():
+        done = set()
+    else:
+        return None
+    return next((m for m in SCHEMA_MIGRATIONS if m not in done), None)
+
+
 def init_db() -> None:
     """Create any missing table; safe to call on every start.
 
@@ -307,7 +335,7 @@ def init_db() -> None:
     """
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        migration = pending_migration(table_names(cursor))
+        migration = pending_migration(cursor)
         if migration:
             raise MigrationPendingError(migration)
         for statement in _schema():
@@ -384,7 +412,7 @@ def diagnose_connection() -> Dict[str, Any]:
             cursor = conn.cursor()
             tables = table_names(cursor)
             out["db_reachable"] = True
-            migration = pending_migration(tables)
+            migration = pending_migration(cursor)
             if migration:
                 pending = MigrationPendingError(migration)
                 out["error"], out["reason"] = describe_error(pending), failure_reason(pending)
@@ -407,15 +435,16 @@ def diagnose_connection() -> Dict[str, Any]:
 
 @dataclass(frozen=True)
 class AuditEntry:
-    """One row of the audit log. The writes that are audited take their
+    """One row of the audit log: what changed, and who changed it (the
+    verified identity of the caller). The writes that are audited take their
     entries with them and store them in their own transaction."""
     action: str
     entity_type: str
     entity_id: str
+    user_id: str
     old_value: Optional[str] = None
     new_value: Optional[str] = None
     reason: Optional[str] = None
-    user_id: str = "system"
 
 
 def insert_audit(cursor, entries: Sequence[AuditEntry]) -> None:
@@ -441,7 +470,20 @@ def _driver_values(d: Driver) -> tuple:
     """The values of _DRIVER_COLUMNS for one driver, in that order."""
     return (d.id, d.force, d.name, d.description, d.direction, d.probability, d.start_year,
             d.peak_year, d.diffusion_curve, d.gp1_pct_affected, d.uncertainty, d.vc_epicentre, d.confidence,
-            d.analysis, dumps(d.baseline) if d.baseline else None, d.scores_edited)
+            d.analysis, dumps(d.baseline), d.scores_edited)
+
+
+def _require_simulatable(drivers: Sequence[Driver]) -> None:
+    """Refuse to store drivers the engine could not simulate.
+
+    The constraints of the schema hold every score of a driver row on its
+    scale; that the exposure maps name every category and every region is
+    checked here, before anything is written, so every stored driver can be
+    simulated as it stands.
+    """
+    problems = simulation_problems(list(drivers))
+    if problems:
+        raise InvalidDriversError(problems)
 
 
 def _write_driver_children(cursor, d: Driver) -> None:
@@ -455,33 +497,25 @@ def _write_driver_children(cursor, d: Driver) -> None:
     for region, score in d.regional_exposure.items():
         cursor.execute(f"INSERT INTO driver_regional_exposure (driver_id, region, exposure_score) VALUES ({ph(3)})",
                        (d.id, region, score))
-    for src in d.sources or []:
+    for src in d.sources:
         cursor.execute(f"INSERT INTO driver_sources (driver_id, title, url, tier, note) VALUES ({ph(5)})",
-                       (d.id, src.get("title", ""), src.get("url", ""), src.get("tier", ""), src.get("note", "")))
+                       (d.id, src["title"], src["url"], src["tier"], src["note"]))
 
 
-def save_drivers(drivers: List[Driver]) -> None:
-    """Insert or replace drivers, keeping each row (and its proposals) alive.
+def insert_drivers(drivers: List[Driver]) -> None:
+    """Store the drivers of a new database, each with its exposures and sources.
 
-    Used to seed a new database. The driver row is updated in place (an
-    upsert), never deleted and inserted again, because expert proposals
-    reference it with ON DELETE CASCADE. The exposure
-    and source rows are rewritten from the object. ``created_at`` survives;
-    ``updated_at`` is refreshed and ``revision`` goes up by one.
+    Raises InvalidDriversError, and writes nothing, if a driver could not be
+    simulated.
     """
+    _require_simulatable(drivers)
     cols = ", ".join(_DRIVER_COLUMNS)
-    updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in _DRIVER_COLUMNS if c != "id")
     with get_db_connection() as conn:
         cursor = conn.cursor()
         for d in drivers:
-            cursor.execute(
-                f"""INSERT INTO drivers ({cols}) VALUES ({ph(len(_DRIVER_COLUMNS))})
-                    ON CONFLICT (id) DO UPDATE SET {updates}, revision = drivers.revision + 1,
-                        updated_at = CURRENT_TIMESTAMP""",
-                _driver_values(d),
-            )
+            cursor.execute(f"INSERT INTO drivers ({cols}) VALUES ({ph(len(_DRIVER_COLUMNS))})", _driver_values(d))
             _write_driver_children(cursor, d)
-    logger.info("Saved %d drivers", len(drivers))
+    logger.info("Seeded %d drivers", len(drivers))
 
 
 def save_driver_edit(driver: Driver, expected_revision: int, audit: Sequence[AuditEntry] = ()) -> int:
@@ -492,7 +526,10 @@ def save_driver_edit(driver: Driver, expected_revision: int, audit: Sequence[Aud
     two edits made from the same state only the first lands. The second
     raises StaleRevisionError and changes nothing. The audit entries are
     written in the same transaction: an edit is never stored without them.
+    An edit that leaves a driver the engine could not simulate raises
+    InvalidDriversError and changes nothing.
     """
+    _require_simulatable([driver])
     p = placeholder()
     columns = [c for c in _DRIVER_COLUMNS if c != "id"]
     with get_db_connection() as conn:
@@ -527,15 +564,12 @@ def load_drivers() -> List[Driver]:
             cursor.execute(f"SELECT driver_id, {column} AS k, exposure_score FROM {table}")
             for r in cursor.fetchall():
                 r = _row(r)
-                if r["driver_id"] in exposures:
-                    exposures[r["driver_id"]][key][r["k"]] = r["exposure_score"]
+                exposures[r["driver_id"]][key][r["k"]] = int(r["exposure_score"])
         sources: Dict[str, list] = {r["id"]: [] for r in rows}
         cursor.execute("SELECT driver_id, title, url, tier, note FROM driver_sources ORDER BY id")
         for r in cursor.fetchall():
             r = _row(r)
-            if r["driver_id"] in sources:
-                sources[r["driver_id"]].append({"title": r["title"], "url": r["url"],
-                                                "tier": r["tier"] or "", "note": r["note"] or ""})
+            sources[r["driver_id"]].append({"title": r["title"], "url": r["url"], "tier": r["tier"], "note": r["note"]})
 
     drivers = []
     for r in rows:
@@ -544,22 +578,20 @@ def load_drivers() -> List[Driver]:
             id=r["id"],
             force=r["force"],
             name=r["name"],
-            description=r["description"] or "",
+            description=r["description"],
             direction=r["direction"],
-            probability=r["probability"],
-            start_year=r["start_year"],
-            analysis=r["analysis"] or "",
+            probability=int(r["probability"]),
+            start_year=int(r["start_year"]),
+            analysis=r["analysis"],
             category_exposure=e["category"],
             regional_exposure=e["region"],
             vc_epicentre=r["vc_epicentre"],
             sources=sources[r["id"]],
-            confidence=r["confidence"] or "Medium",
-            # A missing score stays missing, so the engine refuses to run
-            # rather than simulate an invented value.
-            gp1_pct_affected=r["gp1_pct_affected"],
-            peak_year=_int_or_none(r["peak_year"]),
+            confidence=r["confidence"],
+            gp1_pct_affected=float(r["gp1_pct_affected"]),
+            peak_year=int(r["peak_year"]),
             diffusion_curve=r["diffusion_curve"],
-            uncertainty=_int_or_none(r["uncertainty"]),
+            uncertainty=int(r["uncertainty"]),
             baseline=_loads(r["baseline"]),
             scores_edited=bool(r["scores_edited"]),
             revision=int(r["revision"]),

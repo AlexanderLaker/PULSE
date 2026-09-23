@@ -31,8 +31,7 @@
    "Government": 0.123,
    "Environmental": 0.401,
    "Competitive": 0.1
-  },
-  "regionless_drivers": []
+  }
  },
  "reference_run": {
   "seed": 42,

@@ -6,7 +6,16 @@ one transaction, so the database ends either fully migrated or unchanged.
 While it runs it holds exclusive locks on the tables it touches (PostgreSQL)
 or the write lock (SQLite), so nothing can write in between.
 
-1. The driver tables are created and filled from the previous ones:
+1. Every driver is checked first. The driver schema stores only drivers the
+   engine can simulate: every score present and on its scale, a start year and
+   a peak year after the onset, a known force, curve, confidence and value-chain
+   stage, and at least one region. The previous engine simulated a driver
+   without any regional exposure as present in every region; the driver schema
+   has no such rule, so such a driver is refused too. While any driver fails a
+   check the migration changes nothing and lists every problem, to be
+   corrected in the dashboard of the release still deployed (a force, a start
+   year or a confidence, which that dashboard cannot edit, with SQL).
+2. The driver tables are created and filled from the previous ones:
      trends                    -> drivers      (strategic_implication -> analysis,
                                                 ai_suggestion -> baseline,
                                                 user_override -> scores_edited)
@@ -24,7 +33,15 @@ or the write lock (SQLite), so nothing can write in between.
    driver schema stores the stage itself. A driver's stage, a proposal's and
    the one in a baseline are read from the stored scores with the rule the
    previous engine and dashboard used (epicentre_of), so each keeps the stage
-   it was shown with; the report names any driver that had no value chain.
+   it was shown with.
+   An exposure map keeps the taxonomy's names only, and a name it lacks gets
+   0; the previous engine read both as 0, so no number changes, and the
+   report lists every name dropped or set. A baseline holds every score: a
+   driver without a readable baseline takes its current scores, a baseline
+   field left empty the current score, and the report names both.
+   An expert proposal is a draft: a score the API would refuse today (a GP1
+   share of 0, a peak year at or before the onset, a value off its scale, a
+   name outside the taxonomy) is cleared, and the report names it.
    The previous editor saved a driver's source list as JSON in trends.data_source
    while the sources table kept the rows the driver was created with. Where
    data_source holds such a list, that list (the one the admin last saved)
@@ -32,25 +49,30 @@ or the write lock (SQLite), so nothing can write in between.
    data_source summary itself is not carried over: the dashboard derives it
    from the sources. Rows of the child tables whose driver no longer exists are
    not copied and are counted in the report (the archive keeps them).
-2. Tables the driver schema does not have are dropped (the trend tables,
+3. Tables the driver schema does not have are dropped (the trend tables,
    config_snapshots, triggers, ai_suggestions, session_snapshots, and older
    leftovers where a database still has them), and so is every column of
    simulation_runs beyond id, run_date, iterations and results. Nothing is
    dropped with CASCADE: if a table this migration does not know depends on
    one it drops, the migration stops and changes nothing. Tables it does not
    know, such as user_roles, are never touched.
-3. The keys of the stored runs follow the new names: meta.trend_count ->
+4. The keys of the stored runs follow the new names: meta.trend_count ->
    meta.driver_count, meta.trend_fingerprint -> meta.driver_fingerprint, and
    trend_ids / unscored_trend_ids -> driver_ids / unscored_driver_ids in the
-   integrity events. No number changes.
-4. The content is brought up to date:
+   integrity events. Each driver fingerprint gains the onset years, which
+   the previous one did not record, and its exposure maps move onto the
+   taxonomy's names as the drivers' do, so the next production run compares
+   like with like. No number changes.
+5. The content is brought up to date:
      - every driver of the seed gets its current PRISM Analysis text;
      - a description that still holds a previously shipped text gets the current
        one (descriptions.json); an edited description is left alone and reported;
      - the newest Consumer Journey content gets the key driverCodes instead of
-       trendCodes and the current tile texts where a tile field still holds a
-       previously shipped text (journey_edits.json); it is saved as a new version.
-5. The migration is recorded in schema_migrations and in the audit log.
+       trendCodes, loses any code that is not a driver of the base, gets the
+       current tile texts where a tile field still holds a previously shipped
+       text (journey_edits.json) and has escaped paragraph breaks written out;
+       it is saved as a new version.
+6. The migration is recorded in schema_migrations and in the audit log.
 
 Before the commit, every dropped row and column is written to a local archive,
 migrations/0001_driver_schema/archive/<database>-<time>.json (readable by the
@@ -65,7 +87,8 @@ Without --sqlite the target is POSTGRES_URL or DATABASE_URL (from the shell or
 changes a PostgreSQL database needs --postgres; a dry run does not.
 
 Exit codes: 0 migrated or already migrated; 1 refused (no suitable database,
-not the previous schema, or --postgres missing); 2 failed and rolled back.
+not the previous schema, --postgres missing, or drivers that need correcting);
+2 failed and rolled back.
 """
 from __future__ import annotations
 
@@ -85,7 +108,9 @@ REPO = HERE.parents[1]
 sys.path.insert(0, str(REPO))
 
 import prism.env_loader  # noqa: E402,F401  (loads .env; shell variables win)
-from prism.config import VC_STEPS  # noqa: E402
+from prism.config import (CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS,  # noqa: E402
+                          VALID_DIFFUSION_CURVES, VC_STEPS, display_code)
+from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, SCORE_FIELDS  # noqa: E402
 
 MIGRATION = "0001_driver_schema"
 ARCHIVE_DIR = HERE / "archive"
@@ -119,64 +144,69 @@ EVENT_DETAIL_RENAMES = {"trend_ids": "driver_ids", "unscored_trend_ids": "unscor
 SOURCE_KINDS = ("primary source", "analyst report", "trade press", "primary_source", "analyst_report", "trade_press")
 
 
+def one_of(values) -> str:
+    """A SQL list of string literals, for a CHECK (column IN (...)) constraint."""
+    return ", ".join("'" + str(v).replace("'", "''") + "'" for v in values)
+
+
 def _ddl(postgres: bool) -> list:
     """The driver schema, as prism/database.py creates it on a new database."""
     serial = "SERIAL PRIMARY KEY" if postgres else "INTEGER PRIMARY KEY AUTOINCREMENT"
     return [
-        """CREATE TABLE drivers (
+        f"""CREATE TABLE drivers (
             id TEXT PRIMARY KEY,
-            force TEXT NOT NULL,
+            force TEXT NOT NULL CHECK (force IN ({one_of(FORCES)})),
             name TEXT NOT NULL,
-            description TEXT,
-            direction TEXT,
-            probability INTEGER,
-            start_year INTEGER,
-            peak_year INTEGER,
-            diffusion_curve TEXT,
-            gp1_pct_affected REAL,
-            uncertainty INTEGER,
-            vc_epicentre TEXT,
-            confidence TEXT DEFAULT 'Medium',
-            analysis TEXT,
-            baseline TEXT,
-            scores_edited BOOLEAN DEFAULT FALSE,
+            description TEXT NOT NULL,
+            direction TEXT NOT NULL CHECK (direction IN ({one_of(DIRECTIONS)})),
+            probability INTEGER NOT NULL CHECK (probability BETWEEN 1 AND 5),
+            start_year INTEGER NOT NULL,
+            peak_year INTEGER NOT NULL,
+            diffusion_curve TEXT NOT NULL CHECK (diffusion_curve IN ({one_of(VALID_DIFFUSION_CURVES)})),
+            gp1_pct_affected REAL NOT NULL CHECK (gp1_pct_affected > 0 AND gp1_pct_affected <= 1),
+            uncertainty INTEGER NOT NULL CHECK (uncertainty BETWEEN 0 AND 5),
+            vc_epicentre TEXT NOT NULL CHECK (vc_epicentre IN ({one_of(VC_STEPS)})),
+            confidence TEXT NOT NULL CHECK (confidence IN ({one_of(CONFIDENCE_LEVELS)})),
+            analysis TEXT NOT NULL,
+            baseline TEXT NOT NULL,
+            scores_edited BOOLEAN NOT NULL DEFAULT FALSE,
             revision INTEGER NOT NULL DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""",
-        """CREATE TABLE driver_category_exposure (
-            driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
-            category TEXT NOT NULL,
-            exposure_score INTEGER,
+        f"""CREATE TABLE driver_category_exposure (
+            driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
+            category TEXT NOT NULL CHECK (category IN ({one_of(CATEGORIES)})),
+            exposure_score INTEGER NOT NULL CHECK (exposure_score BETWEEN 0 AND 5),
             PRIMARY KEY (driver_id, category)
         )""",
-        """CREATE TABLE driver_regional_exposure (
-            driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
-            region TEXT NOT NULL,
-            exposure_score INTEGER,
+        f"""CREATE TABLE driver_regional_exposure (
+            driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
+            region TEXT NOT NULL CHECK (region IN ({one_of(REGIONS)})),
+            exposure_score INTEGER NOT NULL CHECK (exposure_score BETWEEN 0 AND 5),
             PRIMARY KEY (driver_id, region)
         )""",
         f"""CREATE TABLE driver_sources (
             id {serial},
-            driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
+            driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
             title TEXT NOT NULL,
             url TEXT NOT NULL,
-            tier TEXT DEFAULT '',
-            note TEXT DEFAULT ''
+            tier TEXT NOT NULL,
+            note TEXT NOT NULL
         )""",
         f"""CREATE TABLE driver_score_proposals (
             id {serial},
-            driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
+            driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
             user_id TEXT NOT NULL,
-            user_name TEXT,
-            probability INTEGER,
-            gp1_pct_affected REAL,
+            user_name TEXT NOT NULL,
+            probability INTEGER CHECK (probability BETWEEN 1 AND 5),
+            gp1_pct_affected REAL CHECK (gp1_pct_affected > 0 AND gp1_pct_affected <= 1),
             peak_year INTEGER,
-            diffusion_curve TEXT,
-            uncertainty INTEGER,
+            diffusion_curve TEXT CHECK (diffusion_curve IN ({one_of(VALID_DIFFUSION_CURVES)})),
+            uncertainty INTEGER CHECK (uncertainty BETWEEN 0 AND 5),
             category_exposure TEXT,
             regional_exposure TEXT,
-            vc_epicentre TEXT,
+            vc_epicentre TEXT CHECK (vc_epicentre IN ({one_of(VC_STEPS)})),
             comment TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE (driver_id, user_id)
@@ -304,6 +334,37 @@ def rename_run_keys(results: dict) -> bool:
     return changed
 
 
+def complete_fingerprint(results: dict, start_years: dict) -> bool:
+    """Bring a stored run's driver fingerprint to what a run records now; True if it changed.
+
+    The next production run compares its drivers with every field of the
+    stored fingerprint, so each driver still in the database gets what the
+    previous fingerprint lacked. Its onset year ("s"): the one the run was
+    computed on, since the previous release could not edit it. And its
+    exposure maps ("ce", "re") on the taxonomy's names, as the migration puts
+    the drivers' own: a missing name 0, the value the previous engine read
+    for it, and a name outside the taxonomy dropped.
+    """
+    fingerprint = (results.get("meta") or {}).get("driver_fingerprint")
+    changed = False
+    if not isinstance(fingerprint, dict):
+        return changed
+    for driver_id, entry in fingerprint.items():
+        if not isinstance(entry, dict) or driver_id not in start_years:
+            continue
+        if "s" not in entry:
+            entry["s"] = int(start_years[driver_id])
+            changed = True
+        for key, names in (("ce", CATEGORIES), ("re", REGIONS)):
+            stored = entry.get(key)
+            if isinstance(stored, dict):
+                on_taxonomy = {name: round(float(stored.get(name) or 0), 4) for name in sorted(names)}
+                if on_taxonomy != stored:
+                    entry[key] = on_taxonomy
+                    changed = True
+    return changed
+
+
 class Database:
     """The connection and the few dialect differences the migration needs."""
 
@@ -385,19 +446,150 @@ def json_value(value):
     return json.loads(value) if isinstance(value, str) else value
 
 
-def baseline_of(ai_suggestion):
-    """The baseline JSON from the previous ai_suggestion: the same scores, with a
-    stored value-chain profile replaced by its stage (vc_epicentre)."""
+class DriversNeedCorrection(ValueError):
+    """Drivers the driver schema cannot store as they are; the message lists every problem."""
+
+    def __init__(self, problems: list):
+        self.problems = list(problems)
+        super().__init__("\n  ".join(["these drivers need correcting before the migration can run:"] + self.problems))
+
+
+def whole(value, low: int, high: int) -> bool:
+    """A whole number (int or integral float, never a bool) from low to high."""
+    return (not isinstance(value, bool) and isinstance(value, (int, float)) and value == value
+            and value == int(value) and low <= value <= high)
+
+
+def exposure_map(stored, names) -> tuple:
+    """``(map, dropped, filled)``: a stored exposure map on the taxonomy's names.
+
+    A name outside the taxonomy is dropped and a missing name gets 0. The
+    previous engine read both as 0, so neither changes a number.
+    """
+    stored = stored if isinstance(stored, dict) else {}
+    dropped = sorted(k for k in stored if k not in names)
+    filled = [k for k in names if k not in stored]
+    return {k: stored.get(k, 0) for k in names}, dropped, filled
+
+
+def baseline_of(ai_suggestion, scores: dict) -> tuple:
+    """``(baseline, source, filled)``: a driver's baseline from the previous ai_suggestion.
+
+    The baseline holds every score of the driver schema (SCORE_FIELDS). The
+    stored value-chain profile becomes its stage (epicentre_of), and its
+    exposure maps are put on the taxonomy's names like the driver's own. A
+    driver without a readable suggestion takes its current scores (source
+    "scores"); a field the suggestion lacks or leaves empty takes the current
+    score and is listed in ``filled``.
+    """
     text = json_text(ai_suggestion)
     try:
         snapshot = json.loads(text) if text else None
     except ValueError:
-        return text
-    if not isinstance(snapshot, dict) or "vc_exposure" not in snapshot:
-        return text
-    profile = snapshot.pop("vc_exposure")
-    snapshot.setdefault("vc_epicentre", epicentre_of(profile))
-    return json.dumps(snapshot)
+        snapshot = None
+    if not isinstance(snapshot, dict):
+        return dict(scores), "scores", []
+    if "vc_exposure" in snapshot:
+        snapshot.setdefault("vc_epicentre", epicentre_of(snapshot.pop("vc_exposure")))
+    baseline, filled = {}, []
+    for name in SCORE_FIELDS:
+        value = snapshot.get(name)
+        if value is None or value == {}:
+            baseline[name] = scores[name]
+            filled.append(name)
+        elif name in ("category_exposure", "regional_exposure"):
+            baseline[name] = exposure_map(value, CATEGORIES if name == "category_exposure" else REGIONS)[0]
+        else:
+            baseline[name] = value
+    return baseline, "suggestion", filled
+
+
+def read_previous_drivers(db: "Database", tables: set) -> list:
+    """Every driver of the previous schema as the driver schema will store it.
+
+    One dict per trends row: the row, its value-chain stage, its exposure
+    maps on the taxonomy's names (with the names dropped and filled), its
+    baseline, and the problems that keep it out of the driver schema. The
+    driver schema stores only drivers the engine can simulate, so a driver
+    with a problem stops the migration until it is corrected.
+    """
+    from prism.drivers import Driver, simulation_problems
+    owned = "trend_id IN (SELECT id FROM trends)"
+    children: dict = {"trend_vc_exposure": {}, "trend_category_exposure": {}, "trend_regional_exposure": {}}
+    for table, key in (("trend_vc_exposure", "vc_step"), ("trend_category_exposure", "category"),
+                       ("trend_regional_exposure", "region")):
+        if table in tables:
+            for r in db.rows(f"SELECT trend_id, {key} AS k, exposure_score FROM {table} WHERE {owned}"):
+                children[table].setdefault(r["trend_id"], {})[r["k"]] = r["exposure_score"]
+    out = []
+    for r in db.rows("SELECT * FROM trends ORDER BY id"):
+        stage = epicentre_of(children["trend_vc_exposure"].get(r["id"]))
+        category, dropped_c, filled_c = exposure_map(children["trend_category_exposure"].get(r["id"]), CATEGORIES)
+        region, dropped_r, filled_r = exposure_map(children["trend_regional_exposure"].get(r["id"]), REGIONS)
+        driver = Driver(id=r["id"], force=r["force"], name=r["name"], direction=r.get("direction"),
+                        probability=r.get("probability"), start_year=r.get("start_year"),
+                        gp1_pct_affected=r.get("gp1_pct_affected"), peak_year=r.get("peak_year"),
+                        diffusion_curve=r.get("diffusion_curve"), uncertainty=r.get("uncertainty"),
+                        vc_epicentre=stage, category_exposure=category, regional_exposure=region)
+        problems = [line.split(": ", 1)[1] for line in simulation_problems([driver])]
+        if stage is None:
+            problems = [line for line in problems if not line.startswith("value-chain epicentre")]
+            problems.append("no value chain is stored (its eight scores are missing or all 0); set its epicentre")
+        if r.get("confidence") not in CONFIDENCE_LEVELS:
+            problems.append(f"confidence {r.get('confidence')!r} is not one of {', '.join(CONFIDENCE_LEVELS)}")
+        if not any(region.values()):
+            problems.append("no regional exposure is stored; the previous engine simulated such a driver as present "
+                            "in every region, the driver schema does not: set its regions")
+        baseline, source, baseline_filled = baseline_of(r.get("ai_suggestion"), driver.scores())
+        out.append({"row": r, "stage": stage, "category": category, "region": region,
+                    "dropped": dropped_c + dropped_r, "filled": filled_c + filled_r,
+                    "baseline": baseline, "baseline_from": source, "baseline_filled": baseline_filled,
+                    "problems": problems})
+    return out
+
+
+def proposal_scores(r: dict, start_year: int) -> tuple:
+    """``(values, cleared)``: a previous proposal's scores as the driver schema stores them.
+
+    A proposal is a draft, so a score the API would refuse today (a GP1 share
+    of 0, a peak year at or before the driver's onset or beyond the horizon, a
+    value off its scale or a name outside the taxonomy) is cleared rather than
+    stopping the migration; ``cleared`` names what was, and the expert can
+    score it again. The value-chain profile becomes its stage.
+    """
+    first_peak = max(DEFAULT_BASE_YEAR, int(start_year)) + 1
+    cleared = []
+
+    def keep(name, ok):
+        value = r.get(name)
+        if value is not None and not ok(value):
+            cleared.append(name)
+            return None
+        return value
+
+    values = {
+        "probability": keep("probability", lambda v: whole(v, 1, 5)),
+        "gp1_pct_affected": keep("gp1_pct_affected", lambda v: not isinstance(v, bool)
+                                 and isinstance(v, (int, float)) and 0 < v <= 1),
+        "peak_year": keep("peak_year", lambda v: whole(v, first_peak, DEFAULT_PATH_YEARS[-1])),
+        "diffusion_curve": keep("diffusion_curve", lambda v: v in VALID_DIFFUSION_CURVES),
+        "uncertainty": keep("uncertainty", lambda v: whole(v, 0, 5)),
+    }
+    for name, names in (("category_exposure", CATEGORIES), ("regional_exposure", REGIONS)):
+        try:
+            stored = json_value(r.get(name))
+        except ValueError:
+            stored = None
+        stored = stored if isinstance(stored, dict) else {}
+        kept = {k: int(v) for k, v in stored.items() if k in names and whole(v, 0, 5)}
+        if len(kept) < len(stored):
+            cleared.append(name if not kept else f"{name} ({len(stored) - len(kept)} of {len(stored)} cells)")
+        values[name] = kept or None
+    try:
+        values["vc_epicentre"] = epicentre_of(json_value(r.get("vc_exposure")))
+    except ValueError:
+        values["vc_epicentre"] = None
+    return values, cleared
 
 
 def migrate(db: Database) -> dict:
@@ -413,6 +605,12 @@ def migrate(db: Database) -> dict:
         db.execute(f"SET LOCAL lock_timeout = '{LOCK_TIMEOUT}'")
         locked = [t for t in DROP_TABLES + LOCKED_TABLES if t in tables]
         db.execute(f"LOCK TABLE {', '.join(locked)} IN ACCESS EXCLUSIVE MODE")
+
+    # ── the drivers, checked before anything changes ────────────────────────
+    drivers = read_previous_drivers(db, tables)
+    problems = [f"{d['row']['id']}: {line}" for d in drivers for line in d["problems"]]
+    if problems:
+        raise DriversNeedCorrection(problems)
 
     # ── what is dropped, archived first ─────────────────────────────────────
     for table in DROP_TABLES:
@@ -430,44 +628,43 @@ def migrate(db: Database) -> dict:
     for statement in _ddl(db.postgres):
         db.execute(statement)
 
-    # Child rows are copied only where their driver exists; SQLite does not
-    # enforce the previous foreign keys, so a database can hold orphans.
-    owned = "trend_id IN (SELECT id FROM trends)"
-    profiles: dict = {}
-    if "trend_vc_exposure" in tables:
-        for r in db.rows(f"SELECT trend_id, vc_step, exposure_score FROM trend_vc_exposure WHERE {owned}"):
-            profiles.setdefault(r["trend_id"], {})[r["vc_step"]] = r["exposure_score"]
-
-    drivers = db.rows("SELECT * FROM trends ORDER BY id")
     from_editor: dict = {}
-    without_stage = []
-    for r in drivers:
-        stage = epicentre_of(profiles.get(r["id"]))
-        if stage is None:
-            without_stage.append(r["id"])
+    for d in drivers:
+        r = d["row"]
         db.execute(
             "INSERT INTO drivers (id, force, name, description, direction, probability, start_year, peak_year, "
             "diffusion_curve, gp1_pct_affected, uncertainty, vc_epicentre, confidence, analysis, baseline, "
             f"scores_edited, created_at, updated_at) VALUES ({', '.join([p] * 18)})",
-            (r["id"], r["force"], r["name"], r.get("description"), r.get("direction"), r.get("probability"),
-             r.get("start_year"), r.get("peak_year") or None, r.get("diffusion_curve") or None,
-             r.get("gp1_pct_affected"), r.get("uncertainty"), stage, r.get("confidence") or "Medium",
-             r.get("strategic_implication"), baseline_of(r.get("ai_suggestion")),
+            (r["id"], r["force"], r["name"], r.get("description") or "", r["direction"], r["probability"],
+             r["start_year"], r["peak_year"], r["diffusion_curve"], r["gp1_pct_affected"], r["uncertainty"],
+             d["stage"], r["confidence"], r.get("strategic_implication") or "", json.dumps(d["baseline"]),
              bool(r.get("user_override")), r.get("created_at"), r.get("updated_at")))
+        for table, key, values in (("driver_category_exposure", "category", d["category"]),
+                                   ("driver_regional_exposure", "region", d["region"])):
+            for name, score in values.items():
+                db.execute(f"INSERT INTO {table} (driver_id, {key}, exposure_score) VALUES ({p}, {p}, {p})",
+                           (r["id"], name, int(score)))
         saved = editor_sources(r.get("data_source"))
         if saved is not None:
             from_editor[r["id"]] = saved
+    # Child rows are copied only where their driver exists; SQLite does not
+    # enforce the previous foreign keys, so a database can hold orphans.
+    owned = "trend_id IN (SELECT id FROM trends)"
     orphans = {}
     for child in CHILD_TABLES:
         if child in tables:
             n = db.rows(f"SELECT COUNT(*) AS n FROM {child} WHERE trend_id IS NULL OR NOT ({owned})")[0]["n"]
             if n:
                 orphans[child] = int(n)
-    for new, old, key in (("driver_category_exposure", "trend_category_exposure", "category"),
-                          ("driver_regional_exposure", "trend_regional_exposure", "region")):
-        if old in tables:
-            db.execute(f"INSERT INTO {new} (driver_id, {key}, exposure_score) "
-                       f"SELECT trend_id, {key}, exposure_score FROM {old} WHERE {owned}")
+    report["exposures"] = {
+        "names_outside_the_taxonomy_dropped": {d["row"]["id"]: d["dropped"] for d in drivers if d["dropped"]},
+        "missing_names_set_to_0": {d["row"]["id"]: d["filled"] for d in drivers if d["filled"]},
+    }
+    report["baselines"] = {
+        "from_the_current_scores": [d["row"]["id"] for d in drivers if d["baseline_from"] == "scores"],
+        "fields_from_the_current_scores": {d["row"]["id"]: d["baseline_filled"] for d in drivers
+                                           if d["baseline_filled"]},
+    }
 
     table_sources: dict = {}
     if "trend_sources" in tables:
@@ -486,30 +683,28 @@ def migrate(db: Database) -> dict:
         driver_id: {"saved_in_editor": len(saved), "table_rows": len(table_sources.get(driver_id, []))}
         for driver_id, saved in sorted(from_editor.items())}
 
-    proposals = proposal_stages = 0
+    proposals, cleared = [], {}
     if "trend_score_proposals" in tables:
-        present = set(db.columns("trend_score_proposals"))
-        fields = ("user_id", "user_name", "probability", "gp1_pct_affected", "peak_year",
-                  "diffusion_curve", "uncertainty", "category_exposure", "regional_exposure",
-                  "comment", "updated_at")
-        select = ", ".join(f if f in present else f"NULL AS {f}" for f in fields)
-        db.execute(f"INSERT INTO driver_score_proposals (driver_id, {', '.join(fields)}) "
-                   f"SELECT trend_id, {select} FROM trend_score_proposals WHERE {owned} ORDER BY id")
-        proposals = db.rows("SELECT COUNT(*) AS n FROM driver_score_proposals")[0]["n"]
-        if "vc_exposure" in present:
-            for r in db.rows(f"SELECT trend_id, user_id, vc_exposure FROM trend_score_proposals "
-                             f"WHERE {owned} AND vc_exposure IS NOT NULL"):
-                try:
-                    stage = epicentre_of(json_value(r["vc_exposure"]))
-                except ValueError:
-                    stage = None
-                if stage is not None:
-                    db.execute(f"UPDATE driver_score_proposals SET vc_epicentre = {p} "
-                               f"WHERE driver_id = {p} AND user_id = {p}", (stage, r["trend_id"], r["user_id"]))
-                    proposal_stages += 1
-    report["copied"] = {"drivers": len(drivers), "sources": source_count, "proposals": int(proposals)}
-    report["value_chain"] = {"drivers_with_a_stage": len(drivers) - len(without_stage),
-                             "drivers_without_one": without_stage, "proposals_with_a_stage": proposal_stages}
+        start_years = {d["row"]["id"]: d["row"]["start_year"] for d in drivers}
+        for r in db.rows(f"SELECT * FROM trend_score_proposals WHERE {owned} ORDER BY id"):
+            values, dropped_fields = proposal_scores(r, start_years[r["trend_id"]])
+            if dropped_fields:
+                cleared[f"{r['trend_id']}/{r['user_id']}"] = dropped_fields
+            proposals.append(values)
+            db.execute(
+                "INSERT INTO driver_score_proposals (driver_id, user_id, user_name, probability, gp1_pct_affected, "
+                "peak_year, diffusion_curve, uncertainty, category_exposure, regional_exposure, vc_epicentre, "
+                f"comment, updated_at) VALUES ({', '.join([p] * 13)})",
+                (r["trend_id"], r["user_id"], r.get("user_name") or "", values["probability"],
+                 values["gp1_pct_affected"], values["peak_year"], values["diffusion_curve"], values["uncertainty"],
+                 json.dumps(values["category_exposure"]) if values["category_exposure"] else None,
+                 json.dumps(values["regional_exposure"]) if values["regional_exposure"] else None,
+                 values["vc_epicentre"], r.get("comment"), r.get("updated_at")))
+    report["copied"] = {"drivers": len(drivers), "sources": source_count, "proposals": len(proposals)}
+    report["proposals"] = {
+        "with_a_value_chain_stage": sum(v["vc_epicentre"] is not None for v in proposals),
+        "scores_cleared": cleared,
+    }
     report["orphans_skipped"] = orphans
 
     # ── drop what nothing uses ──────────────────────────────────────────────
@@ -521,24 +716,30 @@ def migrate(db: Database) -> dict:
     report["dropped_simulation_run_columns"] = drop_columns
 
     # ── stored runs ─────────────────────────────────────────────────────────
-    renamed_runs = 0
+    start_years = {d["row"]["id"]: d["row"]["start_year"] for d in drivers}
+    renamed_runs = completed_runs = 0
     for row in db.rows("SELECT id FROM simulation_runs ORDER BY id"):
         raw = db.rows(f"SELECT results FROM simulation_runs WHERE id = {p}", (row["id"],))[0]["results"]
         try:
             results = json_value(raw)
         except ValueError:
             continue
-        if isinstance(results, dict) and rename_run_keys(results):
+        if not isinstance(results, dict):
+            continue
+        renamed = rename_run_keys(results)
+        completed = complete_fingerprint(results, start_years)
+        if renamed or completed:
             db.execute(f"UPDATE simulation_runs SET results = {p} WHERE id = {p}", (json.dumps(results), row["id"]))
-            renamed_runs += 1
-    report["runs_with_renamed_keys"] = renamed_runs
+        renamed_runs += renamed
+        completed_runs += completed
+    report["runs"] = {"with_renamed_keys": renamed_runs, "with_the_fingerprint_completed": completed_runs}
 
     # ── content ─────────────────────────────────────────────────────────────
     from prism.seed_drivers import DRIVERS
     present = {r["id"]: r for r in db.rows("SELECT id, description, analysis FROM drivers")}
     analysis_updated = 0
     for d in DRIVERS:
-        if d.id in present and (present[d.id]["analysis"] or "") != d.analysis:
+        if d.id in present and present[d.id]["analysis"] != d.analysis:
             db.execute(f"UPDATE drivers SET analysis = {p}, revision = revision + 1, "
                        f"updated_at = CURRENT_TIMESTAMP WHERE id = {p}",
                        (d.analysis, d.id))
@@ -550,7 +751,7 @@ def migrate(db: Database) -> dict:
     for driver_id, entry in descriptions.items():
         if driver_id not in present:
             continue
-        stored = present[driver_id]["description"] or ""
+        stored = present[driver_id]["description"]
         if stored == entry["text"]:
             current.append(driver_id)
         elif sha256(stored) in entry["previous_sha256"]:
@@ -565,7 +766,7 @@ def migrate(db: Database) -> dict:
     report["journey"] = migrate_journey(db)
 
     db.execute(f"INSERT INTO schema_migrations (version) VALUES ({p})", (MIGRATION,))
-    summary = (f"{len(drivers)} drivers, {source_count} sources, {proposals} proposals copied; "
+    summary = (f"{len(drivers)} drivers, {source_count} sources, {len(proposals)} proposals copied; "
                f"{len(dropped)} tables dropped; {renamed_runs} runs renamed")
     db.execute("INSERT INTO audit_log (action, entity_type, entity_id, new_value, reason, user_id) "
                f"VALUES ('schema_migrated', 'database', {p}, {p}, {p}, 'migration-0001')",
@@ -606,7 +807,16 @@ def drop_run_columns(db: Database, columns: list) -> None:
 
 
 def migrate_journey(db: Database) -> dict:
-    """Rename trendCodes and apply the tile text edits to the newest stored journey content."""
+    """Bring the newest stored journey content up to date and save it as a new version.
+
+    Per tile: trendCodes becomes driverCodes (an empty list where a tile has
+    neither); a code that is not a driver of the driver base is removed, since
+    the dashboard resolves every code to one; a text that still holds a
+    previously shipped version gets the current one (journey_edits.json); and
+    escaped paragraph breaks ("\\n") in a text an admin saved are written out.
+    """
+    from prism.seed_drivers import DRIVERS
+    codes = {display_code(d.id, d.force) for d in DRIVERS}
     p = db.p
     rows = db.rows("SELECT id, content FROM journey_content ORDER BY id DESC LIMIT 1")
     if not rows:
@@ -616,17 +826,22 @@ def migrate_journey(db: Database) -> dict:
     by_tile: dict = {}
     for e in edits:
         by_tile.setdefault(e["tile"], []).append(e)
-    renamed = applied = 0
-    already, edited = [], []
+    renamed = applied = unescaped = 0
+    already, edited, removed = [], [], {}
     for journey in ("lhc", "hair"):
         for stage in content.get(journey) or []:
             for side in ("benefiting", "negativelyImpacted"):
                 tiles = stage.get(side) or []
                 for i, tile in enumerate(tiles):
-                    if "trendCodes" in tile and "driverCodes" not in tile:
+                    if "driverCodes" not in tile:
                         tile = {("driverCodes" if k == "trendCodes" else k): v for k, v in tile.items()}
+                        tile.setdefault("driverCodes", [])
                         tiles[i] = tile
                         renamed += 1
+                    unknown = [c for c in tile["driverCodes"] if c not in codes]
+                    if unknown:
+                        tile["driverCodes"] = [c for c in tile["driverCodes"] if c in codes]
+                        removed[tile["id"]] = unknown
                     for e in by_tile.get(tile.get("id"), []):
                         stored = tile.get(e["field"])
                         if stored == e["text"]:
@@ -636,12 +851,18 @@ def migrate_journey(db: Database) -> dict:
                             applied += 1
                         else:
                             edited.append(f"{tile['id']}.{e['field']}")
-    if renamed or applied:
+                    for field in ("analysis", "driverNote"):
+                        if isinstance(tile.get(field), str) and "\\n" in tile[field]:
+                            tile[field] = tile[field].replace("\\n", "\n")
+                            unescaped += 1
+    changed = bool(renamed or applied or unescaped or removed)
+    if changed:
         db.execute(f"INSERT INTO journey_content (content, updated_by) VALUES ({p}, {p})",
                    (json.dumps(content), f"migration {MIGRATION}"))
     return {"stored_content": True, "tiles_renamed": renamed, "texts_updated": applied,
             "texts_already_current": len(already), "texts_edited_left_alone": edited,
-            "new_version_saved": bool(renamed or applied)}
+            "texts_with_breaks_written_out": unescaped, "codes_removed": removed,
+            "new_version_saved": changed}
 
 
 def main(argv: list | None = None) -> int:
@@ -676,6 +897,11 @@ def main(argv: list | None = None) -> int:
     db.begin()
     try:
         result = migrate(db)
+    except DriversNeedCorrection as e:
+        db.rollback()
+        print(f"{db.where}: nothing changed; {e}")
+        print("Correct them in the dashboard of the release still deployed, then run the dry run again.")
+        return 1
     except Exception as e:  # noqa: BLE001 (rolled back and reported)
         db.rollback()
         print(f"Migration FAILED and was rolled back; the database is unchanged.\n  {type(e).__name__}: {e}")

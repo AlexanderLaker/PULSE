@@ -161,10 +161,9 @@ describe('Drivers page: the Edited chip', () => {
     expect(screen.getByTitle('Baseline 5 / 5 · edited to 4 / 5')).toBeTruthy();
   });
 
-  it('says when an edited driver has no baseline to compare with', () => {
-    const { container } = openDriver({ scores_edited: true, baseline: null });
-    expect(edited(container)[0].getAttribute('title'))
-      .toBe('Edited by an admin. This driver has no baseline to compare with.');
+  it('says when an edited driver matches its baseline again', () => {
+    const { container } = openDriver({ scores_edited: true });
+    expect(edited(container)[0].getAttribute('title')).toBe('Edited by an admin; every score matches the baseline.');
   });
 });
 

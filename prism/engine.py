@@ -60,35 +60,21 @@ MC_SE_BOOTSTRAP_SEED = 20260713
 
 
 def region_presence(driver) -> np.ndarray:
-    """A driver's weight in each region (REGIONS order): regional exposure / 5.
-
-    A driver without any regional exposure counts as present everywhere (1 in
-    every region) rather than being dropped; the shift and the region lens
-    both use this rule, and the run reports such drivers.
-    """
-    reg = driver.regional_exposure or {}
-    vals = np.array([min(float(reg.get(r, 0.0)), 5.0) / 5.0 for r in REGIONS])
-    return vals if vals.sum() > 0 else np.ones(len(REGIONS))
+    """A driver's weight in each region (REGIONS order): regional exposure / 5."""
+    return np.array([driver.regional_exposure[r] / 5.0 for r in REGIONS])
 
 
 def exposure_matrix(drivers: list) -> np.ndarray:
     """How strongly each driver reaches each composite cell, (drivers, cells).
 
     Cell (c, r) has index ``c * len(REGIONS) + r``; a driver reaches it with
-    (category exposure / 5) x its presence in the region (region_presence).
+    (category exposure / 5) x (regional exposure / 5). A driver with no
+    exposure in a category or a region reaches none of its cells.
     """
-    n_regions = len(REGIONS)
-    out = np.zeros((len(drivers), len(CATEGORIES) * n_regions))
-    for j, driver in enumerate(drivers):
-        presence = region_presence(driver)
-        for c_idx, cat in enumerate(CATEGORIES):
-            exp = driver.category_exposure.get(cat, 0)
-            ce = min(exp, 5) / 5.0 if exp > 0 else 0.0
-            if ce <= 0:
-                continue
-            for r_idx in range(n_regions):
-                out[j, c_idx * n_regions + r_idx] = ce * presence[r_idx]
-    return out
+    n = len(drivers)
+    category = np.array([[d.category_exposure[c] / 5.0 for c in CATEGORIES] for d in drivers]).reshape(n, -1)
+    region = np.array([region_presence(d) for d in drivers]).reshape(n, len(REGIONS))
+    return (category[:, :, np.newaxis] * region[:, np.newaxis, :]).reshape(n, len(CATEGORIES) * len(REGIONS))
 
 
 def floor_event(count: int) -> dict:
@@ -179,29 +165,15 @@ class MonteCarloEngine:
     def cell_weight_matrix(self) -> np.ndarray:
         """Gross-profit share matrix W, (categories x regions), normalised to sum 1.
 
-        An empty or all-zero configuration falls back to a flat grid with an
-        integrity event; that is a guard against a broken config, not a
-        modelling choice.
+        The configuration names a non-negative share for every category and
+        region (config_validation checks it); a matrix without any positive
+        share raises ValueError.
         """
-        cats = CATEGORIES
-        cw = self.config.cell_weights or {}
-        W = np.zeros((len(cats), len(REGIONS)))
-        for c_idx, cat in enumerate(cats):
-            row = cw.get(cat) or {}
-            for r_idx, region in enumerate(REGIONS):
-                W[c_idx, r_idx] = max(0.0, float(row.get(region, 0.0) or 0.0))
+        cw = self.config.cell_weights
+        W = np.array([[float(cw[cat][region]) for region in REGIONS] for cat in CATEGORIES])
         total = W.sum()
         if total <= 0:
-            if not any(e.get("type") == "cell_weights_fallback" for e in self._integrity_events):
-                self._integrity_events.append({
-                    "type": "cell_weights_fallback",
-                    "severity": "warning",
-                    "message": "config.cell_weights is empty or all-zero; the roll-up used a flat "
-                               "grid instead. This guards against a broken configuration and is not "
-                               "the engine default; check what produced the configuration.",
-                })
-            W = np.full_like(W, 1.0 / W.size)
-            total = 1.0
+            raise ValueError("the cell weights hold no positive share")
         return W / total
 
     def row_normalized_cell_weights(self) -> np.ndarray:
@@ -250,7 +222,7 @@ class MonteCarloEngine:
             },
             "category_weights_used": {cat: float(W[c_idx, :].sum()) for c_idx, cat in enumerate(cats)},
             "region_weights_used": {r: float(W[:, r_idx].sum()) for r_idx, r in enumerate(REGIONS)},
-            "cell_weights_source": str(self.config.cell_weights_source or "unspecified"),
+            "cell_weights_source": str(self.config.cell_weights_source),
         }
 
     # ── Sampling ────────────────────────────────────────────────────────────
@@ -391,12 +363,11 @@ class MonteCarloEngine:
         path_years = self.config.path_years
         sched_table = np.ones((n_drivers, n_off, n_years))
         for j, driver in enumerate(drivers):
-            sy = driver.start_year
-            onset = self.config.base_year if sy is None else max(int(self.config.base_year), int(sy))
+            onset = max(int(self.config.base_year), int(driver.start_year))
             for k, off in enumerate(offsets):
                 pk = max(int(driver.peak_year) + off, onset + 1)
-                sched = compute_materialization_schedule(pk, driver.diffusion_curve, path_years,
-                                                         self.config.base_year, start_year=sy)
+                sched = compute_materialization_schedule(pk, driver.diffusion_curve, driver.start_year,
+                                                         path_years, self.config.base_year)
                 for y_idx, yr in enumerate(path_years):
                     sched_table[j, k, y_idx] = sched[yr]
         return sched_table, offsets, off_probs_by_driver
@@ -477,22 +448,6 @@ class MonteCarloEngine:
         fw = np.array([self.config.force_weights[f] for f in FORCES])
 
         exposure = exposure_matrix(drivers)
-        # Drivers without any regional exposure count as present everywhere
-        # (region_presence) and are reported.
-        regionless = [d.id for d in drivers if not any((d.regional_exposure or {}).values())]
-        if regionless:
-            self._integrity_events.append({
-                "type": "regional_exposure_coverage",
-                "severity": "warning",
-                "message": (
-                    f"{len(regionless)} driver(s) carry no regional exposure and were "
-                    f"treated as present in every region; score their regions on the "
-                    f"Drivers page: " + ", ".join(regionless[:10])
-                    + ("…" if len(regionless) > 10 else "")
-                ),
-                "detail": {"count": len(regionless), "driver_ids": regionless[:50]},
-            })
-
         sched_table, offsets, off_probs_by_driver = self.peak_schedule_table(drivers)
         offset_idx = self.draw_peak_offsets(off_probs_by_driver, n_iter)
         driver_arange = np.arange(n_drivers)
@@ -558,71 +513,37 @@ class MonteCarloEngine:
         # Value chain: each driver's relevance, |normalized_score| x category
         # exposure / 5, goes wholly to its epicentre stage. Propagation along
         # the chain is not modelled.
+        # A category no driver reaches has a median of exactly zero; its
+        # shares are zero too, so every lens still adds up to the row total.
+        def shares(sums: dict) -> dict:
+            total = sum(sums.values())
+            return {k: (v / total if total > 0 else 0.0) for k, v in sums.items()}
+
         drivers = db.drivers
-        vc_shares: dict = {}
-        vc_fallback_cats: list = []
-        for cat in CATEGORIES:
-            vsum = {s: 0.0 for s in VC_STEPS}
-            for driver in drivers:
-                cat_exp = driver.category_exposure.get(cat, 0)
-                if cat_exp > 0:
-                    vsum[driver.vc_epicentre] += abs(driver.normalized_score) * (min(cat_exp, 5) / 5.0)
-            vtot = sum(vsum.values())
-            if vtot > 0:
-                vc_shares[cat] = {s: v / vtot for s, v in vsum.items()}
-            else:
-                # No driver reaches the category: an even spread keeps the lens
-                # adding up, and the integrity event below says so.
-                vc_shares[cat] = {s: 1.0 / len(VC_STEPS) for s in VC_STEPS}
-                vc_fallback_cats.append(cat)
-
-        if vc_fallback_cats:
-            self._integrity_events.append({
-                "type": "vc_attribution_fallback",
-                "severity": "warning",
-                "message": (
-                    f"{len(vc_fallback_cats)} categor"
-                    f"{'y' if len(vc_fallback_cats) == 1 else 'ies'} had no contributing "
-                    f"driver; the value-chain lens shows an even 1/8 spread there, a "
-                    f"structural fallback rather than expert judgment: " + ", ".join(vc_fallback_cats)
-                ),
-                "detail": {"categories": list(vc_fallback_cats)},
-            })
-
         cats = list(CATEGORIES)
         # Region lens: each (category, region) cell weighted by its own share
         # of the category's gross profit.
         Wn_lens = self.row_normalized_cell_weights()
         presences = [region_presence(d) for d in drivers]
+        vc_shares: dict = {}
         force_shares: dict = {}
         region_shares: dict = {}
-        for cat in cats:
+        for c_idx, cat in enumerate(cats):
+            vsum = {s: 0.0 for s in VC_STEPS}
             fsum = {f: 0.0 for f in FORCES}
-            for driver in drivers:
-                cat_exp = driver.category_exposure.get(cat, 0)
-                if cat_exp > 0:
-                    fw = self.config.force_weights[driver.force]
-                    fsum[driver.force] += abs(driver.normalized_score) * (cat_exp / 5.0) * fw
-            ftot = sum(fsum.values())
-            if ftot > 0:
-                force_shares[cat] = {f: v / ftot for f, v in fsum.items()}
-            else:
-                force_shares[cat] = {f: 1.0 / len(FORCES) for f in FORCES}
-
             rsum = {r: 0.0 for r in REGIONS}
-            c_idx_lens = cats.index(cat)
-            for r_idx_lens, region in enumerate(REGIONS):
-                rw = float(Wn_lens[c_idx_lens, r_idx_lens])
-                for j, driver in enumerate(drivers):
-                    cat_exp = driver.category_exposure.get(cat, 0)
-                    if cat_exp > 0:
-                        presence = float(presences[j][r_idx_lens])
-                        rsum[region] += abs(driver.normalized_score) * (cat_exp / 5.0) * presence * rw
-            rtot = sum(rsum.values())
-            if rtot > 0:
-                region_shares[cat] = {r: v / rtot for r, v in rsum.items()}
-            else:
-                region_shares[cat] = {r: 1.0 / len(REGIONS) for r in REGIONS}
+            for j, driver in enumerate(drivers):
+                cat_exp = driver.category_exposure[cat]
+                if cat_exp == 0:
+                    continue
+                relevance = abs(driver.normalized_score) * (cat_exp / 5.0)
+                vsum[driver.vc_epicentre] += relevance
+                fsum[driver.force] += relevance * self.config.force_weights[driver.force]
+                for r_idx, region in enumerate(REGIONS):
+                    rsum[region] += relevance * float(presences[j][r_idx]) * float(Wn_lens[c_idx, r_idx])
+            vc_shares[cat] = shares(vsum)
+            force_shares[cat] = shares(fsum)
+            region_shares[cat] = shares(rsum)
 
         force_decomp = {int(y): {} for y in years}
         vc_decomp = {int(y): {} for y in years}
@@ -653,7 +574,7 @@ class MonteCarloEngine:
         # shares). An average of the category bands would ignore how the
         # categories partly offset one another and come out too wide.
         w = self._category_weight_vector()
-        w = np.full(n_cats, 1.0 / n_cats) if w.sum() <= 0 else w / w.sum()
+        w = w / w.sum()
         port = np.tensordot(samples, w, axes=([1], [0]))
         portfolio_path = {}
         for y_idx, year in enumerate(years):
@@ -752,8 +673,7 @@ class MonteCarloEngine:
 
         # Per-chain portfolio median at the terminal year, before pooling.
         w = self._category_weight_vector()
-        w = (w / w.sum()) if w.sum() > 0 else np.full(
-            len(CATEGORIES), 1.0 / len(CATEGORIES))
+        w = w / w.sum()
         per_chain_portfolio_medians = [
             float(np.median(per_chain_cat[i][:, :, last_idx] @ w)) for i in range(n_chains)
         ]
@@ -764,18 +684,18 @@ class MonteCarloEngine:
         result["regional_shift_matrix"] = self._build_regional_matrix(pooled_reg)
         result.update(self._weights_used())
 
-        # The input-driven events (correlation repair, regional coverage) are the
-        # same in every chain: report chain 0's once. Floored factors depend on
-        # the draws, so their count is summed over the chains. The value-chain
-        # events come from the pooled compilation; cell-weight events are merged
-        # by type.
+        # The input-driven events (a correlation repair, a zero cell-weight row)
+        # are the same in every chain: report chain 0's once. Floored factors
+        # depend on the draws, so their count is summed over the chains. The
+        # pooled compilation adds its own zero-row event only where chain 0 has
+        # not already reported one.
         merged = list(chain_engines[0]._integrity_events)
         floored = sum(engine._floored_factor_cells for engine in chain_engines)
         if floored:
             merged.append(floor_event(floored))
         seen = {e.get("type") for e in merged}
         for e in result.get("integrity_events", []):
-            if e.get("type") in ("cell_weight_zero_row", "cell_weights_fallback") and e.get("type") in seen:
+            if e.get("type") == "cell_weight_zero_row" and e.get("type") in seen:
                 continue
             merged.append(e)
         result["integrity_events"] = merged

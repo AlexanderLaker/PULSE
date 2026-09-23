@@ -5,6 +5,7 @@ with the mean p/6 unchanged; UNCERTAINTY_PEAK_JITTER gives the jitter width
 (0/1/1/2/3/4 years). Every driver needs a score: a driver without one cannot
 be simulated.
 """
+import copy
 import re
 from pathlib import Path
 
@@ -12,9 +13,10 @@ import numpy as np
 import pytest
 
 from prism.config import UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER, beta_prior_for, peak_jitter_for
-from prism.drivers import Driver, DriverSet, simulation_problems
+from prism.drivers import Driver, DriverSet, InvalidDriversError, simulation_problems
 from prism.input_drift import compute_input_drift_event, driver_fingerprint
 from prism.engine import MonteCarloEngine
+from support import category_map, region_map
 
 
 class TestPriorMapping:
@@ -30,21 +32,19 @@ class TestPriorMapping:
         for p in range(1, 6):
             assert beta_prior_for(p, 3) == pytest.approx((p, 6 - p))
 
-    def test_out_of_range_scores_are_clamped(self):
-        assert beta_prior_for(4, 9) == beta_prior_for(4, 5)
-        assert beta_prior_for(4, -2) == beta_prior_for(4, 0)
+    @pytest.mark.parametrize("probability, uncertainty", [(4, 9), (4, -2), (0, 3), (6, 3), (None, 3), (4, None)])
+    def test_a_score_off_its_scale_is_refused(self, probability, uncertainty):
+        with pytest.raises(ValueError, match="outside its scale"):
+            beta_prior_for(probability, uncertainty)
 
     def test_the_about_section_states_these_tables(self):
         """The dashboard's About this model section describes the prior and the jitter in words."""
         src = (Path(__file__).resolve().parent.parent / "components" / "dashboard" / "shift"
                / "AboutThisModel.tsx").read_text(encoding="utf-8")
-        assert "&plusmn;1yr" not in src
-        assert not re.search(r"fixed[^.;]{0,30}(concentration|spread)", src)
         k, j = UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER
         assert f"keep the mean and narrow or widen the band, from &alpha;+&beta;={k[0]} at score 0 to {k[5]} at score 5" in src
         assert f"the prior at uncertainty score 3 (&alpha;+&beta;={k[3]})" in src
         assert f"peak-year jitter of &plusmn;{min(j.values())} to &plusmn;{max(j.values())} years" in src
-        assert "unscored" not in src
 
     def test_the_dashboard_copies_of_the_tables_match(self):
         """lib/uncertainty.ts carries the two tables for the editor and the drill-down."""
@@ -80,18 +80,19 @@ class TestDriverModel:
         d.uncertainty = 7
         d.recompute()
         assert d.uncertainty == 7                              # never rewritten silently
-        assert d.probability_prior == beta_prior_for(5, 5)     # the prior reads the end of the scale
+        assert d.probability_prior == (3, 3)                   # neutral, so the driver can be built and checked
         assert any("uncertainty 7" in line for line in simulation_problems([d]))   # and a run refuses it
 
-    def test_a_driver_without_a_score_is_listed_but_never_simulated(self):
+    def test_a_driver_without_a_score_cannot_be_simulated(self):
         d = Driver(id="u2", force="Consumer", probability=4, gp1_pct_affected=0.2)
-        assert d.uncertainty is None and d.probability_prior == (3, 3)   # neutral, for listing only
+        assert d.uncertainty is None and d.probability_prior == (3, 3)
         assert any("uncertainty None" in line for line in simulation_problems([d]))
 
     def test_fingerprint_carries_score_and_diffs_it(self):
-        base = Driver(id="u1", force="Consumer", probability=4, gp1_pct_affected=0.1,
-                     category_exposure={"Hair: Care": 3}, regional_exposure={"Europe": 5},
-                     vc_epicentre="Marketing", peak_year=2029, diffusion_curve="linear", uncertainty=2)
+        base = Driver(id="u1", force="Consumer", direction="Expansion", probability=4, gp1_pct_affected=0.1,
+                     category_exposure=category_map({"Hair: Care": 3}), regional_exposure=region_map({"Europe": 5}),
+                     vc_epicentre="Marketing", start_year=2025, peak_year=2029, diffusion_curve="linear",
+                     uncertainty=2)
         fp0 = driver_fingerprint([base])
         assert fp0["u1"]["u"] == 2
         base.uncertainty = 4
@@ -108,8 +109,8 @@ def _db(uncertainties):
         drivers.append(Driver(
             id=f"t{i}", force="Consumer", name=f"t{i}", direction="Contraction",
             probability=4, start_year=2025, gp1_pct_affected=0.20, peak_year=2029,
-            diffusion_curve="linear", category_exposure={"Hair: Care": 5},
-            regional_exposure={"Europe": 5}, vc_epicentre="Marketing",
+            diffusion_curve="linear", category_exposure=category_map({"Hair: Care": 5}),
+            regional_exposure=region_map({"Europe": 5}), vc_epicentre="Marketing",
             uncertainty=u,
         ))
     return DriverSet(drivers=drivers)
@@ -206,20 +207,20 @@ class TestDatabaseRoundTrip:
         dbm.init_db()
         t = Driver(id="unc_1", force="Consumer", name="x", direction="Contraction",
                   probability=4, start_year=2025, gp1_pct_affected=0.2, peak_year=2029,
-                  diffusion_curve="linear", category_exposure={"Hair: Care": 5},
-                  regional_exposure={"Europe": 5}, vc_epicentre="Marketing", uncertainty=2)
-        t2 = Driver(id="unc_2", force="Consumer", name="y", direction="Expansion",
-                   probability=3, start_year=2025, gp1_pct_affected=0.1, peak_year=2030,
-                   diffusion_curve="linear", category_exposure={"Hair: Care": 5},
-                   regional_exposure={"Europe": 5}, vc_epicentre="Marketing")
-        dbm.save_drivers([t, t2])
+                  diffusion_curve="linear", category_exposure=category_map({"Hair: Care": 5}),
+                  regional_exposure=region_map({"Europe": 5}), vc_epicentre="Marketing", uncertainty=2,
+                  confidence="Medium")
+        t.baseline = t.scores()
+        dbm.insert_drivers([t])
         loaded = {x.id: x for x in dbm.load_drivers()}
         assert loaded["unc_1"].uncertainty == 2
         assert loaded["unc_1"].probability_prior == pytest.approx(beta_prior_for(4, 2))
-        # a missing score loads as missing: listed, never simulated
-        assert loaded["unc_2"].uncertainty is None
-        assert loaded["unc_2"].probability_prior == (3, 3)
-        assert any("uncertainty None" in line for line in simulation_problems([loaded["unc_2"]]))
+        # the database stores no driver without a score
+        unscored = copy.deepcopy(t)
+        unscored.id, unscored.uncertainty = "unc_2", None
+        with pytest.raises(InvalidDriversError, match="uncertainty None"):
+            dbm.insert_drivers([unscored])
+        assert [d.id for d in dbm.load_drivers()] == ["unc_1"]
         # proposals carry the field too
         row = dbm.upsert_driver_proposal("unc_1", "expert-a", {"uncertainty": 4, "probability": 3}, "A")
         assert row["uncertainty"] == 4
@@ -229,19 +230,18 @@ class TestDatabaseRoundTrip:
         agg = aggregate_proposals(rows)
         assert agg["uncertainty"] == {"median": 4, "count": 1}
         summ = build_proposal_summary(rows, "expert-a")
-        assert summ["uncertainty"]["median"] == 4 and summ["my"]["uncertainty"] == 4
+        assert summ["my"]["uncertainty"] == 4
 
 
 class TestOnsetClamp:
     """A jittered peak that lands at or before the onset saturates at "peaks
-    the year after the onset"; it never falls into the schedule's "peak at or
-    before the onset ramps to the horizon" branch, which would turn the
-    earliest draw into the latest arrival."""
+    the year after the onset", the earliest arrival a schedule allows, so the
+    earliest draws arrive earliest."""
 
     def _driver(self, u):
         return Driver(id="clamp", force="Consumer", name="c", direction="Contraction", probability=5,
                      start_year=2025, gp1_pct_affected=0.2, peak_year=2027, diffusion_curve="linear",
-                     category_exposure={"Hair: Care": 5}, regional_exposure={"Europe": 5},
+                     category_exposure=category_map({"Hair: Care": 5}), regional_exposure=region_map({"Europe": 5}),
                      vc_epicentre="Marketing", uncertainty=u)
 
     def test_schedule_table_is_monotone_earlier_for_negative_offsets(self, mock_model_config):

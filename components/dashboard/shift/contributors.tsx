@@ -31,7 +31,7 @@ interface Contributor {
 export function rankContributors(
   category: string, drivers: Driver[], attribution: AttributionResult, median: number,
 ): Contributor[] {
-  const exposed = drivers.filter((d) => (d.category_exposure[category] ?? 0) > 0);
+  const exposed = drivers.filter((d) => d.category_exposure[category] > 0);
   const raw = exposed.map((d) => attribution.byDriver[d.id].category[category][HORIZON]);
   const rawTotal = raw.reduce((a, b) => a + b, 0);
   const scale = Math.abs(rawTotal) > 1e-9 && Math.abs(median) > 1e-9 ? median / rawTotal : 1;

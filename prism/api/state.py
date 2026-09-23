@@ -42,14 +42,14 @@ def driver_set() -> DriverSet:
     An empty drivers table is seeded from prism.seed_drivers, so a new
     database starts with the driver base.
     """
-    from prism.database import drivers_stamp, load_drivers, save_drivers
+    from prism.database import drivers_stamp, insert_drivers, load_drivers
     with _lock:
         ensure_schema()
         stamp = drivers_stamp()
         if stamp[0] == 0:
             from prism.seed_drivers import get_seed_drivers
             logger.warning("The drivers table is empty; seeding it with the driver base")
-            save_drivers(get_seed_drivers())
+            insert_drivers(get_seed_drivers())
             stamp = drivers_stamp()
         if _cache["drivers"] is None or _cache["drivers_stamp"] != stamp:
             _cache["drivers"] = DriverSet(drivers=load_drivers())

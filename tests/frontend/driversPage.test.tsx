@@ -18,7 +18,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor, act, within } from '@testing-library/react';
 import type { DriverProposal, DriverProposalsResponse } from '@/types';
 import type { PrismStore } from '@/hooks/usePrism';
-import { makeDriver, makeStore } from './fixtures/prism';
+import { categoryMap, makeDriver, makeStore } from './fixtures/prism';
 
 const STORE = vi.hoisted(() => ({ current: null as PrismStore | null }));
 const API = vi.hoisted(() => ({ getDriverProposals: vi.fn(), saveMyProposal: vi.fn() }));
@@ -40,7 +40,7 @@ window.scrollTo = (() => {}) as typeof window.scrollTo;
 const PRIVATE_LABEL = makeDriver();
 const GLP1 = makeDriver({
   id: 'consumer_r02', name: 'GLP-1 adoption reshapes personal-care demand', direction: 'Expansion',
-  category_exposure: { 'Hair: Care': 5 },
+  category_exposure: categoryMap({ 'Hair: Care': 5 }),
 });
 
 const response = (my: DriverProposal | null): DriverProposalsResponse => ({
@@ -111,7 +111,7 @@ describe('the states around the list', () => {
 
 describe('the admin editor', () => {
   it('sends the changed exposure cells only, with the revision it started from', async () => {
-    const driver = makeDriver({ revision: 7, category_exposure: { 'Hair: Care': 5, 'Hair: Color': 2 } });
+    const driver = makeDriver({ revision: 7, category_exposure: categoryMap({ 'Hair: Care': 5, 'Hair: Color': 2 }) });
     STORE.current = makeStore({ drivers: [driver] });
     render(<Drivers isAdmin />);
     fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));

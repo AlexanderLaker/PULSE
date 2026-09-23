@@ -6,12 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from prism.database import PENDING_MIGRATION_MARKERS
-from support import load_module
+from support import database_awaiting_a_migration, load_module
 
 REPO = Path(__file__).resolve().parents[1]
-#: The table only a database still awaiting migration 0001 has (prism/database.py).
-AWAITING_0001 = PENDING_MIGRATION_MARKERS["0001_driver_schema"][0]
 
 
 @pytest.fixture
@@ -21,7 +18,7 @@ def seeded(monkeypatch, tmp_path):
     import prism.database as dbm
     from prism.seed_drivers import get_seed_drivers
     dbm.init_db()
-    dbm.save_drivers(get_seed_drivers())
+    dbm.insert_drivers(get_seed_drivers())
     return dbm
 
 
@@ -38,9 +35,8 @@ class TestProductionRun:
         assert production.main([]) == 1
 
     def test_refuses_a_database_awaiting_a_migration(self, production, monkeypatch, tmp_path):
-        import sqlite3
         awaiting = tmp_path / "awaiting.db"
-        sqlite3.connect(awaiting).execute(f"CREATE TABLE {AWAITING_0001} (id TEXT PRIMARY KEY)").connection.close()
+        database_awaiting_a_migration(awaiting)
         monkeypatch.setenv("PRISM_DB_PATH", str(awaiting))
         assert production.main(["--allow-sqlite"]) == 1
 
@@ -70,12 +66,15 @@ class TestProductionRun:
         assert f"vs run #{run['id']}" in events[0]["message"] and "no changes" in events[0]["message"]
 
     def test_a_driver_that_cannot_be_simulated_is_exit_6(self, production, seeded, caplog):
+        """The database refuses a missing or off-scale score itself; what a change made outside PRISM can
+        still leave behind (a missing exposure row, a peak year moved onto the onset) stops the run."""
         with seeded.get_db_connection() as conn:
-            conn.cursor().execute("UPDATE drivers SET gp1_pct_affected = NULL WHERE id = 'consumer_r02'")
-            conn.cursor().execute("UPDATE drivers SET direction = 'Sideways' WHERE id = 'technology_r01'")
+            conn.cursor().execute("DELETE FROM driver_category_exposure "
+                                  "WHERE driver_id = 'consumer_r02' AND category = 'LHC: IC'")
+            conn.cursor().execute("UPDATE drivers SET peak_year = start_year WHERE id = 'technology_r01'")
         assert production.main(["--allow-sqlite", "--iterations", "200"]) == 6
-        assert "driver consumer_r02: gp1_pct_affected None" in caplog.text
-        assert "driver technology_r01: direction 'Sideways'" in caplog.text
+        assert "driver consumer_r02: category_exposure has no score for LHC: IC" in caplog.text
+        assert "driver technology_r01: peak year" in caplog.text
         assert seeded.load_latest_run() is None
 
     def test_the_correlation_check_stops_the_run(self, production, seeded, monkeypatch):
@@ -204,9 +203,8 @@ class TestSyncAnalysis:
         assert "0 with an outdated analysis" in capsys.readouterr().out
 
     def test_a_database_awaiting_a_migration_is_refused(self, monkeypatch, tmp_path, capsys):
-        import sqlite3
         awaiting = tmp_path / "awaiting.db"
-        sqlite3.connect(awaiting).execute(f"CREATE TABLE {AWAITING_0001} (id TEXT PRIMARY KEY)").connection.close()
+        database_awaiting_a_migration(awaiting)
         monkeypatch.setenv("PRISM_DB_PATH", str(awaiting))
         sync = load_module("scripts/sync_analysis.py")
         assert sync.main(["--dry-run"]) == 1

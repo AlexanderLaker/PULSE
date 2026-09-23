@@ -5,7 +5,7 @@
  * editable.
  */
 import type { FC } from 'react';
-import { CATEGORIES, NO_VALUE, REGIONS, shortCat } from '@/lib/format';
+import { CATEGORIES, REGIONS, shortCat } from '@/lib/format';
 import { UNCERTAINTY_LABELS } from '@/lib/uncertainty';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { VC_STEPS, VC_SHORT_LABELS, stageIndex, type VcStep } from '@/lib/valueChain';
@@ -74,7 +74,7 @@ export const CategoryExposureGrid: FC<{ exposures: ExposureMap }> = ({ exposures
           <div className="grid grid-cols-4 gap-3">
             {cats.map((cat) => (
               <div key={cat.name} className="flex flex-col items-center gap-1.5">
-                <ReadDots value={exposures[cat.name] ?? 0} color={S.primary} />
+                <ReadDots value={exposures[cat.name]} color={S.primary} />
                 <div
                   className="text-[11px] font-medium text-center"
                   style={{ color: S.onSurface }}
@@ -101,10 +101,8 @@ export const BaselineMark: FC<{ size?: number }> = ({ size = 9 }) => (
 /** Read-only epicentre rail with its stage labels, for the expanded panel
  *  only: the collapsed rows carry no value-chain cell. A diamond marks the
  *  baseline stage where it differs. */
-export const EpicentreRail: FC<{ stage: string | null; baseline?: string | null }> = ({ stage, baseline }) => {
-  const title = stage == null
-    ? 'Value chain: unscored'
-    : `Value chain epicentre: ${vcStageLabel(stage)}${baseline != null && baseline !== stage ? ` · baseline: ${baseline}` : ''}`;
+export const EpicentreRail: FC<{ stage: string; baseline: string }> = ({ stage, baseline }) => {
+  const title = `Value chain epicentre: ${vcStageLabel(stage)}${baseline !== stage ? ` · baseline: ${baseline}` : ''}`;
   return (
     <div title={title} aria-label={title} style={{ cursor: 'help' }}>
       <div style={{ position: 'relative', height: 40 }}>
@@ -116,21 +114,19 @@ export const EpicentreRail: FC<{ stage: string | null; baseline?: string | null 
             backgroundColor: S.surfaceHighest, transform: 'translateX(-50%)',
           }} />
         ))}
-        {baseline != null && baseline !== stage && (
+        {baseline !== stage && (
           <span style={{
             position: 'absolute', top: 15, left: vcPos(baseline),
             width: 10, height: 10, backgroundColor: S.bg, border: `2px solid ${S.onSurface}`,
             transform: 'translateX(-50%) rotate(45deg)',
           }} />
         )}
-        {stage != null && (
-          <span style={{
-            position: 'absolute', top: 11, left: vcPos(stage),
-            width: 18, height: 18, borderRadius: 999,
-            backgroundColor: S.primary, border: `3px solid ${S.surface}`,
-            outline: `1px solid ${S.cardBorderStrong}`, transform: 'translateX(-50%)',
-          }} />
-        )}
+        <span style={{
+          position: 'absolute', top: 11, left: vcPos(stage),
+          width: 18, height: 18, borderRadius: 999,
+          backgroundColor: S.primary, border: `3px solid ${S.surface}`,
+          outline: `1px solid ${S.cardBorderStrong}`, transform: 'translateX(-50%)',
+        }} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', marginTop: 2 }}>
         {VC_STEPS.map((step, i) => (
@@ -148,10 +144,11 @@ export const EpicentreRail: FC<{ stage: string | null; baseline?: string | null 
 };
 
 /** Editable epicentre slider (Expert Rating and the admin editor): drag the
- *  pin or click a stage; the value snaps to one of the eight stages. */
+ *  pin or click a stage; the value snaps to one of the eight stages. An
+ *  expert's proposal may name no stage yet (value null). */
 export const EpicentreSlider: FC<{
   value: string | null;
-  baseline?: string | null;
+  baseline: string;
   onChange: (stage: VcStep) => void;
 }> = ({ value, baseline, onChange }) => (
   <div>
@@ -163,7 +160,7 @@ export const EpicentreSlider: FC<{
           borderRadius: 999, backgroundColor: S.surfaceHighest, transform: 'translateX(-50%)',
         }} />
       ))}
-      {baseline != null && baseline !== value && (
+      {baseline !== value && (
         <span title={`Baseline: ${baseline}`} style={{
           position: 'absolute', top: 17, left: vcPos(baseline), width: 10, height: 10,
           backgroundColor: S.bg, border: `2px solid ${S.onSurface}`,
@@ -180,10 +177,10 @@ export const EpicentreSlider: FC<{
       )}
       <input
         type="range" min={0} max={VC_STEPS.length - 1} step={1}
-        value={Math.max(0, stageIndex(value ?? baseline ?? 'Supply Chain'))}
+        value={stageIndex(value ?? baseline)}
         onChange={(e) => onChange(VC_STEPS[parseInt(e.target.value, 10)])}
         aria-label="Value chain epicentre"
-        aria-valuetext={value != null ? vcStageLabel(value) : 'unscored'}
+        aria-valuetext={vcStageLabel(value)}
         style={{ position: 'absolute', left: 0, right: 0, top: 8, width: '100%', height: 28, opacity: 0, cursor: 'grab', margin: 0 }}
       />
     </div>
@@ -211,7 +208,7 @@ export const EpicentreSlider: FC<{
         backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontSize: 11, fontWeight: 700,
         fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap', cursor: 'help',
       }}>
-        <BaselineMark /> {baseline != null ? `Baseline: ${baseline}` : `Baseline ${NO_VALUE}`}
+        <BaselineMark /> Baseline: {baseline}
       </span>
       <span style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: S.neutral, fontWeight: 700 }}>Downstream</span>
     </div>
@@ -226,24 +223,25 @@ export const RegionExposureGrid: FC<{ exposures: ExposureMap }> = ({ exposures }
         <div className="text-[11px] font-medium" style={{ color: S.onSurface }}>
           {region}
         </div>
-        <ReadDots value={exposures[region] ?? 0} color={S.primary} />
+        <ReadDots value={exposures[region]} color={S.primary} />
       </div>
     ))}
   </div>
 );
 
 /** Uncertainty picker: six labelled buttons, 0 to 5 (0 is a real score,
- *  unlike probability), with the baseline score outlined. */
+ *  unlike probability), with the baseline score outlined. An expert's
+ *  proposal may leave it empty (value null). */
 export const UncertaintyPicker: FC<{
   value: number | null | undefined;
-  baseline?: number | null;
+  baseline: number;
   onChange: (v: number) => void;
   /** Clicking the selected score again clears it (Expert Rating). */
   onClear?: () => void;
 }> = ({ value, baseline, onChange, onClear }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
     <div role="radiogroup" aria-label="Uncertainty score" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}
-      title={baseline != null ? `Baseline ${baseline} / 5 (${UNCERTAINTY_LABELS[baseline]})` : undefined}>
+      title={`Baseline ${baseline} / 5 (${UNCERTAINTY_LABELS[baseline]})`}>
       {[0, 1, 2, 3, 4, 5].map((v) => {
         const on = value != null && Math.round(value) === v;
         return (
@@ -271,10 +269,10 @@ export const UncertaintyPicker: FC<{
   </div>
 );
 
-/** The hover on an exposure cell: its baseline score; undefined without a
- *  baseline, so the dots keep their own "N / 5" labels. */
-const baselineHint = (v: number | undefined): string | undefined =>
-  v == null ? undefined : `Baseline ${v} / 5`;
+/** The hover on an exposure cell: its baseline score, where the grid shows one;
+ *  without it the dots keep their own "N / 5" labels. */
+const baselineHint = (baseline: ExposureMap | undefined, key: string): string | undefined =>
+  baseline == null ? undefined : `Baseline ${baseline[key]} / 5`;
 
 // Dot fill for a fractional score: a full dot is solid, a partial one fills
 // from the left (a mean of 3.2 fills a fifth of the fourth dot), an empty one
@@ -316,7 +314,7 @@ const CURVE_PATHS: Record<string, string> = {
   linear: 'M2,16 L26,2',
   front_loaded: 'M2,16 Q6,3 26,2',
   back_loaded: 'M2,16 Q22,15 26,2',
-  step_function: 'M2,16 L18,16 L18,2 L26,2',
+  step_function: 'M2,16 L21,15.3 L26,2',
 };
 export const DiffusionGlyph: FC<{ curve: string; color: string }> = ({ curve, color }) => (
   <svg width="30" height="18" viewBox="0 0 28 18" aria-hidden="true">
@@ -451,11 +449,11 @@ export const EditableCategoryGrid: FC<{
             {cats.map((cat) => (
               <div key={cat.name} className="flex flex-col items-center gap-1.5">
                 <EditableDots
-                  value={clearable ? exposures[cat.name] : (exposures[cat.name] ?? 0)}
+                  value={exposures[cat.name]}
                   onChange={(v) => onChange(withCell(exposures, cat.name, v))}
                   label={`${cat.name} exposure`}
                   clearable={clearable}
-                  hint={baselineHint(baseline == null ? undefined : (baseline[cat.name] ?? 0))}
+                  hint={baselineHint(baseline, cat.name)}
                 />
                 <div
                   className="text-[11px] font-medium text-center"
@@ -486,11 +484,11 @@ export const EditableRegionGrid: FC<{
           {region}
         </div>
         <EditableDots
-          value={clearable ? exposures[region] : (exposures[region] ?? 0)}
+          value={exposures[region]}
           onChange={(v) => onChange(withCell(exposures, region, v))}
           label={`${region} exposure`}
           clearable={clearable}
-          hint={baselineHint(baseline == null ? undefined : (baseline[region] ?? 0))}
+          hint={baselineHint(baseline, region)}
         />
       </div>
     ))}
