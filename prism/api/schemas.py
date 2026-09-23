@@ -1,8 +1,8 @@
 """Request bodies of the write endpoints."""
 import re
-from typing import Optional
+from typing import Annotated, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StrictInt, model_validator
 
 from prism.config import DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS
 from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, SOURCE_TIERS
@@ -12,19 +12,31 @@ from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, SOURCE_TIERS
 FIRST_PEAK, LAST_PEAK = DEFAULT_BASE_YEAR + 1, DEFAULT_PATH_YEARS[-1]
 
 
-def one_of(values) -> str:
+def pattern_one_of(values) -> str:
     """A regular expression that matches exactly one of the values."""
     return "^(" + "|".join(re.escape(v) for v in values) + ")$"
 
 
+def _not_a_bool(value):
+    if isinstance(value, bool):
+        raise ValueError("a share is a number, not true or false")
+    return value
+
+
+#: A number that JSON's true and false do not pass for (the whole-number
+#: scores are StrictInt for the same reason).
+Share = Annotated[float, BeforeValidator(_not_a_bool)]
+
+
 class SourceRef(BaseModel):
-    """One piece of evidence behind a driver: a title, a link, or both; its
-    credibility tier (empty when unrated) and when it was published."""
+    """One piece of evidence behind a driver: a title, an http(s) link, or
+    both; its credibility tier (empty when unrated) and when it was
+    published."""
     model_config = ConfigDict(extra="forbid")
 
     title: str = Field("", max_length=500)
-    url: str = Field("", max_length=2000)
-    tier: str = Field("", pattern=one_of(("",) + SOURCE_TIERS))
+    url: str = Field("", max_length=2000, pattern=r"^(https?://\S+)?$")
+    tier: str = Field("", pattern=pattern_one_of(("",) + SOURCE_TIERS))
     published: str = Field("", max_length=500)
 
     @model_validator(mode="after")
@@ -47,15 +59,15 @@ class DriverUpdate(BaseModel):
     """
     model_config = ConfigDict(extra="forbid")
 
-    revision: int = Field(..., ge=1)
+    revision: StrictInt = Field(..., ge=1)
     description: Optional[str] = Field(None, max_length=20000)
-    direction: Optional[str] = Field(None, pattern=one_of(DIRECTIONS))
-    probability: Optional[int] = Field(None, ge=1, le=5)
-    gp1_pct_affected: Optional[float] = Field(None, gt=0.0, le=1.0)
-    peak_year: Optional[int] = Field(None, ge=FIRST_PEAK, le=LAST_PEAK)
+    direction: Optional[str] = Field(None, pattern=pattern_one_of(DIRECTIONS))
+    probability: Optional[StrictInt] = Field(None, ge=1, le=5)
+    gp1_pct_affected: Optional[Share] = Field(None, gt=0.0, le=1.0)
+    peak_year: Optional[StrictInt] = Field(None, ge=FIRST_PEAK, le=LAST_PEAK)
     diffusion_curve: Optional[str] = None
-    uncertainty: Optional[int] = Field(None, ge=0, le=5)
-    confidence: Optional[str] = Field(None, pattern=one_of(CONFIDENCE_LEVELS))
+    uncertainty: Optional[StrictInt] = Field(None, ge=0, le=5)
+    confidence: Optional[str] = Field(None, pattern=pattern_one_of(CONFIDENCE_LEVELS))
     category_exposure: Optional[dict] = None
     regional_exposure: Optional[dict] = None
     vc_epicentre: Optional[str] = None
@@ -71,11 +83,11 @@ class ProposalUpdate(BaseModel):
     """
     model_config = ConfigDict(extra="forbid")
 
-    probability: Optional[int] = Field(None, ge=1, le=5)
-    gp1_pct_affected: Optional[float] = Field(None, gt=0.0, le=1.0)
-    peak_year: Optional[int] = Field(None, ge=FIRST_PEAK, le=LAST_PEAK)
+    probability: Optional[StrictInt] = Field(None, ge=1, le=5)
+    gp1_pct_affected: Optional[Share] = Field(None, gt=0.0, le=1.0)
+    peak_year: Optional[StrictInt] = Field(None, ge=FIRST_PEAK, le=LAST_PEAK)
     diffusion_curve: Optional[str] = None
-    uncertainty: Optional[int] = Field(None, ge=0, le=5)
+    uncertainty: Optional[StrictInt] = Field(None, ge=0, le=5)
     category_exposure: Optional[dict] = None
     regional_exposure: Optional[dict] = None
     vc_epicentre: Optional[str] = None

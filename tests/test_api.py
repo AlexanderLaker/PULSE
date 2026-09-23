@@ -374,6 +374,9 @@ class TestDrivers:
         {"regional_exposure": {"Latin America": 2}}, {"vc_epicentre": "Retail"}, {"vc_epicentre": None},
         {"value_chain": {"Marketing": 5}},
         {"sources": [{"title": "", "url": ""}]}, {"sources": [{"title": "x", "tier": "Z"}]},
+        {"sources": [{"title": "x", "url": "javascript:alert(1)"}]}, {"sources": [{"url": "example.org/a"}]},
+        {"probability": True}, {"probability": 4.0}, {"uncertainty": False}, {"gp1_pct_affected": True},
+        {"peak_year": "2031"},
     ])
     def test_invalid_edits_are_refused(self, api, body):
         response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"revision": 1, **body})
@@ -489,6 +492,8 @@ class TestProposals:
         assert api.put(path, headers=bearer(), json={"gp1_pct_affected": 0}).status_code == 422
         assert api.put(path, headers=bearer(), json={"peak_year": 2025}).status_code == 422   # not after the onset
         assert api.put(path, headers=bearer(), json={"user_id": "someone-else"}).status_code == 422
+        for boolean in ({"probability": True}, {"uncertainty": False}, {"gp1_pct_affected": True}):
+            assert api.put(path, headers=bearer(), json=boolean).status_code == 422, boolean
         assert api.put("/api/v1/drivers/nope/proposals", headers=bearer(), json={"probability": 3}).status_code == 404
 
 
