@@ -6,10 +6,10 @@ Henkel Consumer Brands (HCB) gain or lose by each year from 2026 to 2035? The
 answer is a distribution, because every driver's materialisation is
 uncertain; PRISM reports its percentiles.
 
-This document describes the engine (`prism/simulation/bayesian_mc.py`) and
-its configuration (`prism/config.py`). docs/DRIVERS.md describes the inputs a
-driver carries, docs/DRIVER_ANALYSIS.md the per-driver attribution built on
-the same arithmetic.
+This document describes the engine (`prism/engine.py`) and its configuration
+(`prism/config.py`). docs/DRIVERS.md describes the inputs a driver carries,
+docs/DRIVER_ANALYSIS.md the per-driver attribution built on the same
+arithmetic.
 
 ## Reading the output
 
@@ -38,8 +38,8 @@ the same arithmetic.
 | Correlation across forces | a 6 x 6 matrix, values 0.04 to 0.22 | Structured judgment; positive definite as entered |
 | Cell weights | the estimated HCB gross-profit mix, 13 x 4 | `scripts/build_cell_weights.py`; replaced by the finance file at run time |
 | Base year, path | 2025; 2026 to 2035 | |
-| Peak-year jitter | on (width 1 year for a driver without an uncertainty score) | `peak_year_jitter`; 0 switches timing jitter off for every driver |
-| Iterations | 3 chains x 50,000 in production | `scripts/run_production.py` |
+| Peak-year jitter | on, each driver within the width its uncertainty score sets | `peak_year_jitter`; off, every driver peaks in its own year |
+| Iterations | 3 chains x 50,000 in production, master seed 42 | `PRODUCTION_CHAINS`, `PRODUCTION_ITERATIONS`, `PRODUCTION_SEED` |
 
 The configuration is code: changing a parameter is a reviewed change to
 `prism/config.py` (or to the generator that writes it) followed by a new
@@ -67,15 +67,12 @@ prior's mean is always `p / 6`; the uncertainty score sets its concentration
 alpha = max(0.5, kappa x p / 6)      beta = max(0.5, kappa - alpha)
 ```
 
-A driver without an uncertainty score gets `(alpha, beta) = (p, 6 - p)`, the
-same prior as `u = 3`. The prior means by probability score are 0.17, 0.33,
-0.50, 0.67 and 0.83. The priors are structured judgment and are never updated
-from data.
+The prior means by probability score are 0.17, 0.33, 0.50, 0.67 and 0.83.
+The priors are structured judgment and are never updated from data.
 
 The draws are correlated through a Gaussian copula. The driver-level
 correlation matrix `R` takes the within-force value for two drivers of the
-same force and the force-pair value otherwise (0.05 for a pair the matrix
-does not name). Then
+same force and the force-pair value otherwise. Then
 
 ```
 Z ~ N(0, R)      U = Phi(Z), clipped to [1e-12, 1 - 1e-12]      p_j = BetaInv(U_j; alpha_j, beta_j)
@@ -116,15 +113,16 @@ onset to peak:
 
 Each iteration moves every driver's peak year by an integer offset `k`
 between `-w` and `+w`, drawn with weights `w + 1 - |k|` (a symmetric
-triangle), where `w` is the driver's jitter width from the table above; a
-driver without an uncertainty score takes the global width of 1 year. A
+triangle), where `w` is the driver's jitter width from the table above. A
 jittered peak never falls on or before the onset: it stops at the year after
 it. This gives the timing bands their meaning, "arrives a year earlier or
 later".
 
-Every driver of the base carries its own peak year and curve. A driver
-without them follows its force's default schedule (`prism/config.py`), gated
-by its onset.
+Every driver carries its own onset, peak year, curve and uncertainty score.
+The engine has no defaults for them: a driver that lacks one, or whose peak
+does not come after its onset, is refused before the first draw
+(`prism/drivers.py`, `simulation_problems`), and so is one without a known
+value-chain epicentre.
 
 ### 4. Exposure
 
@@ -154,9 +152,11 @@ n_eff = (sum of mu)^2 / (sum of mu^2),   mu_j = |E[s_j]| x x_jcr
 within-force overlap. `n_eff` is the effective number of contributing drivers:
 it equals their count when they contribute equally, approaches 1 when one
 dominates, and changes in proportion to a driver's size, so a small driver
-changes it little. With every overlap below 0.5 this guarantees that adding a
-driver moves its force's total in the driver's own direction: a small
-tailwind never worsens a cell and a small headwind never improves it.
+changes it little. The dampening is set from the score means, and with every
+overlap below 0.5 adding a driver moves its force's total at the means in the
+driver's own direction: a small tailwind never worsens a cell and a small
+headwind never improves it. A single iteration, whose draws differ from the
+means, can deviate slightly.
 
 ### 6. Compounding across forces
 
@@ -199,7 +199,8 @@ an integrity event.
   the difference of two medians.
 - **The portfolio band.** The portfolio shift is computed per iteration and
   its percentiles are taken afterwards. Averaging the category bands would
-  give a band that is too narrow.
+  ignore how the categories partly offset one another and give a band that is
+  too wide.
 - **The lenses.** The Shift Analysis splits each category's median by force,
   by value-chain stage and by region. A driver's weight in a category is
   `|E[s_j]| x category exposure / 5`; the force lens multiplies it by the
@@ -209,10 +210,14 @@ an integrity event.
   modelled). Each lens's shares add up to 1, so every lens adds up to the same
   median. The lenses are attributions of one simulated number, not separate
   simulations, and they use magnitudes: a lens shows how much of a median each
-  force, stage or region accounts for, not the direction of its own push.
+  force, stage or region accounts for, not the direction of its own push. The
+  per-driver attribution behind the drill-down and the PRISM Analysis
+  (docs/DRIVER_ANALYSIS.md) evaluates the engine's arithmetic itself, with
+  signs, timing and the overlap correction, so its totals by force or region
+  can differ from these lenses.
 - **Monte Carlo standard error.** A bootstrap (200 resamples) of each
   category's terminal-year median, P10 and P90. At 3 x 50,000 iterations it is
-  about 0.001 percentage points, far below the one-decimal display. It
+  about 0.001 to 0.002 percentage points, far below the one-decimal display. It
   measures sampling noise only, never model error. The About this model
   section of the Shift Analysis shows the largest standard error of a
   category median next to the seed stability.
@@ -257,8 +262,8 @@ outcomes. `scripts/compute_attenuation.py` computes it in five steps:
    counts as noise;
 3. across forces only, an asymmetric force-size factor `sqrt(n_j / n_i)`,
    capped at 1.5;
-4. an additive mechanism adjustment per force pair, each with its written
-   reason in the script;
+4. additive mechanism adjustments, per force (to the within-force overlap)
+   and per force pair, each with its written reason in the script;
 5. clamps: within a force to [0.10, 0.45], across forces to [0.00, 0.45].
 
 The result is the within-force overlap `ov_f` of step 5 above and the
@@ -276,8 +281,10 @@ base carries the edit.
 
 The roll-up weights each of the 52 cells with its share of HCB gross profit.
 Until finance provides the real shares, the engine uses an **estimate built
-from public reporting and category knowledge. It is not Henkel P&L**, and
-every place that shows a number built on it says so.
+from public reporting and category knowledge. It is not Henkel P&L.** The
+Shift Analysis says so under its heading whenever the served run stands on
+it, and so do the run details under About this model, Settings, the QA
+workbook and the basis line of every PRISM Analysis.
 
 `scripts/build_cell_weights.py` builds it as
 
@@ -292,7 +299,7 @@ region vector times a category vector and regional concentration moves the
 category numbers. Every input carries a grade: **B** public reporting
 supports it, **E** defensible but unverified, **G** low-confidence guess. The
 record is `data/calibration/cell_weights_estimate.json`; Settings shows the
-whole derivation.
+whole derivation whenever the served run used this estimate.
 
 The estimate's marginals are: categories Colour 17.1, Care 13.0, Styling 7.1,
 Body 8.0, Fabric Clean 24.1, Fabric Care 4.3, Fabric Finishers 6.7, Laundry
@@ -315,7 +322,8 @@ records its seeds and the scipy and numpy versions it computed with. scipy is
 a hard requirement: the engine refuses to import without it, and there is no
 approximate fallback. `tests/test_golden_pipeline.py` pins the engine's
 output on a fixed set of drivers; the pins change only with a deliberate
-model change, in the same commit, together with a new `MODEL_VERSION`.
+change of the model (together with a new `MODEL_VERSION`) or of those
+drivers, in the same commit.
 
 ## The reference result
 
@@ -350,6 +358,6 @@ bugs or reads more into the numbers than they hold.
 - **The value chain is an attribution.** The value-chain epicentre feeds the
   value-chain lens only, never the shift, and no effect propagates along the
   chain.
-- **Structured-judgment layers.** The overlap correction, the correlations and
-  the cell-weight estimate are judgment, documented and graded, not
-  estimated from data.
+- **Structured-judgment layers.** The overlap correction (every adjustment
+  with its written reason), the correlations and the cell-weight estimate
+  (every input graded) are judgment, not estimated from data.

@@ -634,8 +634,8 @@ class MonteCarloEngine:
 
         # The portfolio band is the joint percentile of the per-iteration
         # portfolio shift (category shifts weighted by their gross-profit
-        # shares), not an average of the category bands, which would be
-        # narrower than the truth.
+        # shares). An average of the category bands would ignore how the
+        # categories partly offset one another and come out too wide.
         w = self._category_weight_vector()
         w = np.full(n_cats, 1.0 / n_cats) if w.sum() <= 0 else w / w.sum()
         port = np.tensordot(samples, w, axes=([1], [0]))

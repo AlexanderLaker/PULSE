@@ -13,13 +13,15 @@ drivers' category exposure vectors, not a fit to outcomes:
   5. clamps: within-force [0.10, 0.45], cross-force [0.00, 0.45]
 
 and per force the attenuation is 0.5 x (1 - the mean of the force's row in the
-cross-force matrix over the five other forces). The script also reports the minimum eigenvalue of the
-driver-level copula correlation matrix the default correlations imply on this
-driver base; it must stay positive.
+cross-force matrix over the five other forces). The script also reports the
+minimum eigenvalue of the driver-level copula correlation matrix the default
+correlations imply on this driver base; it must stay positive.
 
-The result depends on the exposure space, so re-run the script whenever the
-taxonomy or the exposure scores change, copy the three blocks it prints into
-prism/config.py and give the new record its own CALIBRATION_VERSION.
+The result depends on the exposure space and on how many drivers each force
+has, so re-run the script whenever the taxonomy, the exposure scores or the
+drivers change, copy the three blocks it prints into prism/config.py and give
+the new record its own CALIBRATION_VERSION. The new values move the model's
+numbers: a new MODEL_VERSION and new golden pins go with them.
 
     python3 scripts/compute_attenuation.py           write the record, print the blocks for prism/config.py
     python3 scripts/compute_attenuation.py --check   exit 1 if the record or prism/config.py is out of date

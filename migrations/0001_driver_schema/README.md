@@ -1,10 +1,10 @@
 # Migration 0001: the driver schema
 
-A database that PRISM ran on before this release has the previous schema: the
-drivers sit in a table called `trends`, next to tables nothing reads any more.
-The API and the production run of this release refuse such a database (the
-API answers 503 with a message naming this migration, the production run
-exits with code 1) and write nothing to it. The dashboard's role table,
+A database of the previous schema keeps the drivers in a table called
+`trends`, next to tables the driver schema does not have. The API and the
+production run refuse such a database (the API answers 503 with a message
+naming this migration, the production run exits with code 1) and write
+nothing to it. The dashboard's role table,
 `user_roles`, is not part of the migration and keeps working throughout.
 `migrate.py` moves a database onto the current schema in one transaction.
 What it changes is listed in its docstring; in short:
@@ -18,10 +18,10 @@ What it changes is listed in its docstring; in short:
   as eight scores drawn around the stage an expert chose; the migration keeps
   the stage those scores centre on, the one the dashboard showed, for every
   driver, every expert proposal and every baseline;
-- the tables and `simulation_runs` columns nothing reads are dropped, after
-  their rows are written to a local archive file. Nothing is dropped with
-  `CASCADE`: if a table the migration does not know depends on one it drops,
-  it stops and changes nothing;
+- the tables and `simulation_runs` columns the driver schema does not have
+  are dropped, after their rows are written to a local archive file. Nothing
+  is dropped with `CASCADE`: if a table the migration does not know depends on
+  one it drops, it stops and changes nothing;
 - the stored runs get the current key names (`meta.driver_count`,
   `meta.driver_fingerprint`); no number changes;
 - each driver gets its current PRISM Analysis text, and descriptions and

@@ -21,8 +21,10 @@ or a weight changes.
 - The record carries the reference run and a digest of its inputs; `--check`
   fails when the inputs change or the reference stops reproducing the recorded
   production run.
-- The category drill-down ranks drivers with a TypeScript port of the same
-  decomposition, held to the Python record by a parity fixture.
+- The Shift Analysis uses a TypeScript port of the same decomposition, held
+  to the Python one by a parity fixture: the category drill-down ranks its
+  drivers with it and the Time Path's impact filter splits the median with
+  it.
 
 ## Consequences
 

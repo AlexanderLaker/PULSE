@@ -52,16 +52,18 @@ export const MetaChip: FC<{ label: string }> = ({ label }) => (
 
 // ─── Source tier: the credibility scale, from S (official regulators and
 // statistics) to E (social, unverified); the tooltip explains each tier. ─
+// The grades the driver base uses (docs/DRIVERS.md, Sources); a + or - moves
+// a source a little up or down from its grade, for a reason its note gives.
 export const TIER_CONFIG: Record<SourceTier, { color: string; description: string }> = {
-  'S':  { color: '#22c55e', description: 'Official regulatory / statistical authority' },
-  'A':  { color: '#3b82f6', description: 'Tier-1 consulting or analyst primary research' },
-  'A-': { color: '#60a5fa', description: 'Investment-bank equity research' },
-  'B+': { color: '#a78bfa', description: 'Specialist market-research firm' },
-  'B':  { color: '#c084fc', description: 'Industry trade press' },
-  'B-': { color: '#e879f9', description: 'Company first-party source' },
+  'S':  { color: '#22c55e', description: 'Statute, regulator, official statistics or peer-reviewed research' },
+  'A':  { color: '#3b82f6', description: 'Analyst, consulting or market-measurement research; a major poll or major press; a company’s reports, results or published positions' },
+  'A-': { color: '#60a5fa', description: 'A little below A; the note says why' },
+  'B+': { color: '#a78bfa', description: 'A little above B; the note says why' },
+  'B':  { color: '#c084fc', description: 'Specialist research firm or trade press; an earnings-call transcript; a survey' },
+  'B-': { color: '#e879f9', description: 'A little below B; the note says why' },
   'C':  { color: '#f59e0b', description: 'General business press' },
-  'D':  { color: '#ef4444', description: 'Aggregator / forecast' },
-  'E':  { color: '#991b1b', description: 'Social / unverified' },
+  'D':  { color: '#ef4444', description: 'Aggregator or forecast' },
+  'E':  { color: '#991b1b', description: 'Social media or unverified' },
 };
 export const TIER_OPTIONS = Object.keys(TIER_CONFIG) as SourceTier[];
 

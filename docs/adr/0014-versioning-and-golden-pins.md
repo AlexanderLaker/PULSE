@@ -15,6 +15,8 @@ the API and the dashboard also need to agree on which model they describe.
 - A change to any number the model produces is a deliberate model change: a
   new version, the golden pins of `tests/test_golden_pipeline.py`
   regenerated in the same commit, and a new production run after the deploy.
+  The pins also move when the fixture drivers they are computed on change;
+  such a commit says so and keeps the version.
 - A result key the dashboard needs is listed in `prism/api/runs.py`; the API
   refuses to serve a run without it, so an incompatible run is reported
   instead of rendered wrongly.

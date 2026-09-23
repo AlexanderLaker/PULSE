@@ -9,8 +9,8 @@ numbers that carry the hierarchy while the chrome stays quiet.
 
 | File | Holds |
 |---|---|
-| `lib/theme.ts` | `S`, the colour tokens of surfaces, text, borders, status and overlays; `SHADOW`, one shadow per kind of surface; `INK_RGB` and `PRIMARY_RGB` for tints with their own alpha; the three font stacks (`HEADLINE_FONT`, `BODY_FONT`, `MONO_FONT`) |
-| `lib/format.ts` | the shift colours (`EXPANSION`, `CONTRACTION`, `NEUTRAL`, their soft tints and RGB channels), the matrix heat ramp, the force colours (`FORCE_COLORS`) and the category colours (`CATEGORIES`) |
+| `lib/theme.ts` | `S`, the colour tokens of surfaces, text, borders, status and overlays, and the shift pair; `SHADOW`, one shadow per kind of surface; `INK_RGB`, `PRIMARY_RGB`, `EXPANSION_RGB` and `CONTRACTION_RGB` for tints with their own alpha; the three font stacks (`HEADLINE_FONT`, `BODY_FONT`, `MONO_FONT`) |
+| `lib/format.ts` | the shift colours as the views use them (`EXPANSION`, `CONTRACTION`, `EXPANSION_SOFT`, `shiftColor`, which falls back to `mutedText` for a flat shift), built on the theme's pair; the matrix heat ramp; the force colours (`FORCE_COLORS`) and the category colours (`CATEGORIES`) |
 | `tailwind.config.ts` | Tailwind's colours and shadows, read from `lib/theme.ts` under kebab-case names: `bg-theme-primary`, `text-theme-on-surface-variant`, `shadow-door` |
 | `app/globals.css` | the base layer: reset, focus ring, selection, scrollbar, input focus, Recharts grid lines, reduced motion and the frame of Clerk's forms; its colours come from the same tokens through Tailwind's `theme()` |
 | `app/layout.tsx` | the fonts (self-hosted with next/font) and Clerk's appearance: its variables from `S`, its element classes in the theme's Tailwind names |
@@ -19,7 +19,9 @@ Components style themselves inline from these tokens and use Tailwind for
 layout and spacing; where a class has to carry a colour or a shadow (Clerk's
 elements take classes, and a hover state is simplest as a class), it uses the
 theme's names. A literal colour anywhere else in the dashboard's code fails
-`tests/test_repository.py`. Three palettes belong to a single view and live
+`tests/test_repository.py`, and so do a named colour (`'white'`) and a class
+of Tailwind's own palette (`bg-white`, `text-slate-500`), which bypass the
+tokens the same way. Three palettes belong to a single view and live
 in it: the source-tier colours on the Drivers page
 (`components/dashboard/drivers/cards.tsx`), the washes of the entry gate's
 doors (`HomeGate.tsx`) and the Explorer's bar fills
@@ -50,13 +52,14 @@ its arrow).
 | `amber` | `#b45309` | warnings, estimate grades |
 | `expert`, `delta` | `#6b4fc4`, `#b07d2b` | on the Drivers page, the expert aggregate and the chip with its delta to the baseline |
 
-Shadows are navy-based (`rgba(0, 52, 94, ...)`), never black, and there is one
-per kind of surface (`SHADOW`): `card` (`0 4px 60px -15px rgba(0, 52, 94,
-0.08)`), `popover` for hover cards, chart tooltips and menus, `tip` for the
-dark tooltips, `dialog`, `sheet` for the Explorer's side panel, `nav`,
-`raised` for the active segment of a segmented control, `lift` for a card
-under the pointer, `primaryButton`, `authCard`, and `door` and `doorHover` for
-the entry gate.
+Shadows are tinted, never black: navy (`rgba(0, 52, 94, ...)`) under
+surfaces, the primary blue under a primary button (`primaryButton`) and a card
+lifting under the pointer (`lift`). There is one per kind of surface
+(`SHADOW`): `card` (`0 4px 60px -15px rgba(0, 52, 94, 0.08)`), `popover` for
+hover cards, chart tooltips and menus, `tip` for the dark tooltips, `dialog`,
+`sheet` for the Explorer's side panel, `nav`, `raised` for the active segment
+of a segmented control, `lift`, `primaryButton`, `authCard`, and `door` and
+`doorHover` for the entry gate.
 
 ### Shifts
 
@@ -81,7 +84,8 @@ used for interface chrome.
 
 | Role | Font |
 |---|---|
-| Headlines, tab labels, large figures | Manrope, 700 to 800 |
+| Headlines and large figures | Manrope, 700 to 800 |
+| Navigation tabs | Manrope, 600 |
 | Body text and controls | Inter |
 | Figures in tables and formulas | JetBrains Mono, or Inter with tabular numerals |
 
@@ -115,8 +119,10 @@ value a reader needs.
 ## Shapes and patterns
 
 - Cards: 12 to 16 px radius, white, with the card shadow or a hairline
-  border. Controls (buttons, chips, tab pills): fully rounded. Inputs and
-  small nested elements: 8 to 10 px.
+  border. Buttons, chips and tab pills: fully rounded. Segmented controls (the
+  lens and filter toggles of the Shift Analysis) and the year stepper: a 9 to
+  10 px track with 7 px segments. Inputs and small nested elements: 8 to
+  10 px.
 - Top navigation: the wordmark and the production tabs on the left; the beta
   tab, settings and the user on the right. The active tab is primary blue with
   an underline; beta tabs use the muted scale.
@@ -136,4 +142,6 @@ value a reader needs.
 - Time-path cells of the matrix carry an accessible label with the median and
   the band.
 - Ratings are radio groups; the scoring mode toggle is a tab list.
-- Motion respects `prefers-reduced-motion`.
+- Motion respects `prefers-reduced-motion`: the CSS animations and
+  transitions through `globals.css`, the framer-motion animations through
+  `MotionConfig` in the dashboard page.

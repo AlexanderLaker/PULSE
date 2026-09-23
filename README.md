@@ -4,9 +4,10 @@ PRISM (Profit Pool Risk & Intelligence Simulation Model) estimates how the
 external drivers of Henkel Consumer Brands' business shift the gross profit
 (GP1) of its categories between 2026 and 2035. Experts score 51 Profit Pool
 Drivers; a Monte Carlo engine turns the scores into relative shifts per
-category, region and year, each with a P10 to P90 band, and attributes every
-shift to the forces, value-chain stages and regions behind it; a dashboard
-shows the latest production run next to the drivers behind it.
+category, region and year, each with a P10 to P90 band, and splits each
+category's median shift across the forces, value-chain stages and regions
+behind it; a dashboard shows the latest production run next to the drivers
+behind it.
 
 The numbers are relative shifts, never amounts: a reader applies them to their
 own figures, `GP1_2035 = GP1_today x (1 + shift)`. They hold strategy
@@ -74,7 +75,7 @@ its own; docs/OPERATIONS.md (Roles) shows how to work as an admin locally.
 | `hooks/`, `types/` | The data store and the types that mirror the API's JSON |
 | `lib/` | Shared logic: the API client, formatting, the Shift Matrix arithmetic, cell weights, the per-driver attribution, tokens, auth helpers |
 | `data/` | Dashboard content (the Consumer Journey, the generated driver code map), the driver base and the PRISM Analysis templates (`drivers/`), and the generated records of the overlap correction, the cell-weight estimate and the attribution (`calibration/`, `drivers/driver_attribution.json`) |
-| `prism/` | The Python package: the engine (`simulation/`), the model configuration, persistence and the API (`api/`) |
+| `prism/` | The Python package: the engine (`engine.py`), the model configuration, the driver base, persistence, the QA workbook and the API (`api/`) |
 | `api/index.py` | The Vercel entry point of the API |
 | `scripts/` | The production run, the generators and maintenance tools |
 | `migrations/` | One-time database migrations, each with its runbook |
@@ -107,7 +108,7 @@ Vercel the same variables are set in the project settings.
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | dashboard (also at build time) | Clerk publishable key |
 | `CLERK_SECRET_KEY` | dashboard | Clerk secret key |
 | `CLERK_WEBHOOK_SIGNING_SECRET` | dashboard | Verifies the Clerk webhook that adds new users to `user_roles` |
-| `DATABASE_URL` | dashboard, API, scripts | The PostgreSQL database. The API and the scripts also accept `POSTGRES_URL`, which wins when both are set; the dashboard reads `DATABASE_URL` only |
+| `DATABASE_URL` | dashboard, API, scripts | The PostgreSQL database. Every part also accepts `POSTGRES_URL`, which wins when both are set |
 | `PRISM_JWT_SECRET` | dashboard, API | Signs the tokens between the dashboard and the API; at least 32 characters, the same value on both sides |
 | `NEXT_PUBLIC_SIGNUP_CODE` | dashboard (at build time) | The access code the sign-up page asks for (without it the page asks for `HCB2026`). It is readable in the browser, so who may sign up is restricted in Clerk (docs/OPERATIONS.md) |
 | `ADMIN_BOOTSTRAP_SECRET` | dashboard | Enables `/api/admin/bootstrap` while set; remove it once an admin exists |
@@ -131,4 +132,4 @@ pointed at another database. Set both URLs, because `POSTGRES_URL` wins when
 | [docs/DESIGN.md](docs/DESIGN.md) | The visual design system |
 | [docs/EXPLORER.md](docs/EXPLORER.md) | The data behind the Profit Pool Explorer |
 | [docs/adr/](docs/adr/README.md) | The design decisions and why they were taken |
-| [migrations/0001_driver_schema/README.md](migrations/0001_driver_schema/README.md) | Moving a database of the previous release onto this one |
+| [migrations/0001_driver_schema/README.md](migrations/0001_driver_schema/README.md) | The one-time migration of a database to the driver schema, and its runbook |

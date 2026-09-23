@@ -16,8 +16,8 @@ probability score does not say.
   structured judgment and is never updated from data.
 - One uncertainty score per driver (0 to 5) sets the prior's concentration
   (24, 16, 10, 6, 4, 3) and the width of its peak-year jitter (0, 1, 1, 2, 3,
-  4 years). A driver without a score gets concentration 6 and the global
-  one-year jitter.
+  4 years). Every driver carries one; a driver without it cannot be
+  simulated.
 - Confidence (how well the present state is evidenced) is shown on the page
   and does not enter the simulation.
 - A driver is scored in one direction. There are no two-sided magnitudes.

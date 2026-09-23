@@ -3,7 +3,8 @@
 The Profit Pool Explorer (a beta view) shows where the profit sits in the
 Hair and the Laundry & Home Care industries and how each pool is developing.
 It is separate from the simulation: nothing in it feeds the Shift Matrix, and
-it is the one place in the dashboard that shows amounts of money. Its data
+it is the one view built on amounts of money (elsewhere a figure in euros
+appears only as quoted evidence in a driver's description or sources). Its data
 and arithmetic are `lib/profitPoolData.ts`; `tests/frontend/profitPoolData.test.ts`
 checks them.
 
@@ -11,8 +12,8 @@ checks them.
 
 | View | What a bar is | Pool |
 |---|---|---|
-| Hair: value chain | one tier of the industry (raw materials to retail), sized on its own revenue | about €153bn of tier revenue; end-consumer retail about €82bn |
-| Laundry: value chain | the same for laundry | about €277bn of tier revenue; end-consumer retail about €87bn |
+| Hair: value chain | one tier of the industry, from raw materials through brand owners and professional products to wholesale, store retail and e-commerce, sized on its own revenue | about €153bn of tier revenue; end-consumer retail about €82bn |
+| Laundry: value chain | one tier from raw materials through brand owners to wholesale and store retail, plus laundry services and appliance makers, each sized on its own revenue | about €277bn of tier revenue; end-consumer retail about €87bn |
 | Hair: categories | one Euromonitor Passport hair category | about €82bn at retail value |
 | Home Care: categories | one Passport home-care category, eleven rows | about €186bn at retail value |
 | Hair: core and adjacent | branded retail hair against adjacent pools: salon services, professional products, tools and appliances, scalp care, subscription and direct-to-consumer, supplements | about €254bn |

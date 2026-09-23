@@ -79,9 +79,10 @@ holds per driver:
 - the terminal-year contribution to the portfolio in points, by year, with
   its rank among all drivers and among the headwinds or tailwinds, its share
   of the gross headwind or tailwind and of its force;
-- the contribution by cell, category and region, each cell's share of the
-  pool, the driver's share of each cell's shift, the same-force drivers in
-  the same cells, and the cell where the driver is the largest share of the
+- the contribution by category and by region, and in the driver's six
+  largest cells: each cell's share of the pool, the driver's share of the
+  cell's shift and up to three drivers of the same force in the cell; and,
+  over all 52 cells, the cell where the driver is the largest share of the
   cell's own shift;
 - the expected materialisation by year and the share of the terminal-year
   effect present in each year;
@@ -99,35 +100,46 @@ The record also carries its reference run, the production recipe (3 x 50,000
 iterations, seed 42) on the committed driver base and the default
 configuration, and a digest of everything that run depends on: every
 driver's scoring state, the force layers, the cell weights, the path and the
-engine version. It records the production run the reference reproduces,
-with that run's 13 terminal-year category quantiles read from its QA
-workbook.
+engine version. It records the production run the reference reproduces:
+that run's terminal-year P10, median and P90 of each of the 13 categories,
+read from its QA workbook (`prism/workbook.py`, `read_workbook`).
 
 ## The readings
 
 `data/drivers/driver_analysis.json` holds one template per driver: authored
 prose in which every figure the model produces is a named placeholder, such
 as `{pp}` for its contribution, `{reach}`, `{peak_year}` or `{pool_europe}`
-(`render_fields` in `scripts/driver_analysis_render.py` lists them all). The
-renderer fills the placeholders from the record and appends the basis line.
+(`render_fields` in `prism/readings.py` lists them all). The renderer fills
+the placeholders from the record and appends the basis line.
 The rendered text is stored next to the template, carried into
 `prism/seed_drivers.py` by the seed generator, and written into existing
 databases by `scripts/sync_analysis.py`. The Drivers page renders the
 four labels as small headings, the basis line in small type and a footnote
 under the card: "Attribution at the score means, reconciled to the portfolio
-median in the basis line; a reading authored on those figures." The card is
-read-only for every role.
+median in the basis line; a reading authored on those figures. Read as
+exposure if nobody acts, not as a forecast." The card is read-only for every
+role.
 
-The category drill-down of the Shift Analysis ranks its contributing drivers
-with the same arithmetic (`lib/driverAttribution.ts`, a TypeScript port held
-to the Python record by a parity fixture), so a driver's rank there and its
-reading agree. The drill-down scales each category's contributions to that
-category's own terminal-year median. Its bars are shares of the category's
-gross movement, headwinds and tailwinds counted by size, and add up to 100
-percent; the readings quote shares of the net shift, which are larger where
-tailwinds offset headwinds. The panel's footer says both. When the model
-configuration does not load, the drill-down falls back to a proxy (Shift
-value times category exposure / 5) and names that basis instead.
+The Shift Analysis uses the same arithmetic (`lib/driverAttribution.ts`, a
+TypeScript port held to the Python decomposition by a parity fixture that
+carries the inputs and the unscaled outputs), computed from the live drivers
+and the served run's cell weights:
+
+- The category drill-down ranks its contributing drivers with it, so a
+  driver's rank there and its reading agree. It scales each category's
+  contributions to that category's own terminal-year median. Its bars are
+  shares of the category's gross movement, headwinds and tailwinds counted by
+  size, and add up to 100 percent; the readings quote shares of the net
+  shift, which are larger where tailwinds offset headwinds. The panel's footer
+  says both.
+- The Time Path's Expansion drivers and Contraction drivers filters split each
+  cell's median by the sum of the expanding and of the contracting drivers'
+  contributions in that category and year (`signSplit`). The two parts add up
+  to the median; they are a split of the one simulated number, not a
+  separate run.
+
+Without the model configuration there is no attribution: the drill-down says
+that its drivers cannot be attributed, and the two filters cannot be chosen.
 
 ### Rules
 
@@ -151,8 +163,10 @@ A reading never contains:
 Contributions are stated in points of the portfolio shift with two decimals
 ("0.90 of the 5.6 points"), so that close drivers can be told apart; the
 portfolio totals keep the headline's one decimal. Shares are whole
-percentages; ranks are ordinals. Cells and categories are named with the
-labels the page shows, in lower case ("fabric clean Europe"). A headwind is
+percentages, except a force's pass-through and a cell's share of the pool,
+which carry one decimal; ranks are ordinals. Cells and categories are named
+with the labels the page shows, in lower case, the hair categories in full
+("fabric clean Europe", "hair colour", "body care"). A headwind is
 stated against the net exposure the dashboard shows and its force's gross
 headwind; a tailwind against the gross headwind it offsets and the gross
 tailwind. The width of a driver's own range follows from its probability and
@@ -166,9 +180,9 @@ labels in order and the basis line, the length, the forbidden content (a
 list of patterns for restated scores in numerals and in words, history,
 management response, dashes, filler and the word trend), no unfilled
 placeholder, the direction wording, an observable in the band paragraph, and
-two template checks against hand-typed model figures (the shapes a model
-figure takes in the prose, and any rendered value typed into its own
-template). The rule on facts outside the description and sources is held by
+three template checks against hand-typed model figures (the shapes a model
+figure takes in the prose, any rendered value typed into its own template,
+and the peak year anywhere but `{peak_year}`). The rule on facts outside the description and sources is held by
 the author and by the review of every regeneration.
 
 ## Regeneration
@@ -181,8 +195,11 @@ fails when the inputs digest no longer matches the reference run, so a
 re-scored base cannot keep readings reconciled to a median the model no
 longer produces, and when the recorded reference run does not reproduce the
 production run recorded with it. The check does not repeat the reference
-run; `--reference` does. Comparisons admit one unit in the fourth decimal
-(floating-point differences between machines) and nothing more.
+run; `--reference` does. The record's figures may differ from the committed
+ones by one unit in the fourth decimal (floating-point differences between
+machines), the parity fixture by 1e-12 plus 1e-9 of the value, the reference
+from the recorded production run by 1.5e-6 per quantile; the texts must
+match exactly.
 
 The build reads the driver base (`data/drivers/driver_base.json`); the
 production run reads the database. The reference run reproduces a
@@ -207,23 +224,19 @@ When the scores or the model's parameters change:
 
 ### On the finance shares
 
-The committed readings are built on the estimated gross-profit mix, and stay
-on it: the finance shares are kept out of the repository, and the CI check
-recomputes without them. When the production run uses the finance file, the
-dashboard's headline moves away from the median the basis line names, and
-every card says so. To show readings on the finance shares, build them
-outside the repository and write them into the database:
+The readings are written for the estimated gross-profit mix, and stay on it.
+Several templates compare shares of the estimate in words ("a region that
+holds a twentieth of the estimated mix", "the two regions that together hold
+most of it"), and those words are the author's, not placeholders, so
+rendering the same templates on other shares would put the estimate's
+comparisons next to the finance figures. The renderer therefore refuses a
+record built on any other cell weights, and the build has no option for them.
 
-```bash
-python3 scripts/build_driver_analysis.py --reference --workbook runs/<the finance run's workbook> --cell-weights FILE
-python3 scripts/sync_analysis.py --dry-run --texts runs/driver_analysis/driver_analysis.json
-python3 scripts/sync_analysis.py --texts runs/driver_analysis/driver_analysis.json
-```
-
-The build writes its record and texts to `runs/driver_analysis/`
-(git-ignored), never over the committed files, and their basis line names the
-finance cell weights. A database seeded later, or synced without `--texts`,
-gets the committed readings on the estimate again.
+When the production run uses the finance file, the dashboard's headline moves
+away from the median the basis line names, and every card says so under its
+basis line. Readings on the finance shares are a decision for the owner:
+they need templates rewritten so that no comparison depends on the mix, and
+a build that keeps the finance shares out of the repository.
 
 ## Limits
 
@@ -234,10 +247,9 @@ gets the committed readings on the estimate again.
   at both ends. It is quoted only where it is material.
 - Comparative claims are the author's reading of the record on the day of the
   basis line, which is why every regeneration ends with a read of the texts.
-- The committed readings are written on the estimated HCB gross-profit mix,
-  not on Henkel P&L. Where a reading says a cell holds a share of the pool,
-  that is the estimate's share; readings on the finance shares live only in
-  the databases they are synced to (see "On the finance shares").
+- The readings are written on the estimated HCB gross-profit mix, not on
+  Henkel P&L. Where a reading says a cell holds a share of the pool, that is
+  the estimate's share (see "On the finance shares").
 - A reading describes the driver base, not the live database. An admin edit
   on the Drivers page changes the drill-down at once and the reading only
   when the base carries the edit and the readings are regenerated.

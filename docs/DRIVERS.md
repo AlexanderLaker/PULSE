@@ -27,8 +27,10 @@ Journey cites drivers by code.
 
 An id is never given to another driver. Stored runs (their fingerprints),
 expert proposals, the audit log and the journey content refer to drivers by
-id or code, so a driver that leaves the base takes its id with it, and a new
-driver gets the next free number of its force.
+id or code, so a driver that leaves the base takes its id with it. A new
+driver takes a number above the highest its force has ever used: C-37, K-13,
+T-19, G-17, E-12 and X-18 so far. The gaps in the numbering belong to drivers
+that left and are never filled.
 
 ## Fields
 
@@ -105,36 +107,38 @@ and a tie leaves the choice to the admin.
 
 ### Sources
 
-Every source has a tier, from S (the most authoritative) to E:
+Every source has a tier, from S (the most authoritative) to E, as the base
+grades its sources and the Drivers page describes them:
 
 | Tier | Source kind |
 |---|---|
-| S | Primary: statute, regulator, official statistics, company filings |
-| A | Analyst or consulting research, major press |
-| A- | Investment-bank equity research |
-| B+ | Specialist market-research firm |
-| B | Industry trade press |
-| B- | Company first-party source |
+| S | Statute, regulator, official statistics, peer-reviewed research |
+| A | Analyst, consulting or market-measurement research (Circana, NielsenIQ, BCG); a major poll or major press; a company's reports, results and published positions |
+| B | Specialist research firms and trade press (Kline, Happi); earnings-call transcripts; surveys |
 | C | General business press |
 | D | Aggregator or forecast |
-| E | Social or unverified |
+| E | Social media or unverified |
 
-Every driver of the base needs at least one source of tier S, A or B; the
-seed generator refuses a base that lacks one. The Drivers page sums up a
+A-, B+ and B- move a source a little down from A, up from B or down from B;
+its note says why. The base uses S, A and B only.
+
+Every driver of the base needs at least one source of tier S, A or B; a base
+that lacks one is refused before anything is generated from it. The Drivers page sums up a
 driver's first three sources in one evidence line, each as its publisher
 (the title up to its first colon) with the note, as in "Circana (Apr 2026)".
 
 ## Where the base lives
 
-The reviewed base is `data/drivers/driver_base.json`. Besides the fields
-above, each entry carries a classification kept with the review (theme,
-foresight tier, scope, megatrend, the year first observed, the mechanism);
-the model and the dashboard do not use it.
+The driver base is `data/drivers/driver_base.json`. Besides the fields
+above, each entry carries a classification (theme, foresight tier, scope,
+megatrend, the year first observed, the mechanism); the model and the
+dashboard do not use it.
 
-`scripts/generate_seed.py` validates the base (known forces and taxonomy
-keys, scores in range, an onset before the peak, a known epicentre, an S, A
-or B source behind every driver) and writes two files that are never
-edited by hand:
+`prism/driver_base.py` reads and validates the base (known forces and
+taxonomy keys, scores in range, an onset before the peak, a known epicentre,
+an S, A or B source behind every driver) for everything built from it: the
+seed, the overlap correction and the PRISM Analysis. `scripts/generate_seed.py`
+writes two files from it that are never edited by hand:
 
 - `prism/seed_drivers.py`: the drivers a new database is seeded with,
   including each driver's PRISM Analysis text (docs/DRIVER_ANALYSIS.md) and
@@ -152,34 +156,48 @@ the Drivers page: the edit is written at once, every changed field goes to the
 audit log in the same transaction, and a changed score marks the driver as
 Edited against its baseline. The name, the force and the onset come from the
 base and are not edited on the page, and a peak year must fall after the
-onset. An exposure edit sends only the cells that changed. Every driver
-carries a revision number that each save raises; an edit names the revision it
-was made on, so when two admins (or two tabs) edit the same driver, the second
-save is refused with a request to reload instead of silently undoing the
-first.
+onset. An exposure edit sends only the cells that changed. A stored exposure
+on a name outside the taxonomy cannot be simulated: the next save of the
+driver drops it and logs what it dropped, and that repair alone does not mark
+the driver as Edited. Every driver carries a revision number that each save
+raises; an edit names the revision it was made on, so when two admins (or two
+tabs) edit the same driver, the second save is refused with a request to
+reload instead of silently undoing the first.
 
 Experts propose scores under Expert Rating; a proposal never changes a
 driver. The proposal saves as it is edited, one request at a time per driver
 with the newest draft, and a cell outside the current taxonomy is left out of
-it. Admins see the proposals aggregated under Review & Endorse and choose per
-field between keeping the current value, the baseline, the expert mean and a
-manual value: a field an expert scored starts on the expert mean, a field
-nobody scored on its current value. Endorsing saves the chosen values as an
-ordinary edit. The next production run reports every change as input drift.
+it. Admins see the proposals aggregated under Review & Endorse: the mean of
+the probability, the GP1 share and each exposure cell, the median of the peak
+year and the uncertainty, the most frequent curve, and the value-chain stage
+as a majority vote. They choose per field between keeping the current value,
+the baseline, the expert aggregate and a manual value: a field an expert
+scored starts on the aggregate, a field nobody scored on its current value.
+Endorsing saves the chosen values as an ordinary edit. The next production
+run reports every change as input drift.
 
 The base file changes when a review changes the reference scores or the
 texts. After an edit to `driver_base.json`:
 
 1. run `scripts/generate_seed.py`;
-2. if category exposures changed, run `scripts/compute_attenuation.py` and
-   copy the blocks it prints into `prism/config.py` (its `--check` fails
-   until the record and the configuration agree);
+2. if category exposures changed, or drivers were added or removed (the
+   correction depends on how many drivers each force has), run
+   `scripts/compute_attenuation.py`, copy the blocks it prints into
+   `prism/config.py` and give the record a new `CALIBRATION_VERSION`. The
+   new correction moves the model's numbers, so the same commit carries a new
+   `MODEL_VERSION` and the regenerated golden pins (docs/adr/0014);
 3. regenerate the PRISM Analysis as docs/DRIVER_ANALYSIS.md describes;
-4. commit the regenerated files; CI checks all of them.
+4. until migration 0001 has run on every database, a changed description
+   must also be the text its entry in
+   `migrations/0001_driver_schema/descriptions.json` ends on, with the hash
+   of the replaced text added (the migration's tests say which), and the
+   same holds for a Consumer Journey tile text listed in `journey_edits.json`;
+5. commit the regenerated files; CI checks all of them.
 
 A new database picks up the base when it is seeded. An existing database
 keeps its own drivers: a changed analysis text reaches it through
-`scripts/sync_analysis.py`, and scores are changed on the Drivers page.
-Adding or removing drivers, or making changed scores the new baseline of an
-existing database, is a database migration: a new folder under
-`migrations/`, built like `0001_driver_schema`.
+`scripts/sync_analysis.py`, which writes nothing else; scores, descriptions
+and sources are changed on the Drivers page. Adding or removing drivers, or
+making changed scores the new baseline of an existing database, is a
+database migration: a new folder under `migrations/`, built like
+`0001_driver_schema`.

@@ -7,9 +7,9 @@ Status: accepted
 Drivers of the same force, and some force pairs, tend to materialise
 together. A dependence structure is needed; it has to be a valid correlation
 matrix, or the engine must repair it and silently use correlations different
-from the configured ones. A Student-t copula was tried: across degrees of
-freedom from 4 to infinity the portfolio band moved by less than 2 percent, so
-the extra parameter added complexity without a visible effect.
+from the configured ones. A Student-t copula would add a tail parameter, but
+across degrees of freedom from 4 to infinity it moves the portfolio band by
+less than 2 percent: complexity without a visible effect.
 
 ## Decision
 

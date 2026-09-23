@@ -13,8 +13,8 @@ How to develop, test, run, deploy and look after PRISM.
 
 The production run, the generators and the migrations run on a developer
 machine with the full Python environment. The scripts that touch a database
-act on the one in `DATABASE_URL` (or `POSTGRES_URL`) and print which one that
-is; read it before you go on.
+act on the one in `POSTGRES_URL` or, when that is not set, `DATABASE_URL`, and
+print which one that is; read it before you go on.
 
 ## Local development
 
@@ -105,18 +105,22 @@ key of the right form, so CI sets one that names no real Clerk instance.
 A few rules the suite holds:
 
 - **Golden pins** (`tests/test_golden_pipeline.py`) fix the engine's output on
-  a small driver set. They change only with a deliberate model change, in the
-  same commit, with a new `MODEL_VERSION` (docs/adr/0014).
+  a small driver set. They change only with a deliberate change of the model
+  (with a new `MODEL_VERSION`, docs/adr/0014) or of those drivers, in the same
+  commit.
 - **One version**: `prism.__version__`, the engine's `MODEL_VERSION` and
   `package.json` must agree.
 - **Generated files** are never edited by hand.
 - **Parity**: the taxonomies (the names of forces, categories, regions and
   value-chain stages), the uncertainty tables and the per-driver attribution
   exist in Python and TypeScript; tests keep each pair identical.
-- **Colours** come from `lib/theme.ts` (and the shift colours from
-  `lib/format.ts`): a literal colour anywhere else in the dashboard's code
-  fails `tests/test_repository.py`, apart from three palettes that belong to
-  one view each (the entry doors, the source grades, the Explorer's bars).
+- **Colours** come from `lib/theme.ts` (the force and category palettes
+  from `lib/format.ts`): a literal colour anywhere else in the dashboard's
+  code, a named one or a class of Tailwind's own palette included, fails
+  `tests/test_repository.py`, apart from three palettes that belong to one
+  view each (the entry doors, the source grades, the Explorer's bars).
+- **Scripts are entry points**: code two scripts share lives in `prism/`, and
+  no script imports another.
 
 ## The production run
 
@@ -125,7 +129,7 @@ python3 scripts/run_production.py
 python3 scripts/run_production.py --cell-weights /path/outside/the/repo/cell_weights.json
 ```
 
-The run reads the database in `DATABASE_URL` (or `POSTGRES_URL`), refuses to
+The run reads the database in `POSTGRES_URL` or `DATABASE_URL`, refuses to
 start without one unless `--allow-sqlite` is given, and takes a few minutes
 at the default 3 x 50,000 iterations (`PRODUCTION_*` in `prism/config.py`). It
 writes a new row to `simulation_runs`; the API serves the newest row from its
@@ -171,29 +175,32 @@ mistaken for the estimate.
 | 3 | the simulation ran but storing it failed; the dashboard keeps serving the previous run |
 | 4 | the correlation matrix is not positive definite on this driver mix |
 | 5 | the cell-weights file is missing or invalid |
-| 6 | a driver cannot be simulated (an unknown force, direction or diffusion curve, a missing GP1 share, a score outside its scale, an exposure on a name outside the taxonomy, a duplicate id); every problem is listed |
+| 6 | a driver cannot be simulated (an unknown force, direction, curve or value-chain stage, a missing score, a score outside its scale, a peak year not after the onset, an exposure on a name outside the taxonomy, a duplicate id); every problem is listed |
 
 After a run, the Shift Analysis's "About this model" footer shows the new
-run's id, date, seeds, numerics, Monte Carlo standard error, seed stability
-and integrity events, including the input drift against the previous run.
+run's id, date, master seed, numerics, Monte Carlo standard error, seed
+stability and integrity events, including the input drift against the
+previous run.
 
 When scores or model parameters changed, regenerate the PRISM Analysis
 readings after the run as docs/DRIVER_ANALYSIS.md describes. A run on the
-finance file leaves the committed readings on the estimate, and every card
-says that its figures come from another run; the same document shows how to
-put readings on the finance shares into the database.
+finance file leaves the readings on the estimate, and every card says that
+its figures come from another run; readings on the finance shares need
+rewritten templates first (the same document, "On the finance shares").
 
 ## Deploying
 
 Push to `main`: Vercel builds the dashboard and the Python function and
 promotes the build to production in about two minutes. Other branches get
 preview deployments. The environment variables live in the Vercel project
-settings (Production and Preview); `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is
-needed at build time, the others at run time. `PRISM_API_ORIGIN`, if used,
-belongs to Production only: set for Preview as well, a preview deployment's
-admin writes would go to the production API. The deploy that brings this
-release to a database of the previous release goes with migration 0001, in
-the order its runbook gives (`migrations/0001_driver_schema/README.md`).
+settings (Production and Preview). `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and
+`NEXT_PUBLIC_SIGNUP_CODE` are read at build time, so a change to either needs
+a new deployment; the others are read at run time. `PRISM_API_ORIGIN`, if
+used, belongs to Production only: set for Preview as well, a preview
+deployment's admin writes would go to the production API. A database that
+still needs migration 0001 (the API answers 503 and names it) is moved in the
+order that migration's runbook gives, the deploy first
+(`migrations/0001_driver_schema/README.md`).
 
 After a deploy:
 
@@ -203,7 +210,7 @@ curl -s https://prism-hcb.vercel.app/api/v1/health
 
 must answer `"status": "ok"` with the driver count and `"has_simulation":
 true`. Then open the dashboard and check that the Shift Analysis shows the
-expected run. `/api/v1/diagnostics` explains a problem (next section).
+expected run. `/api/v1/diagnostics` explains a problem (see Troubleshooting).
 
 A deploy never needs a restart for data to appear: each API instance checks
 the database on every request and reloads the drivers or the run when they
@@ -228,12 +235,20 @@ back as that migration's runbook says.
   log; texts an admin edited reported and left alone; tests on SQLite and
   PostgreSQL. `prism/database.py` lists the migrations a new database already
   contains (`SCHEMA_MIGRATIONS`).
+- **The cell-weight estimate** is changed in `scripts/build_cell_weights.py`
+  (its inputs and grades). Run it to write the record and
+  `lib/cellWeightProvenance.ts`, paste the output of `--emit-python` over
+  `DEFAULT_CELL_WEIGHTS` in `prism/config.py` (the generator's `--check` does
+  not look at `prism/config.py`; `tests/test_cell_weights.py` does), and give
+  the record a new `VERSION`. The new weights move the category and portfolio
+  numbers: the change carries a new `MODEL_VERSION` and golden pins, then the
+  PRISM Analysis is regenerated after the next production run
+  (docs/DRIVER_ANALYSIS.md).
 - **The PRISM Analysis texts** of an existing database follow the generated
   ones with `scripts/sync_analysis.py` (`--dry-run` first). It changes the
   analysis column, raises the revision of each driver it changes (an admin
   editing one of them at that moment is asked to reload before saving) and
-  writes one audit entry per driver. `--texts FILE` writes another rendering,
-  such as readings on the finance shares.
+  writes one audit entry per driver.
 - **The audit log** records every driver edit (one row per changed field),
   journey save, analysis sync and migration in the same transaction as the
   change, with the acting identity, and every role change where it can (a
@@ -241,10 +256,11 @@ back as that migration's runbook says.
 
 ## Roles and users
 
-The first user who signs up becomes admin; everyone after that is a viewer.
-Admins change roles in Settings, under User management; an admin cannot demote
-themselves, so the last admin can never lock everyone out. Two ways exist to
-set a role without an admin session:
+A user becomes admin at sign-up when `user_roles` is empty (the first user);
+everyone else starts as viewer. Admins change other users' roles in
+Settings, under User management, never their own. Two ways exist to set a
+role without an admin session, and both can change any role, the last
+admin's included:
 
 - `python3 scripts/promote_admin.py someone@example.com` (or `--role viewer`)
   with database access;
@@ -282,32 +298,31 @@ sign-up.
 | The Shift Analysis is empty | `simulation_reason` in `/api/v1/diagnostics` is `no_rows` (write a run) or `malformed` (the newest run lacks a key the dashboard needs; write a new run) |
 | Nobody is admin | The webhook did not reach the dashboard: check its deliveries in the Clerk dashboard, then set the role as described under Roles |
 | The production run exits with 4 | The correlation settings are not positive definite on the current driver mix; lower the cross-force correlations in `prism/config.py` |
-| `git` reports a lock file in a synced folder (OneDrive, iCloud) | If no git process runs, rename the stale lock (`mv .git/index.lock .git/index.lock.stale`); synced folders sometimes refuse to delete it |
 
 ## Handover
 
 `bash scripts/package_handover.sh` builds `PRISM_HANDOVER_<date>.zip`: a git
 repository with a single commit of the tracked tree at `HEAD`. It refuses a
-dirty working tree and fails if the exported tree holds `.env`, a local
-database, run outputs or a string that looks like a secret. Three things
-travel separately:
+dirty working tree and fails if the exported tree holds `.env`, Clerk's local
+folder, a local working folder (a leading underscore), a database file, a
+workbook, run outputs or archives, or a string that looks like a secret.
+Three things travel separately:
 
 - the database, as a `pg_dump` of the Neon production branch;
 - the finance cell-weights file, if one exists;
 - the credentials, which are not handed over but rotated: the Clerk keys and
   webhook secret, the Neon password, `PRISM_JWT_SECRET` (the old tokens stop
   working, and an open dashboard fetches a new cookie on its next request, so
-  nobody has to sign in again), `NEXT_PUBLIC_SIGNUP_CODE` and any
-  `ADMIN_BOOTSTRAP_SECRET`.
+  nobody has to sign in again), `NEXT_PUBLIC_SIGNUP_CODE` (a new deployment,
+  since it is built in) and any `ADMIN_BOOTSTRAP_SECRET`.
 
 The services themselves belong to the owner's accounts today: the GitHub
 repository, the Vercel project `prism-profit-pool`, the Neon project and the
-Clerk application. Move each into an account the
-receiving organisation controls, through the service's own transfer where it
-offers one, or by creating it anew (a new Clerk application means new keys
-and a new webhook; a new Neon project is restored from the dump). Rotate the
-credentials after the move, and check the deployment against the list under
-Deploying.
+Clerk application. Move each into an account the receiving organisation
+controls, through the service's own transfer where it offers one, or by
+creating it anew (a new Clerk application means new keys and a new webhook; a
+new Neon project is restored from the dump). Rotate the credentials after the
+move, and check the deployment against the list under Deploying.
 
 ## Hosting elsewhere
 

@@ -16,13 +16,14 @@ naively, such a mechanism counts twice.
   `0.5 x (1 - the force's mean overlap with the five other forces)`.
 - Within a force, contributions to a cell are dampened by
   `1 - overlap x (n_eff - 1) / n_eff`, where `n_eff` is the magnitude-weighted
-  effective number of contributing drivers. Unlike a plain count, it
-  guarantees that adding a driver moves the total in the driver's own
-  direction.
+  effective number of contributing drivers, set from the score means. Unlike a
+  plain count, it guarantees that adding a driver moves the total at the
+  means in the driver's own direction.
 - The overlaps are structured judgment computed from the drivers' category
   exposure vectors (weighted Jaccard similarity, excess over the random-pair
-  baseline, a force-size factor, per-pair mechanism adjustments with written
-  reasons, clamps) by `scripts/compute_attenuation.py`, and called an overlap
+  baseline, a force-size factor, per-force and per-pair mechanism adjustments
+  with written reasons, clamps) by `scripts/compute_attenuation.py`, and called
+  an overlap
   correction, never a calibration against outcomes.
 
 ## Consequences

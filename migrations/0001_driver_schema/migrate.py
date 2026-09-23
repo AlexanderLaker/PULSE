@@ -32,13 +32,13 @@ or the write lock (SQLite), so nothing can write in between.
    data_source summary itself is not carried over: the dashboard derives it
    from the sources. Rows of the child tables whose driver no longer exists are
    not copied and are counted in the report (the archive keeps them).
-2. Tables nothing reads any more are dropped (the trend tables, config_snapshots,
-   triggers, ai_suggestions, session_snapshots, and older leftovers where a
-   database still has them), and so is every column of simulation_runs beyond
-   id, run_date, iterations and results. Nothing is dropped with CASCADE: if a
-   table this migration does not know depends on one it drops, the migration
-   stops and changes nothing. Tables it does not know, such as user_roles, are
-   never touched.
+2. Tables the driver schema does not have are dropped (the trend tables,
+   config_snapshots, triggers, ai_suggestions, session_snapshots, and older
+   leftovers where a database still has them), and so is every column of
+   simulation_runs beyond id, run_date, iterations and results. Nothing is
+   dropped with CASCADE: if a table this migration does not know depends on
+   one it drops, the migration stops and changes nothing. Tables it does not
+   know, such as user_roles, are never touched.
 3. The keys of the stored runs follow the new names: meta.trend_count ->
    meta.driver_count, meta.trend_fingerprint -> meta.driver_fingerprint, and
    trend_ids / unscored_trend_ids -> driver_ids / unscored_driver_ids in the

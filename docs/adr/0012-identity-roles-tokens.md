@@ -12,7 +12,7 @@ should sit next to the audit log it is written to.
 
 - Clerk owns identity. The role (admin or viewer) lives in PRISM's database
   (`user_roles`); a Clerk webhook, verified by its signature, adds a row at
-  sign-up, the first user as admin.
+  sign-up, as admin when the table is empty (the first user).
 - The API never sees a Clerk session. It verifies HS256 tokens that the
   dashboard's server routes sign for the signed-in user and that expire
   (after twelve hours for reads, five minutes for admin writes).
@@ -25,6 +25,6 @@ should sit next to the audit log it is written to.
 ## Consequences
 
 The browser can never hold a token that authorises an admin write. Replacing
-Clerk touches the dashboard (its auth helpers, the sign-in pages, the
-webhook, the user list and the account and session settings), not the API or
-the roles.
+Clerk touches the dashboard (`proxy.ts`, the provider in `app/layout.tsx`,
+the auth helpers, the sign-in pages, the webhook, the user menu and list, and
+the account and session settings), not the API or the roles.

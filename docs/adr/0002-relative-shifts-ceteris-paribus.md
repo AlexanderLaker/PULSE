@@ -12,9 +12,10 @@ There is no history of PRISM outputs to validate the method against.
 
 ## Decision
 
-- The engine outputs relative shifts of gross profit only; the database
-  stores no amount of money. A finance cell-weights file with absolute
-  figures is divided by its total before the engine sees it.
+- The engine outputs relative shifts of gross profit only, and no HCB
+  financial figure is stored (driver descriptions and sources may quote
+  public market figures as evidence). A finance cell-weights file with
+  absolute figures is divided by its total before the engine sees it.
 - The simulation holds strategy constant: no pricing, innovation or
   competitive response by anyone. Every view that shows totals says so, and a
   negative total reads as exposure if nobody acts.
