@@ -147,11 +147,11 @@ class TestAttributionIdentities:
         for year, by_cat in r["decompositions"]["vc"].items():
             for cat, row in by_cat.items():
                 median = r["shift_matrix"][cat]["path"][int(year)]["median"]
-                for step, value in row.items():
-                    if step not in stages:
-                        assert value == 0.0, (cat, year, step)
+                for stage, value in row.items():
+                    if stage not in stages:
+                        assert value == 0.0, (cat, year, stage)
                     elif abs(median) > 1e-15:
-                        assert value != 0.0, (cat, year, step)
+                        assert value != 0.0, (cat, year, stage)
 
     def test_a_category_no_driver_reaches_has_zero_in_every_lens(self, mock_model_config, mock_driver_set):
         """With no driver in a category, its median is exactly zero, and so is every lens value:

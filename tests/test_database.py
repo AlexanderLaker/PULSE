@@ -16,7 +16,7 @@ from urllib.parse import quote
 
 import pytest
 
-from prism.config import CATEGORIES, REGIONS
+from prism.config import CATEGORIES, REGIONS, beta_prior_for
 from prism.drivers import Driver
 from support import database_awaiting_a_migration
 
@@ -213,6 +213,7 @@ class TestDrivers:
         assert (loaded.description, loaded.direction, loaded.probability, loaded.peak_year) == (
             "edited description", "Expansion", 5, 2033)
         assert loaded.scores_edited is True and loaded.uncertainty == 5
+        assert loaded.probability_prior == pytest.approx(beta_prior_for(5, 5))   # rebuilt from the stored scores
         assert loaded.category_exposure["Hair: Care"] == 5 and loaded.category_exposure["LHC: FCN"] == 0
         assert loaded.sources == [{"title": "new source", "url": "https://example.org/b", "tier": "S", "published": ""}]
         assert loaded.baseline == _driver().scores()

@@ -5,7 +5,6 @@ with the mean p/6 unchanged; UNCERTAINTY_PEAK_JITTER gives the jitter width
 (0/1/1/2/3/4 years). Every driver needs a score: a driver without one cannot
 be simulated.
 """
-import copy
 import re
 from pathlib import Path
 
@@ -13,7 +12,7 @@ import numpy as np
 import pytest
 
 from prism.config import UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER, beta_prior_for, peak_jitter_for
-from prism.drivers import Driver, DriverSet, InvalidDriversError, simulation_problems
+from prism.drivers import Driver, DriverSet, simulation_problems
 from prism.input_drift import compute_input_drift_event, driver_fingerprint
 from prism.engine import MonteCarloEngine
 from support import category_map, region_map
@@ -99,7 +98,7 @@ def _driver_set(uncertainties):
     drivers = []
     for i, u in enumerate(uncertainties):
         drivers.append(Driver(
-            id=f"t{i}", force="Consumer", name=f"t{i}", direction="Contraction",
+            id=f"consumer_r{i + 1:02d}", force="Consumer", name=f"Driver {i + 1}", direction="Contraction",
             probability=4, start_year=2025, gp1_pct_affected=0.20, peak_year=2029,
             diffusion_curve="linear", category_exposure=category_map({"Hair: Care": 5}),
             regional_exposure=region_map({"Europe": 5}), vc_epicentre="Marketing",
@@ -192,39 +191,6 @@ class TestEngine:
         assert off[:, 2].min() == -4 and off[:, 2].max() == 4
 
 
-class TestDatabaseRoundTrip:
-    def test_uncertainty_persists_in_sqlite(self, monkeypatch, tmp_path):
-        monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "unc.db"))
-        import prism.database as dbm
-        dbm.init_db()
-        t = Driver(id="unc_1", force="Consumer", name="x", direction="Contraction",
-                  probability=4, start_year=2025, gp1_pct_affected=0.2, peak_year=2029,
-                  diffusion_curve="linear", category_exposure=category_map({"Hair: Care": 5}),
-                  regional_exposure=region_map({"Europe": 5}), vc_epicentre="Marketing", uncertainty=2,
-                  confidence="Medium")
-        t.baseline = t.scores()
-        dbm.insert_drivers([t])
-        loaded = {x.id: x for x in dbm.load_drivers()}
-        assert loaded["unc_1"].uncertainty == 2
-        assert loaded["unc_1"].probability_prior == pytest.approx(beta_prior_for(4, 2))
-        # the database stores no driver without a score
-        unscored = copy.deepcopy(t)
-        unscored.id, unscored.uncertainty = "unc_2", None
-        with pytest.raises(InvalidDriversError, match="uncertainty None"):
-            dbm.insert_drivers([unscored])
-        assert [d.id for d in dbm.load_drivers()] == ["unc_1"]
-        # proposals carry the field too
-        row = dbm.upsert_driver_proposal("unc_1", "expert-a", {"uncertainty": 4, "probability": 3}, "A")
-        assert row["uncertainty"] == 4
-        rows = dbm.load_driver_proposals("unc_1")
-        assert rows[0]["uncertainty"] == 4
-        from prism.api.proposals import aggregate_proposals, build_proposal_summary
-        agg = aggregate_proposals(rows)
-        assert agg["uncertainty"] == {"median": 4, "count": 1}
-        summ = build_proposal_summary(rows, "expert-a")
-        assert summ["my"]["uncertainty"] == 4
-
-
 class TestOnsetClamp:
     """A jittered peak that lands at or before the onset saturates at "peaks
     the year after the onset", the earliest arrival a schedule allows, so the
@@ -270,9 +236,9 @@ class TestOnsetClamp:
         assert eng2.rng.random() == MonteCarloEngine(cfg, seed=8).rng.random()
 
     def test_run_result_reflects_the_clamp(self, mock_model_config):
-        """With score 3 on a driver starting 2025 and peaking 2027, 3 of 9 draws
-        are fully in by 2026 and none is pushed to the horizon, so the 2026
-        median is at least the no-jitter level in magnitude."""
+        """With score 3 on a driver starting 2025 and peaking 2027, the 3 of 9
+        draws whose peak lands at or before the onset are fully in by 2026, so
+        the 2026 median is at least the no-jitter level in magnitude."""
         cfg = mock_model_config.copy_with(path_years=[2026, 2027, 2028, 2029, 2030])
         driver_set = DriverSet(drivers=[self._driver(3)])
         r_on = MonteCarloEngine(cfg.copy_with(peak_year_jitter=True), seed=3).run(driver_set, 4000)

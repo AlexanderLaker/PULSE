@@ -457,14 +457,16 @@ class TestProposals:
             "aggregate": {"probability": None, "gp1_pct_affected": None, "peak_year": None, "uncertainty": None,
                           "diffusion_curve": None, "vc_epicentre": None, "category_exposure": {},
                           "regional_exposure": {}}}
-        api.put(path, headers=bearer(sub="ana", name="Ana"), json={"probability": 4, "comment": "  looks high  "})
+        api.put(path, headers=bearer(sub="ana", name="Ana"),
+                json={"probability": 4, "uncertainty": 4, "comment": "  looks high  "})
         body = api.put(path, headers=bearer(sub="ana", name="Ana"), json={"peak_year": 2031}).json()
         my = body["my"]
         assert my["probability"] == 4 and my["peak_year"] == 2031 and my["comment"] == "looks high"
         api.put(path, headers=bearer(sub="ben", email="ben@example.com"),
-                json={"probability": 2, "category_exposure": {"Hair: Care": 4}})
+                json={"probability": 2, "uncertainty": 3, "category_exposure": {"Hair: Care": 4}})
         body = api.get(path, headers=bearer(sub="ben", email="ben@example.com")).json()
         assert body["aggregate"]["probability"] == {"avg": 3.0, "count": 2}
+        assert body["aggregate"]["uncertainty"] == {"median": 4, "count": 2}   # 3.5, rounded half up
         assert body["aggregate"]["category_exposure"] == {"Hair: Care": {"avg": 4.0, "count": 1}}
         assert [s["name"] for s in body["scorers"]] == ["Ana", "ben"]
         assert "role" not in body["scorers"][0]

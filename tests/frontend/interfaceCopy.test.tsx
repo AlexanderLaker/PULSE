@@ -5,7 +5,7 @@
  *   1. The modelled item is a driver ("Profit Pool Drivers" in full, "Drivers"
  *      in menus and headers). A static sweep over every string literal,
  *      template chunk and JSX text of the interface code (app/, components/,
- *      hooks/, lib/, api/) finds no "trend" or "trends". The authored journey
+ *      hooks/, lib/) finds no "trend" or "trends". The authored journey
  *      content may use the word in its ordinary sense (a fashion trend), so
  *      data/ is not swept.
  *   2. No em dash in any dashboard source, content, copy or comment.
@@ -23,8 +23,8 @@ import * as ts from 'typescript';
 import { makeDriver, makeStore } from './fixtures/prism';
 
 const REPO = path.resolve(__dirname, '..', '..');
-const SOURCE_DIRS = ['app', 'components', 'hooks', 'lib', 'api', 'types', 'data', 'tests/frontend'];
-const COPY_DIRS = ['app', 'components', 'hooks', 'lib', 'api'];
+const SOURCE_DIRS = ['app', 'components', 'hooks', 'lib', 'types', 'data', 'tests/frontend'];
+const COPY_DIRS = ['app', 'components', 'hooks', 'lib'];
 const WORD = /\btrends?\b/i;
 const EM_DASH = String.fromCharCode(0x2014);
 

@@ -363,10 +363,10 @@ class TestCommittedArtefacts:
 
     def test_the_reference_run_reproduces_the_persisted_production_run(self, build, record):
         """The readings describe the run the dashboard shows: the record
-        carries that run's id and its 13 terminal-year category quantiles
-        from the QA workbook run_production.py wrote, and the reference run
-        must reproduce them exactly (same seed, chains, iterations, drivers
-        and configuration)."""
+        carries that run's id and its 13 terminal-year category quantiles,
+        read from the run's QA workbook, and the reference run must reproduce
+        them exactly (same seed, chains, iterations, drivers and
+        configuration)."""
         persisted = record["persisted_run"]
         assert persisted and persisted["id"] and persisted["model_version"] == record["basis"]["model_version"]
         assert len(persisted["categories_terminal"]) == 13

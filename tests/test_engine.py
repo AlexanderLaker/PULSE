@@ -134,7 +134,8 @@ class TestRegionalShift:
 
     def test_a_driver_without_regional_exposure_reaches_no_cell(self, mock_model_config):
         """Exposure 0 in every region is exposure 0 everywhere, as a category score of 0 is: the
-        driver moves nothing, and every lens of the untouched category is zero."""
+        driver moves nothing, every lens of the untouched category is zero, and the run records
+        no integrity event."""
         r = self._run(mock_model_config, _single_driver_set([0, 0, 0, 0]))
         assert r["shift_matrix"]["Hair: Color"]["path"][2030]["median"] == 0.0
         for lens in ("force", "vc", "region"):
