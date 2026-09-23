@@ -11,9 +11,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from prism.config import (CATEGORIES, DEFAULT_PEAK_YEAR_JITTER, UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER,
+from prism.config import (DEFAULT_PEAK_YEAR_JITTER, UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER,
                           beta_prior_for, peak_jitter_for)
-from prism.drivers import Driver, DriverSet
+from prism.drivers import Driver, DriverSet, simulation_problems
 from prism.input_drift import compute_input_drift_event, driver_fingerprint
 from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
 
@@ -76,7 +76,9 @@ class TestDriverModel:
         assert t.normalized_score == pytest.approx(5 / 6 * 0.2)  # mean unchanged
         t.uncertainty = 7
         t.__post_init__()
-        assert t.uncertainty == 5  # clamped
+        assert t.uncertainty == 7                              # never rewritten silently
+        assert t.probability_prior == beta_prior_for(5, 5)     # the prior reads the end of the scale
+        assert any("uncertainty 7" in line for line in simulation_problems([t]))   # and a run refuses it
 
     def test_fingerprint_carries_score_and_diffs_it(self):
         base = Driver(id="u1", force="Consumer", probability=4, gp1_pct_affected=0.1,
@@ -102,7 +104,7 @@ def _db(uncertainties):
             regional_exposure={"Europe": 5}, vc_exposure={"Marketing": 5},
             uncertainty=u,
         ))
-    return DriverSet(drivers=drivers, categories=list(CATEGORIES), forces=["Consumer"])
+    return DriverSet(drivers=drivers)
 
 
 def _velocity_width(r, cat="Hair: Care"):
@@ -211,7 +213,7 @@ class TestDatabaseRoundTrip:
         assert loaded["unc_2"].uncertainty is None
         assert loaded["unc_2"].probability_prior == (3, 3)
         # proposals carry the field too
-        row = dbm.upsert_driver_proposal("unc_1", "expert-a", {"uncertainty": 4, "probability": 3}, "A", "viewer")
+        row = dbm.upsert_driver_proposal("unc_1", "expert-a", {"uncertainty": 4, "probability": 3}, "A")
         assert row["uncertainty"] == 4
         rows = dbm.load_driver_proposals("unc_1")
         assert rows[0]["uncertainty"] == 4
@@ -272,7 +274,7 @@ class TestOnsetClamp:
         are fully in by 2026 and none is pushed to the horizon, so the 2026
         median is at least the no-jitter level in magnitude."""
         cfg = mock_model_config.copy_with(iterations=4000, path_years=[2026, 2027, 2028, 2029, 2030])
-        db = DriverSet(drivers=[self._driver(3)], categories=list(CATEGORIES), forces=["Consumer"])
+        db = DriverSet(drivers=[self._driver(3)])
         r_on = BayesianMonteCarloEngine(cfg.copy_with(peak_year_jitter=1), seed=3).run(db)
         r_off = BayesianMonteCarloEngine(cfg.copy_with(peak_year_jitter=0), seed=3).run(db)
         m_on = r_on["shift_matrix"]["Hair: Care"]["path"][2026]["median"]

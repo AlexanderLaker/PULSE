@@ -38,7 +38,6 @@ DRIVERS = [
         category_exposure=_categories(2, 3, 2, 4, 5, 4, 5, 5, 4, 5, 4, 4, 3),
         vc_exposure=_value_chain(0, 0, 0, 0, 1, 3, 5, 3),  # epicentre Commercial
         regional_exposure=_regions(5, 3, 1, 2),
-        data_source="Circana (Apr 2026); YouGov Germany (Jul 2026); BCG (Jun 2026)",
         sources=[
             {"title": "Circana: private label reaches record 50% unit share across EU6", "url": "https://www.circana.com/post/private-label-reaches-record-50-unit-share-across-europe-s-six-biggest-grocery-markets", "tier": "A", "note": "Apr 2026"},
             {"title": "YouGov Germany: nur Eigenmarken gewinnen hinzu (Wasch- und Reinigungsmittel)", "url": "https://yougov.com/de-de/artikel/55106-nur-eigenmarken-gewinnen-hinzu-im-markt-fur-wasch-und-reinigungsmittel-verlieren-marken-an-strahlkraft", "tier": "B", "note": "Jul 2026"},
@@ -59,7 +58,6 @@ DRIVERS = [
         category_exposure=_categories(2, 5, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         vc_exposure=_value_chain(0, 0, 0, 0, 0, 1, 3, 5),  # epicentre Consumer
         regional_exposure=_regions(2, 5, 2, 1),
-        data_source="Gallup (Jul 2026); Circana (May 2026); Numerator via Food Dive (Aug 2026)",
         sources=[
             {"title": "Gallup: GLP-1 usage reaches new high", "url": "https://news.gallup.com/poll/712157/glp-usage-reaches-new-high.aspx", "tier": "A", "note": "Jul 2026"},
             {"title": "Circana: Chain reactions, the impact of GLP-1 usage on non-food categories", "url": "https://www.circana.com/post/chain-reactions-the-impact-of-glp-1-usage-on-non-food-categories", "tier": "A", "note": "May 2026"},
@@ -81,7 +79,6 @@ DRIVERS = [
         category_exposure=_categories(4, 5, 4, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         vc_exposure=_value_chain(0, 0, 0, 0, 0, 1, 3, 5),  # epicentre Consumer
         regional_exposure=_regions(5, 5, 4, 3),
-        data_source="Circana (Aug 2026); L'Oréal 2025 annual results (Feb 2026); L'Oréal 2026 half-year results (Jul 2026)",
         sources=[
             {"title": "Circana: US beauty H1 2026", "url": "https://www.circana.com/post/us-beauty-industry-posts-solid-first-half-growth-as-fragrance-and-skincare-lead-across-prestige-and", "tier": "A", "note": "Aug 2026"},
             {"title": "L'Oréal 2025 annual results", "url": "https://www.loreal-finance.com/eng/press-release/2025-annual-results", "tier": "A", "note": "Feb 2026"},
@@ -103,7 +100,6 @@ DRIVERS = [
         category_exposure=_categories(3, 5, 2, 4, 1, 1, 0, 1, 0, 0, 1, 0, 0),
         vc_exposure=_value_chain(0, 0, 0, 0, 0, 1, 3, 5),  # epicentre Consumer
         regional_exposure=_regions(5, 4, 3, 2),
-        data_source="L'Oréal 2026 half-year results (Jul 2026); Directive (EU) 2024/825 (EmpCo) (Mar 2024, applies Sep 2026); Circana (Aug 2026)",
         sources=[
             {"title": "L'Oréal 2026 half-year results", "url": "https://www.loreal.com/en/press-release/finance/2026-half-year-results/", "tier": "A", "note": "Jul 2026"},
             {"title": "Directive (EU) 2024/825 (EmpCo)", "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32024L0825", "tier": "S", "note": "Mar 2024, applies Sep 2026"},
@@ -123,7 +119,6 @@ DRIVERS = [
         category_exposure=_categories(5, 3, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 0),
         vc_exposure=_value_chain(0, 0, 0, 0, 0, 1, 3, 5),  # epicentre Consumer
         regional_exposure=_regions(5, 4, 4, 2),
-        data_source="Eurostat (Feb 2026); Destatis (Jun 2026); Henkel H1 2026 results release (Aug 2026)",
         sources=[
             {"title": "Eurostat: Population structure and ageing", "url": "https://ec.europa.eu/eurostat/statistics-explained/index.php?title=Population_structure_and_ageing", "tier": "S", "note": "Feb 2026"},
             {"title": "Destatis: 17.3 million people live alone", "url": "https://www.destatis.de/DE/Presse/Pressemitteilungen/2026/06/PD26_N041_12.html", "tier": "S", "note": "Jun 2026"},
@@ -144,7 +139,6 @@ DRIVERS = [
         category_exposure=_categories(2, 3, 3, 3, 4, 4, 4, 5, 3, 4, 3, 3, 2),
         vc_exposure=_value_chain(0, 0, 0, 0, 0, 1, 3, 5),  # epicentre Consumer
         regional_exposure=_regions(5, 4, 3, 3),
-        data_source="Eurostat flash HICP August 2026 (Sep 2026); ECB monetary policy decision 11 June 2026 (Jun 2026); McKinsey (Jun 2026)",
         sources=[
             {"title": "Eurostat flash HICP August 2026", "url": "https://ec.europa.eu/eurostat/web/products-euro-indicators/w/2-01092026-ap", "tier": "S", "note": "Sep 2026"},
             {"title": "ECB monetary policy decision 11 June 2026", "url": "https://www.ecb.europa.eu/press/pr/date/2026/html/ecb.mp260611~4d41bd5e83.en.html", "tier": "S", "note": "Jun 2026"},
@@ -166,7 +160,6 @@ DRIVERS = [
         category_exposure=_categories(2, 5, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         vc_exposure=_value_chain(0, 0, 0, 0, 0, 1, 3, 5),  # epicentre Consumer
         regional_exposure=_regions(4, 5, 4, 2),
-        data_source="Circana (Feb 2026); Kline (Mar 2026); Henkel (Feb 2026)",
         sources=[
             {"title": "Circana: US beauty 2025 full year", "url": "https://www.circana.com/post/us-prestige-and-mass-beauty-retail-deliver-a-positive-performance-in-2025-circana-reports", "tier": "A", "note": "Feb 2026"},
             {"title": "Kline: the scalp care boom", "url": "https://klinegroup.com/beauty-and-wellbeing/professional-hair-care/the-scalp-care-boom-are-brands-unlocking-growth-from-the-root-up/", "tier": "B", "note": "Mar 2026"},
@@ -186,7 +179,6 @@ DRIVERS = [
         category_exposure=_categories(3, 5, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         vc_exposure=_value_chain(0, 0, 0, 0, 0, 1, 3, 5),  # epicentre Consumer
         regional_exposure=_regions(4, 5, 4, 2),
-        data_source="PubMed (2026); Unilever H1 2026 full announcement (Nutrafol as… (Jul 2026); Hims & Hers FY2025 results (Feb 2026)",
         sources=[
             {"title": "PubMed: semaglutide hair loss (JAAD cohorts, systematic reviews)", "url": "https://pubmed.ncbi.nlm.nih.gov/?term=semaglutide+hair+loss", "tier": "S", "note": "2026"},
             {"title": "Unilever H1 2026 full announcement (Nutrafol as GLP-1 complement)", "url": "https://www.unilever.com/files/unilever-q2-2026-results-full-announcement.pdf", "tier": "A", "note": "Jul 2026"},
@@ -207,7 +199,6 @@ DRIVERS = [
         category_exposure=_categories(2, 5, 4, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         vc_exposure=_value_chain(0, 0, 0, 1, 3, 5, 3, 1),  # epicentre Marketing
         regional_exposure=_regions(4, 5, 4, 2),
-        data_source="Circana (Aug 2026); Circana (Jan 2026); The Fashion Law (Jan 2026)",
         sources=[
             {"title": "Circana: Life imitates brands, how dupe demand is evolving", "url": "https://www.circana.com/post/life-imitates-brands-how-dupe-demand-is-evolving", "tier": "A", "note": "Aug 2026"},
             {"title": "Circana: Beauty in 2026", "url": "https://www.circana.com/post/beauty-in-2026-how-value-wellness-and-tech-are-writing-the-next-chapter", "tier": "A", "note": "Jan 2026"},
@@ -227,7 +218,6 @@ DRIVERS = [
         category_exposure=_categories(4, 5, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         vc_exposure=_value_chain(0, 0, 0, 0, 1, 3, 5, 3),  # epicentre Commercial
         regional_exposure=_regions(0, 0, 5, 1),
-        data_source="Caixin citing CAFFCI (Jan 2026); Euromonitor (May 2026); P&G Q4 FY2026 earnings call transcript (Aug 2026)",
         sources=[
             {"title": "Caixin citing CAFFCI: homegrown brands dominate China's beauty market", "url": "https://www.caixinglobal.com/2026-01-21/chinas-homegrown-cosmetics-brands-now-dominate-worlds-largest-beauty-market-102406146.html", "tier": "B", "note": "Jan 2026"},
             {"title": "Euromonitor: hair care in China", "url": "https://www.euromonitor.com/hair-care-in-china/report", "tier": "A", "note": "May 2026"},
@@ -247,7 +237,6 @@ DRIVERS = [
         category_exposure=_categories(4, 5, 4, 2, 4, 2, 3, 4, 2, 2, 2, 1, 3),
         vc_exposure=_value_chain(0, 0, 0, 0, 0, 1, 3, 5),  # epicentre Consumer
         regional_exposure=_regions(0, 5, 0, 0),
-        data_source="US Census Bureau Vintage 2025 (NC-EST2025-SR11H) (Jun 2026); US Census Bureau (Jan 2026); Numerator (Sep 2025)",
         sources=[
             {"title": "US Census Bureau Vintage 2025 (NC-EST2025-SR11H)", "url": "https://www2.census.gov/programs-surveys/popest/tables/2020-2025/national/asrh/nc-est2025-sr11h.xlsx", "tier": "S", "note": "Jun 2026"},
             {"title": "US Census Bureau: population growth slows", "url": "https://census.gov/newsroom/press-releases/2026/population-growth-slows.html", "tier": "S", "note": "Jan 2026"},
@@ -268,7 +257,6 @@ DRIVERS = [
         category_exposure=_categories(2, 5, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         vc_exposure=_value_chain(0, 0, 0, 0, 0, 1, 3, 5),  # epicentre Consumer
         regional_exposure=_regions(2, 5, 1, 4),
-        data_source="Kline (Apr 2025); Mintel (Jun 2025); BeautyMatter (Aug 2026)",
         sources=[
             {"title": "Kline: which hair care products are driving salon sales in the US", "url": "https://klinegroup.com/beauty-and-wellbeing/which-hair-care-products-are-driving-salon-sales-in-the-united-states/", "tier": "B", "note": "Apr 2025"},
             {"title": "Mintel: US textured haircare and hair styles 2025", "url": "https://store.mintel.com/report/us-textured-haircare-and-hair-styles-market-report", "tier": "A", "note": "Jun 2025"},
@@ -288,7 +276,6 @@ DRIVERS = [
         category_exposure=_categories(2, 3, 2, 3, 5, 3, 3, 2, 4, 3, 3, 3, 1),
         vc_exposure=_value_chain(0, 0, 0, 0, 0, 1, 3, 5),  # epicentre Consumer
         regional_exposure=_regions(5, 2, 5, 1),
-        data_source="Eurostat (Mar 2026); Eurostat (Apr 2026); Eurostat (May 2026)",
         sources=[
             {"title": "Eurostat: fertility 2024 (news release)", "url": "https://ec.europa.eu/eurostat/web/products-eurostat-news/w/ddn-20260306-1", "tier": "S", "note": "Mar 2026"},
             {"title": "Eurostat: EUROPOP2025 population projections", "url": "https://ec.europa.eu/eurostat/statistics-explained/index.php?title=Population_projections_in_the_EU", "tier": "S", "note": "Apr 2026"},
@@ -309,7 +296,6 @@ DRIVERS = [
         category_exposure=_categories(0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 0, 0, 0),
         vc_exposure=_value_chain(0, 0, 0, 0, 0, 1, 3, 5),  # epicentre Consumer
         regional_exposure=_regions(5, 0, 1, 3),
-        data_source="Destatis (2025); EIA RECS 2020 table HC3.1 (2022); CHEAA (May 2024)",
         sources=[
             {"title": "Destatis: Ausstattung privater Haushalte mit Haushaltsgeräten", "url": "https://www.destatis.de/DE/Themen/Gesellschaft-Umwelt/Einkommen-Konsum-Lebensbedingungen/Ausstattung-Gebrauchsgueter/Tabellen/liste-haushaltsgeraete-d.html", "tier": "S", "note": "2025"},
             {"title": "EIA RECS 2020 table HC3.1", "url": "https://www.eia.gov/consumption/residential/data/2020/hc/pdf/HC%203.1.pdf", "tier": "S", "note": "2022"},
@@ -330,7 +316,6 @@ DRIVERS = [
         category_exposure=_categories(0, 0, 0, 0, 2, 2, 4, 5, 0, 0, 1, 1, 0),
         vc_exposure=_value_chain(0, 0, 0, 0, 0, 1, 3, 5),  # epicentre Consumer
         regional_exposure=_regions(5, 5, 3, 3),
-        data_source="Unilever (May 2024); P&G citing Circana New Product Pacesetters 2025 (Jun 2026); Henkel H1 2026 results release (Aug 2026)",
         sources=[
             {"title": "Unilever: the fabric enhancer market is changing", "url": "https://www.unilever.com/news/news-search/2024/the-fabric-enhancer-market-is-changing-heres-how-were-responding/", "tier": "A", "note": "May 2024"},
             {"title": "P&G citing Circana New Product Pacesetters 2025", "url": "https://us.pg.com/blogs/circana-pacesetters/", "tier": "A", "note": "Jun 2026"},
@@ -351,7 +336,6 @@ DRIVERS = [
         category_exposure=_categories(0, 0, 0, 0, 2, 5, 4, 3, 0, 0, 0, 0, 0),
         vc_exposure=_value_chain(0, 0, 0, 0, 0, 1, 3, 5),  # epicentre Consumer
         regional_exposure=_regions(5, 4, 3, 2),
-        data_source="Textile Exchange (Sep 2025); Henkel Q3 2025 statement (Nov 2025); Henkel H1 2026 results release (Aug 2026)",
         sources=[
             {"title": "Textile Exchange: Materials Market Report 2025", "url": "https://textileexchange.org/knowledge-center/reports/materials-market-report-2025/", "tier": "A", "note": "Sep 2025"},
             {"title": "Henkel Q3 2025 statement", "url": "https://www.henkel.com/press-and-media/press-releases-and-kits/2025-11-06-higher-organic-sales-growth-in-q3-positive-volume-development-in-both-business-units-2096492", "tier": "A", "note": "Nov 2025"},
@@ -372,7 +356,6 @@ DRIVERS = [
         category_exposure=_categories(2, 2, 2, 4, 5, 2, 3, 3, 3, 3, 3, 1, 2),
         vc_exposure=_value_chain(0, 0, 0, 0, 0, 1, 3, 5),  # epicentre Consumer
         regional_exposure=_regions(0, 5, 0, 0),
-        data_source="Harvard JCHS (Aug 2026); Harvard JCHS (Aug 2026); Pew (May 2026)",
         sources=[
             {"title": "Harvard JCHS: household growth increasingly feeling impacts of immigration drop", "url": "https://www.jchs.harvard.edu/blog/household-growth-increasingly-feel-impacts-immigration-drop", "tier": "A", "note": "Aug 2026"},
             {"title": "Harvard JCHS: affordability pressures and fewer young adults strain household formation", "url": "https://www.jchs.harvard.edu/blog/affordability-pressures-and-fewer-young-adults-strain-household-formation", "tier": "A", "note": "Aug 2026"},
@@ -391,7 +374,6 @@ DRIVERS = [
         category_exposure=_categories(3, 5, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         vc_exposure=_value_chain(0, 0, 0, 0, 0, 1, 3, 5),  # epicentre Consumer
         regional_exposure=_regions(4, 5, 3, 1),
-        data_source="Circana (Aug 2026); Circana (Feb 2026); GCI Magazine (Kline/Circana data) (2025)",
         sources=[
             {"title": "Circana: US beauty H1 2026", "url": "https://www.circana.com/post/us-beauty-industry-posts-solid-first-half-growth-as-fragrance-and-skincare-lead-across-prestige-and", "tier": "A", "note": "Aug 2026"},
             {"title": "Circana: US beauty 2025 full year", "url": "https://www.circana.com/post/us-prestige-and-mass-beauty-retail-deliver-a-positive-performance-in-2025-circana-reports", "tier": "A", "note": "Feb 2026"},
@@ -411,7 +393,6 @@ DRIVERS = [
         category_exposure=_categories(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5),
         vc_exposure=_value_chain(0, 0, 0, 0, 1, 3, 5, 3),  # epicentre Commercial
         regional_exposure=_regions(1, 0, 1, 5),
-        data_source="Henkel Annual Report 2025 (regional table p. 35… (Mar 2026); Henkel Half-Year Financial Report 2026 (regiona… (Aug 2026); ECB euro reference rate TRY (Sep 2026)",
         sources=[
             {"title": "Henkel Annual Report 2025 (regional table p. 350; IAS 29 note p. 355)", "url": "https://www.henkel.com/resource/blob/2131544/eae43b38b5da9c89268a532af1dfbe4f/data/2025-annual-report.pdf", "tier": "A", "note": "Mar 2026"},
             {"title": "Henkel Half-Year Financial Report 2026 (regional table p. 32)", "url": "https://www.henkel.com/resource/blob/2216938/fc11c44023e1fed5781ccfe4ed6ee360/data/2026-henkel-half-year-financial-report.pdf", "tier": "A", "note": "Aug 2026"},
@@ -431,7 +412,6 @@ DRIVERS = [
         category_exposure=_categories(4, 5, 3, 4, 4, 2, 3, 3, 4, 2, 3, 4, 3),
         vc_exposure=_value_chain(0, 0, 0, 0, 0, 1, 3, 5),  # epicentre Consumer
         regional_exposure=_regions(0, 0, 3, 5),
-        data_source="Henkel Half-Year Financial Report 2026 (Aug 2026); Henkel Q1 2026 statement (May 2026); Redseer (Mar 2026)",
         sources=[
             {"title": "Henkel Half-Year Financial Report 2026", "url": "https://www.henkel.com/resource/blob/2216938/fc11c44023e1fed5781ccfe4ed6ee360/data/2026-henkel-half-year-financial-report.pdf", "tier": "A", "note": "Aug 2026"},
             {"title": "Henkel Q1 2026 statement", "url": "https://www.henkel.com/press-and-media/press-releases-and-kits/2026-05-07-henkel-delivers-good-organic-sales-growth-in-the-first-quarter-of-2026-2156362", "tier": "A", "note": "May 2026"},
@@ -456,7 +436,6 @@ DRIVERS = [
         category_exposure=_categories(2, 3, 3, 3, 5, 4, 4, 5, 4, 4, 4, 4, 3),
         vc_exposure=_value_chain(0, 0, 0, 0, 1, 3, 5, 3),  # epicentre Commercial
         regional_exposure=_regions(5, 3, 1, 3),
-        data_source="EHI (Sep 2025); Lebensmittel Praxis (NIQ Trade Dimensions) (May 2026); Schwarz Gruppe FY2025 release (Jun 2026)",
         sources=[
             {"title": "EHI: Preisbewusstes Einkaufen, Discounter legen zu", "url": "https://www.ehi.org/presse/preisbewusstes-einkaufen-discounter-legen-zu/", "tier": "A", "note": "Sep 2025"},
             {"title": "Lebensmittel Praxis (NIQ Trade Dimensions): Top 30 LEH 2025", "url": "https://lebensmittelpraxis.de/top-30-unternehmen-im-leh.html", "tier": "B", "note": "May 2026"},
@@ -477,7 +456,6 @@ DRIVERS = [
         category_exposure=_categories(2, 3, 3, 3, 5, 2, 3, 4, 2, 5, 3, 3, 3),
         vc_exposure=_value_chain(0, 0, 0, 0, 1, 3, 5, 3),  # epicentre Commercial
         regional_exposure=_regions(3, 5, 5, 2),
-        data_source="Walmart Q2 FY27 earnings (Aug 2026); Amazon Q2 2026 results (8-K exhibit) (Jul 2026); Amazon (May 2026)",
         sources=[
             {"title": "Walmart Q2 FY27 earnings", "url": "https://corporate.walmart.com/news/2026/08/20/walmart-releases-q2-fy27-earnings", "tier": "A", "note": "Aug 2026"},
             {"title": "Amazon Q2 2026 results (8-K exhibit)", "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872426000024/amzn-20260630xex991.htm", "tier": "S", "note": "Jul 2026"},
@@ -498,7 +476,6 @@ DRIVERS = [
         category_exposure=_categories(4, 3, 3, 3, 5, 4, 4, 4, 4, 4, 3, 3, 2),
         vc_exposure=_value_chain(0, 0, 0, 0, 1, 3, 5, 3),  # epicentre Commercial
         regional_exposure=_regions(5, 1, 1, 1),
-        data_source="Lebensmittel Praxis (NIQ Trade Dimensions) (May 2026); Retail Insight Network (Jul 2025); IGD (Jul 2026)",
         sources=[
             {"title": "Lebensmittel Praxis (NIQ Trade Dimensions): Top 30 LEH 2025", "url": "https://lebensmittelpraxis.de/top-30-unternehmen-im-leh.html", "tier": "B", "note": "May 2026"},
             {"title": "Retail Insight Network: Carrefour and Coopérative U form Concordis", "url": "https://www.retail-insight-network.com/news/carrefour-cooperative-u-european-purchasing-alliance/", "tier": "B", "note": "Jul 2025"},
@@ -518,7 +495,6 @@ DRIVERS = [
         category_exposure=_categories(4, 4, 5, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         vc_exposure=_value_chain(0, 0, 0, 0, 1, 3, 5, 3),  # epicentre Commercial
         regional_exposure=_regions(4, 5, 5, 3),
-        data_source="Momentum Works (Aug 2026); WWD (Circana data) (Aug 2026); Lengow (Jul 2026)",
         sources=[
             {"title": "Momentum Works: TikTok Shop on track to surpass USD 100bn GMV in 2026", "url": "https://thelowdown.momentum.asia/tiktok-shop-on-track-to-surpass-us100-billion-gmv-globally-in-2026/", "tier": "A", "note": "Aug 2026"},
             {"title": "WWD (Circana data): TikTok Shop beauty sales top USD 2bn in H1 2026", "url": "https://wwd.com/business-news/business-features/tiktok-shop-beauty-sales-2-billion-dollar-growth-1239106171/", "tier": "B", "note": "Aug 2026"},
@@ -538,7 +514,6 @@ DRIVERS = [
         category_exposure=_categories(4, 5, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         vc_exposure=_value_chain(0, 0, 0, 0, 1, 3, 5, 3),  # epicentre Commercial
         regional_exposure=_regions(4, 5, 4, 2),
-        data_source="L'Oréal 2025 annual results (Feb 2026); L'Oréal annual report 2025 (2026); L'Oréal 2026 half-year results (Jul 2026)",
         sources=[
             {"title": "L'Oréal 2025 annual results", "url": "https://www.loreal.com/en/press-release/finance/2025-annual-results/", "tier": "A", "note": "Feb 2026"},
             {"title": "L'Oréal annual report 2025: Professional Products", "url": "https://www.loreal-finance.com/en/annual-report-2025/professional-products/", "tier": "A", "note": "2026"},
@@ -558,7 +533,6 @@ DRIVERS = [
         category_exposure=_categories(5, 5, 5, 5, 3, 3, 3, 3, 2, 3, 3, 4, 1),
         vc_exposure=_value_chain(0, 0, 0, 0, 1, 3, 5, 3),  # epicentre Commercial
         regional_exposure=_regions(5, 0, 0, 0),
-        data_source="NIQ (Jul 2026); Lebensmittel Zeitung (NIQ) (May 2026); Lebensmittel Praxis (NIQ Trade Dimensions) (May 2026)",
         sources=[
             {"title": "NIQ: Drogeriemärkte werden im Lebensmittelgeschäft zur Konkurrenz für Supermärkte", "url": "https://nielseniq.com/global/de/news-center/2026/drogeriemarkte-werden-im-lebensmittelgeschaft-zur-konkurrenz-fur-supermarkte/", "tier": "A", "note": "Jul 2026"},
             {"title": "Lebensmittel Zeitung (NIQ): Handelsmarken, Discounter bleiben wichtigster Absatzkanal", "url": "https://www.lebensmittelzeitung.net/handel/nachrichten/handelsmarken-discounter-bleiben-wichtigster-absatzkanal-190855", "tier": "B", "note": "May 2026"},
@@ -577,7 +551,6 @@ DRIVERS = [
         category_exposure=_categories(3, 4, 3, 3, 5, 3, 3, 5, 3, 3, 3, 3, 3),
         vc_exposure=_value_chain(0, 0, 0, 1, 3, 5, 3, 1),  # epicentre Marketing
         regional_exposure=_regions(4, 5, 4, 2),
-        data_source="eMarketer (Jan 2026); Amazon Q4 2025 results (advertising USD 68.6bn) (Feb 2026); Walmart Q2 FY27 earnings (Walmart Connect +43%) (Aug 2026)",
         sources=[
             {"title": "eMarketer: FAQ on retail media networks 2026", "url": "https://www.emarketer.com/content/faq-on-retail-media-networks-how-marketers-should-allocate-budgets-2026", "tier": "A", "note": "Jan 2026"},
             {"title": "Amazon Q4 2025 results (advertising USD 68.6bn)", "url": "https://ir.aboutamazon.com/news-release/news-release-details/2026/Amazon-com-Announces-Fourth-Quarter-Results/default.aspx", "tier": "A", "note": "Feb 2026"},
@@ -599,7 +572,6 @@ DRIVERS = [
         category_exposure=_categories(4, 5, 4, 2, 5, 3, 3, 4, 2, 4, 2, 3, 1),
         vc_exposure=_value_chain(0, 0, 0, 1, 3, 5, 3, 1),  # epicentre Marketing
         regional_exposure=_regions(5, 5, 4, 3),
-        data_source="L'Oréal 2026 half-year results (Jul 2026); L'Oréal 2025 annual results (R&I EUR 1.38bn) (Feb 2026); Unilever H1 2026 results presentation (Jul 2026)",
         sources=[
             {"title": "L'Oréal 2026 half-year results", "url": "https://www.loreal-finance.com/eng/press-release/2026-half-year-results", "tier": "A", "note": "Jul 2026"},
             {"title": "L'Oréal 2025 annual results (R&I EUR 1.38bn)", "url": "https://www.loreal-finance.com/eng/press-release/2025-annual-results", "tier": "A", "note": "Feb 2026"},
@@ -621,7 +593,6 @@ DRIVERS = [
         category_exposure=_categories(3, 5, 4, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         vc_exposure=_value_chain(0, 0, 0, 1, 3, 5, 3, 1),  # epicentre Marketing
         regional_exposure=_regions(4, 5, 4, 2),
-        data_source="WWD (Circana data) (Aug 2026); NIQ (Jul 2026); Global Cosmetics News (MFDS data) (May 2026)",
         sources=[
             {"title": "WWD (Circana data): TikTok Shop beauty sales top USD 2bn in H1 2026", "url": "https://wwd.com/business-news/business-features/tiktok-shop-beauty-sales-2-billion-dollar-growth-1239106171/", "tier": "B", "note": "Aug 2026"},
             {"title": "NIQ: K-beauty goes global (+58% Western Europe)", "url": "https://finance.yahoo.com/media-advertising/articles/k-beauty-goes-global-sales-140000565.html", "tier": "A", "note": "Jul 2026"},
@@ -643,7 +614,6 @@ DRIVERS = [
         category_exposure=_categories(0, 1, 0, 3, 2, 5, 1, 4, 1, 0, 4, 4, 3),
         vc_exposure=_value_chain(0, 0, 0, 0, 1, 3, 5, 3),  # epicentre Commercial
         regional_exposure=_regions(5, 3, 1, 3),
-        data_source="Reckitt (Dec 2025); Reckitt (Jul 2025); McBride RNS (Aug 2026)",
         sources=[
             {"title": "Reckitt: completes divestment of Essential Home", "url": "https://www.reckitt.com/news/reckitt-completes-divestment-of-essential-home/", "tier": "A", "note": "Dec 2025"},
             {"title": "Reckitt: agrees to divest Essential Home (deal terms)", "url": "https://www.reckitt.com/news/reckitt-agrees-to-divest-essential-home/", "tier": "A", "note": "Jul 2025"},
@@ -664,7 +634,6 @@ DRIVERS = [
         category_exposure=_categories(5, 4, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         vc_exposure=_value_chain(0, 0, 0, 0, 1, 3, 5, 3),  # epicentre Commercial
         regional_exposure=_regions(5, 5, 3, 3),
-        data_source="Kline (Apr 2026); L'Oréal annual report 2025 (2026); Kao Q2 FY2026 results (Aug 2026)",
         sources=[
             {"title": "Kline: Henkel's potential Olaplex acquisition (share positions)", "url": "https://klinegroup.com/beauty-and-wellbeing/henkels-potential-olaplex-acquisition/", "tier": "B", "note": "Apr 2026"},
             {"title": "L'Oréal annual report 2025: Professional Products", "url": "https://www.loreal-finance.com/en/annual-report-2025/professional-products/", "tier": "A", "note": "2026"},
@@ -686,7 +655,6 @@ DRIVERS = [
         category_exposure=_categories(5, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3),
         vc_exposure=_value_chain(3, 5, 3, 1, 0, 0, 0, 0),  # epicentre Formulation
         regional_exposure=_regions(5, 5, 4, 2),
-        data_source="Unilever (Jun 2026); L'Oréal annual report 2025 (2026); Deloitte (Nov 2025)",
         sources=[
             {"title": "Unilever: building an AI-first enterprise at scale", "url": "https://www.unilever.com/news/news-search/2026/how-unilever-is-building-an-ai-first-enterprise-at-scale/", "tier": "A", "note": "Jun 2026"},
             {"title": "L'Oréal annual report 2025: beauty tech acceleration with AI", "url": "https://www.loreal-finance.com/en/annual-report-2025/beauty-tech-acceleration-with-ai/", "tier": "A", "note": "2026"},
@@ -707,7 +675,6 @@ DRIVERS = [
         category_exposure=_categories(1, 3, 1, 3, 5, 3, 2, 4, 3, 4, 3, 3, 1),
         vc_exposure=_value_chain(3, 5, 3, 1, 0, 0, 0, 0),  # epicentre Formulation
         regional_exposure=_regions(5, 4, 3, 2),
-        data_source="Novonesis H1 2026 interim report (Aug 2026); GFI (2026); Unilever and Galaxy Surfactants deepen partners… (Aug 2026)",
         sources=[
             {"title": "Novonesis H1 2026 interim report", "url": "https://backend.novonesis.com/sites/default/files/document/2026-08/2026-H1-Interim-report.pdf", "tier": "A", "note": "Aug 2026"},
             {"title": "GFI: fermentation state of the industry", "url": "https://gfi.org/resource/fermentation-state-of-the-industry-report/", "tier": "A", "note": "2026"},
@@ -726,7 +693,6 @@ DRIVERS = [
         category_exposure=_categories(0, 1, 0, 1, 5, 2, 2, 4, 2, 2, 3, 2, 0),
         vc_exposure=_value_chain(0, 1, 3, 5, 3, 1, 0, 0),  # epicentre Packaging
         regional_exposure=_regions(4, 5, 3, 3),
-        data_source="Henkel North America (Feb 2025); Fast Company (Feb 2026); Consumer Reports (Mar 2026)",
         sources=[
             {"title": "Henkel North America: concentrated formulas for all, Persil, Snuggle", "url": "https://www.henkel-northamerica.com/press/press-releases-and-kits/2025-02-04-henkel-debuts-new-concentrated-formulas-for-all-persil-snuggle-liquid-laundry-products-2049494", "tier": "A", "note": "Feb 2025"},
             {"title": "Fast Company: Tide evo tile detergent", "url": "https://www.fastcompany.com/91492022/tide-evo-tile-detergent-design", "tier": "B", "note": "Feb 2026"},
@@ -747,7 +713,6 @@ DRIVERS = [
         category_exposure=_categories(0, 0, 0, 0, 5, 3, 3, 4, 2, 4, 2, 1, 0),
         vc_exposure=_value_chain(0, 0, 0, 0, 1, 3, 5, 3),  # epicentre Commercial
         regional_exposure=_regions(5, 4, 3, 1),
-        data_source="Consumer Goods Technology (Jan 2025); Henkel and Samsung (Aug 2024); Amazon Dash Replenishment (developer) (2026)",
         sources=[
             {"title": "Consumer Goods Technology: Henkel's IoT laundry concept may hit retail in 2-3 years", "url": "https://consumergoods.com/henkels-iot-laundry-concept-may-hit-retail-2-3-years", "tier": "B", "note": "Jan 2025"},
             {"title": "Henkel and Samsung: custom wash cycles (Korea)", "url": "https://www.henkel.com/press-and-media/press-releases-and-kits/2024-08-09-henkel-and-samsung-introduce-custom-wash-cycles-that-reduce-energy-consumption-by-60-percent-1950516", "tier": "A", "note": "Aug 2024"},
@@ -767,7 +732,6 @@ DRIVERS = [
         category_exposure=_categories(1, 2, 1, 3, 5, 4, 4, 5, 4, 5, 3, 3, 3),
         vc_exposure=_value_chain(0, 0, 0, 0, 1, 3, 5, 3),  # epicentre Commercial
         regional_exposure=_regions(3, 5, 4, 2),
-        data_source="Morgan Stanley (Dec 2025); Modern Retail (Mar 2026); Amazon (May 2026)",
         sources=[
             {"title": "Morgan Stanley: agentic commerce market impact outlook", "url": "https://www.morganstanley.com/insights/articles/agentic-commerce-market-impact-outlook", "tier": "A", "note": "Dec 2025"},
             {"title": "Modern Retail: what went wrong with ChatGPT's Instant Checkout", "url": "https://www.modernretail.co/technology/what-went-wrong-with-chatgpts-instant-checkout/", "tier": "B", "note": "Mar 2026"},
@@ -788,7 +752,6 @@ DRIVERS = [
         category_exposure=_categories(4, 5, 3, 3, 3, 3, 2, 3, 2, 3, 2, 2, 2),
         vc_exposure=_value_chain(0, 0, 0, 1, 3, 5, 3, 1),  # epicentre Marketing
         regional_exposure=_regions(4, 5, 4, 2),
-        data_source="Adobe (Apr 2026); Digital Commerce 360 (Adobe data) (Jun 2026); McKinsey (Mar 2026)",
         sources=[
             {"title": "Adobe: AI traffic surge to retail sites, pages not machine-readable", "url": "https://business.adobe.com/blog/ai-traffic-surge-retail-sites-not-machine-readable", "tier": "A", "note": "Apr 2026"},
             {"title": "Digital Commerce 360 (Adobe data): AI-referred traffic doubles in a year", "url": "https://www.digitalcommerce360.com/2026/06/17/adobe-ai-referred-traffic-to-retail-sites-doubles-in-a-year/", "tier": "B", "note": "Jun 2026"},
@@ -809,7 +772,6 @@ DRIVERS = [
         category_exposure=_categories(2, 3, 3, 3, 4, 3, 5, 5, 2, 1, 2, 3, 1),
         vc_exposure=_value_chain(3, 5, 3, 1, 0, 0, 0, 0),  # epicentre Formulation
         regional_exposure=_regions(5, 0, 1, 1),
-        data_source="Regulation (EU) 2023/2055 (microplastics) text (Sep 2023); Henkel (2025); Federal Register (Apr 2023)",
         sources=[
             {"title": "Regulation (EU) 2023/2055 (microplastics) text", "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX%3A32023R2055", "tier": "S", "note": "Sep 2023"},
             {"title": "Henkel: position on microplastics", "url": "https://www.henkel.com/sustainability/positions/microplastics", "tier": "A", "note": "2025"},
@@ -828,7 +790,6 @@ DRIVERS = [
         category_exposure=_categories(5, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         vc_exposure=_value_chain(3, 5, 3, 1, 0, 0, 0, 0),  # epicentre Formulation
         regional_exposure=_regions(5, 1, 2, 2),
-        data_source="Regulation (EU) 2026/78 (Omnibus VIII) (Jan 2026); Regulation (EU) 2023/1545 (fragrance allergens) (Jul 2023); Regulation (EU) 2024/2462 (PFHxA) (Sep 2024)",
         sources=[
             {"title": "Regulation (EU) 2026/78 (Omnibus VIII)", "url": "https://eur-lex.europa.eu/eli/reg/2026/78/oj/eng", "tier": "S", "note": "Jan 2026"},
             {"title": "Regulation (EU) 2023/1545 (fragrance allergens)", "url": "https://eur-lex.europa.eu/eli/reg/2023/1545/oj/eng", "tier": "S", "note": "Jul 2023"},
@@ -850,7 +811,6 @@ DRIVERS = [
         category_exposure=_categories(3, 3, 3, 3, 5, 3, 4, 3, 3, 3, 4, 5, 3),
         vc_exposure=_value_chain(0, 1, 3, 5, 3, 1, 0, 0),  # epicentre Packaging
         regional_exposure=_regions(5, 3, 1, 1),
-        data_source="Regulation (EU) 2025/40 (PPWR) (Jan 2025); Gleiss Lutz (Jan 2025); GOV.UK (2026)",
         sources=[
             {"title": "Regulation (EU) 2025/40 (PPWR)", "url": "https://eur-lex.europa.eu/eli/reg/2025/40/oj/eng", "tier": "S", "note": "Jan 2025"},
             {"title": "Gleiss Lutz: new EU packaging regulation, key requirements from August 2026", "url": "https://www.gleisslutz.com/en/know-how/new-eu-packaging-regulation-key-requirements-august-2026", "tier": "A", "note": "Jan 2025"},
@@ -871,7 +831,6 @@ DRIVERS = [
         category_exposure=_categories(2, 3, 2, 3, 5, 2, 2, 2, 3, 3, 4, 3, 2),
         vc_exposure=_value_chain(0, 0, 0, 1, 3, 5, 3, 1),  # epicentre Marketing
         regional_exposure=_regions(5, 1, 1, 1),
-        data_source="Directive (EU) 2024/825 (EmpCo) (Mar 2024); European Parliament Legislative Train (May 2026); Gorrissen Federspiel (Jun 2025)",
         sources=[
             {"title": "Directive (EU) 2024/825 (EmpCo)", "url": "https://eur-lex.europa.eu/eli/dir/2024/825/oj/eng", "tier": "S", "note": "Mar 2024"},
             {"title": "European Parliament Legislative Train: substantiating green claims (status)", "url": "https://www.europarl.europa.eu/legislative-train/spotlight-JD%2023-24/file-substantiating-green-claims", "tier": "S", "note": "May 2026"},
@@ -890,7 +849,6 @@ DRIVERS = [
         category_exposure=_categories(1, 4, 1, 4, 4, 2, 2, 3, 5, 2, 2, 2, 1),
         vc_exposure=_value_chain(0, 0, 1, 3, 5, 3, 1, 0),  # epicentre Supply Chain
         regional_exposure=_regions(5, 1, 1, 1),
-        data_source="Regulation (EU) 2025/2650 (EUDR amendment) (Dec 2025); Council of the EU (Dec 2025); Covington (Feb 2026)",
         sources=[
             {"title": "Regulation (EU) 2025/2650 (EUDR amendment)", "url": "https://eur-lex.europa.eu/eli/reg/2025/2650/oj/eng", "tier": "S", "note": "Dec 2025"},
             {"title": "Council of the EU: deforestation regulation simplified and postponed", "url": "https://www.consilium.europa.eu/en/press/press-releases/2025/12/18/deforestation-council-signs-off-targeted-revision-to-simplify-and-postpone-the-regulation/", "tier": "S", "note": "Dec 2025"},
@@ -910,7 +868,6 @@ DRIVERS = [
         category_exposure=_categories(3, 2, 5, 2, 2, 2, 2, 3, 2, 2, 3, 1, 3),
         vc_exposure=_value_chain(0, 0, 1, 3, 5, 3, 1, 0),  # epicentre Supply Chain
         regional_exposure=_regions(1, 5, 1, 1),
-        data_source="SCOTUSblog (Feb 2026); Tax Foundation (Sep 2026); USTR fact sheet (Jul 2026)",
         sources=[
             {"title": "SCOTUSblog: Learning Resources v. Trump", "url": "https://www.scotusblog.com/case-files/cases/learning-resources-inc-v-trump/", "tier": "A", "note": "Feb 2026"},
             {"title": "Tax Foundation: tariff tracker", "url": "https://taxfoundation.org/research/all/federal/trump-tariffs-trade-war/", "tier": "A", "note": "Sep 2026"},
@@ -932,7 +889,6 @@ DRIVERS = [
         category_exposure=_categories(5, 4, 3, 4, 1, 1, 1, 1, 1, 1, 2, 1, 1),
         vc_exposure=_value_chain(3, 5, 3, 1, 0, 0, 0, 0),  # epicentre Formulation
         regional_exposure=_regions(0, 5, 0, 0),
-        data_source="FDA (Aug 2026); Washington Ecology (2026); Oregon Legislature (2023)",
         sources=[
             {"title": "FDA: MoCRA page", "url": "https://www.fda.gov/cosmetics/cosmetics-laws-regulations/modernization-cosmetics-regulation-act-2022-mocra", "tier": "S", "note": "Aug 2026"},
             {"title": "Washington Ecology: Toxic-Free Cosmetics Act", "url": "https://ecology.wa.gov/waste-toxics/reducing-toxic-chemicals/washingtons-toxics-in-products-laws/toxic-free-cosmetics-act", "tier": "S", "note": "2026"},
@@ -952,7 +908,6 @@ DRIVERS = [
         category_exposure=_categories(2, 3, 2, 5, 5, 2, 3, 2, 5, 0, 3, 2, 3),
         vc_exposure=_value_chain(0, 0, 0, 0, 0, 1, 3, 5),  # epicentre Consumer
         regional_exposure=_regions(0, 5, 0, 0),
-        data_source="Brookings (Oct 2025); CBPP (Jun 2026); Shelby Report (Circana) (Jul 2026)",
         sources=[
             {"title": "Brookings: SNAP cuts in the One Big Beautiful Bill Act", "url": "https://www.brookings.edu/articles/snap-cuts-in-the-one-big-beautiful-bill-act-will-significantly-impair-recession-response/", "tier": "A", "note": "Oct 2025"},
             {"title": "CBPP: SNAP participation losses exceed CBO's estimates", "url": "https://www.cbpp.org/blog/congress-should-staunch-snap-participation-losses-which-exceed-cbos-estimates", "tier": "A", "note": "Jun 2026"},
@@ -972,7 +927,6 @@ DRIVERS = [
         category_exposure=_categories(0, 0, 0, 0, 5, 4, 3, 5, 4, 5, 4, 4, 2),
         vc_exposure=_value_chain(0, 1, 3, 5, 3, 1, 0, 0),  # epicentre Packaging
         regional_exposure=_regions(5, 0, 0, 1),
-        data_source="Regulation (EU) 2026/405 on detergents and surf… (Feb 2026); UL Solutions (Mar 2026); Council of the EU (Jun 2025)",
         sources=[
             {"title": "Regulation (EU) 2026/405 on detergents and surfactants", "url": "https://eur-lex.europa.eu/eli/reg/2026/405/oj/eng", "tier": "S", "note": "Feb 2026"},
             {"title": "UL Solutions: EU publishes new detergent regulation", "url": "https://www.ul.com/news/eu-publishes-new-detergent-regulation", "tier": "B", "note": "Mar 2026"},
@@ -992,7 +946,6 @@ DRIVERS = [
         category_exposure=_categories(5, 5, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         vc_exposure=_value_chain(3, 5, 3, 1, 0, 0, 0, 0),  # epicentre Formulation
         regional_exposure=_regions(5, 0, 0, 0),
-        data_source="Directive (EU) 2024/3019 (UWWTD recast) (Dec 2024)",
         sources=[
             {"title": "Directive (EU) 2024/3019 (UWWTD recast)", "url": "https://eur-lex.europa.eu/eli/dir/2024/3019/oj/eng", "tier": "S", "note": "Dec 2024"},
         ],
@@ -1010,7 +963,6 @@ DRIVERS = [
         category_exposure=_categories(2, 4, 1, 4, 3, 3, 3, 3, 5, 2, 3, 3, 1),
         vc_exposure=_value_chain(5, 3, 1, 0, 0, 0, 0, 0),  # epicentre Raw Materials
         regional_exposure=_regions(5, 4, 4, 4),
-        data_source="World Bank Commodity Price Data (Pink Sheet), A… (Aug 2026); Antara (Jun 2026); S&P Global (Dec 2025)",
         sources=[
             {"title": "World Bank Commodity Price Data (Pink Sheet), August 2026", "url": "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Pink-Sheet-August-2026.pdf", "tier": "S", "note": "Aug 2026"},
             {"title": "Antara: B50 mandate begins 1 July 2026", "url": "https://en.antaranews.com/news/420608/b50-mandate-begins-indonesia-enters-a-new-era-of-energy-independence", "tier": "B", "note": "Jun 2026"},
@@ -1031,7 +983,6 @@ DRIVERS = [
         category_exposure=_categories(4, 2, 5, 4, 3, 2, 2, 2, 2, 3, 2, 2, 4),
         vc_exposure=_value_chain(0, 1, 3, 5, 3, 1, 0, 0),  # epicentre Packaging
         regional_exposure=_regions(5, 0, 1, 1),
-        data_source="European Commission (2026); COM(2025) 989 (Dec 2025); Council of the EU (Jun 2026)",
         sources=[
             {"title": "European Commission: CBAM definitive regime", "url": "https://taxation-customs.ec.europa.eu/carbon-border-adjustment-mechanism/cbam-definitive-regime_en", "tier": "S", "note": "2026"},
             {"title": "COM(2025) 989: CBAM downstream extension proposal", "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX%3A52025PC0989", "tier": "S", "note": "Dec 2025"},
@@ -1051,7 +1002,6 @@ DRIVERS = [
         category_exposure=_categories(2, 2, 2, 2, 5, 2, 2, 2, 2, 4, 2, 2, 1),
         vc_exposure=_value_chain(1, 3, 5, 3, 1, 0, 0, 0),  # epicentre Manufacturing
         regional_exposure=_regions(5, 0, 2, 1),
-        data_source="IEA (Feb 2026); Eurostat (May 2026); World Bank Commodity Price Data (Pink Sheet), A… (Aug 2026)",
         sources=[
             {"title": "IEA: Electricity 2026, prices chapter", "url": "https://www.iea.org/reports/electricity-2026/prices", "tier": "S", "note": "Feb 2026"},
             {"title": "Eurostat: non-household electricity prices H2 2025", "url": "https://ec.europa.eu/eurostat/web/products-eurostat-news/w/ddn-20260508-2", "tier": "S", "note": "May 2026"},
@@ -1072,7 +1022,6 @@ DRIVERS = [
         category_exposure=_categories(3, 3, 3, 3, 5, 4, 4, 4, 4, 4, 4, 4, 3),
         vc_exposure=_value_chain(5, 3, 1, 0, 0, 0, 0, 0),  # epicentre Raw Materials
         regional_exposure=_regions(5, 3, 4, 5),
-        data_source="World Bank blog (May 2026); World Bank (Apr 2026); ICIS (Mar 2026)",
         sources=[
             {"title": "World Bank blog: Strait of Hormuz disruption sends oil prices surging", "url": "https://blogs.worldbank.org/en/opendata/strait-of-hormuz-disruption-sends-oil-prices-surging", "tier": "S", "note": "May 2026"},
             {"title": "World Bank: Commodity Markets Outlook April 2026", "url": "https://www.worldbank.org/en/news/press-release/2026/04/28/commodity-markets-outlook-april-2026-press-release", "tier": "S", "note": "Apr 2026"},

@@ -2,15 +2,22 @@
 
 A database that PRISM ran on before this release has the previous schema: the
 drivers sit in a table called `trends`, next to tables nothing reads any more.
-The current code refuses such a database (the API answers 503 with a message
-naming this migration, the production run exits with code 1) and never writes
-to it. `migrate.py` moves a database onto the current schema in one
-transaction. What it changes is listed in its docstring; in short:
+The API and the production run of this release refuse such a database (the
+API answers 503 with a message naming this migration, the production run
+exits with code 1) and write nothing to it. The dashboard's role table,
+`user_roles`, is not part of the migration and keeps working throughout.
+`migrate.py` moves a database onto the current schema in one transaction.
+What it changes is listed in its docstring; in short:
 
 - the driver tables are created and filled from the previous ones, every row
-  and every expert proposal included;
+  and every expert proposal included. Where an admin saved a driver's source
+  list in the previous editor, that saved list becomes the driver's sources.
+  Rows of the previous child tables whose driver no longer exists are not
+  copied;
 - the tables and `simulation_runs` columns nothing reads are dropped, after
-  their rows are written to a local archive file;
+  their rows are written to a local archive file. Nothing is dropped with
+  `CASCADE`: if a table the migration does not know depends on one it drops,
+  it stops and changes nothing;
 - the stored runs get the current key names (`meta.driver_count`,
   `meta.driver_fingerprint`); no number changes;
 - each driver gets its current PRISM Analysis text, and descriptions and
@@ -25,36 +32,65 @@ use and seeds the driver base.
 
 The order matters. The current code must be live before the migration runs,
 because the previous code would recreate its own tables next to the migrated
-ones. The dashboard is unavailable from the deploy (step 3) until the
-migration has committed (step 4): plan a few quiet minutes.
+ones. The dashboard is unavailable from the deploy (step 4) until the
+migration has committed (step 5): plan a few quiet minutes.
 
 You need the repository at the commit you are deploying, the Python
-environment from `requirements-dev.txt` and a `.env` whose `DATABASE_URL` is
-the Neon database.
+environment from `requirements-dev.txt` and a `.env` whose `DATABASE_URL` (or
+`POSTGRES_URL`) is the Neon production database.
 
 1. **Back up.** In the Neon console, create a branch of the production branch
    (Branches, Create branch, from the current state). It is an instant
    point-in-time copy and your rollback.
 
-2. **Preview.** Run the dry run against Neon. It performs the whole migration
+2. **Rehearse on a copy.** Create a second branch the same way (for example
+   `migration-rehearsal`) and run the real migration against it. Set its
+   connection string in the shell for both variables: a shell variable wins
+   over `.env`, and `POSTGRES_URL` wins over `DATABASE_URL`:
+
+   ```bash
+   export REHEARSAL='<the rehearsal branch connection string>'
+   POSTGRES_URL="$REHEARSAL" DATABASE_URL="$REHEARSAL" python3 migrations/0001_driver_schema/migrate.py --dry-run
+   POSTGRES_URL="$REHEARSAL" DATABASE_URL="$REHEARSAL" python3 migrations/0001_driver_schema/migrate.py --postgres
+   ```
+
+   The report opens with the database host: check in the dry run that it is
+   the rehearsal branch's endpoint, not production's. The second command
+   commits on that branch, so every step, including the archive, runs once
+   for real on production data without touching production; run it again and
+   it must answer that the database is already migrated. Delete the
+   rehearsal branch and its archive file afterwards (the archive holds user
+   emails).
+
+3. **Preview.** Run the dry run against Neon. It performs the whole migration
    inside a transaction, prints the report and rolls back:
 
    ```bash
    python3 migrations/0001_driver_schema/migrate.py --dry-run
    ```
 
-   Expect 51 drivers copied with their sources and proposals, the previous
-   tables in `dropped_tables`, and 51 analysis texts updated. Read the lists
-   named `edited_left_alone` and `texts_edited_left_alone`: each entry is a
-   text an admin changed, which the migration keeps as it is. While the dry
-   run holds its transaction the live dashboard's database reads wait, so run
-   it at a quiet moment; it takes about a minute.
+   The report opens with the database host, production's this time. Expect
+   `copied` to show 51 drivers with their sources and proposals, the previous
+   tables in `dropped_tables`, and 51 in `analysis_updated`. Then read:
 
-3. **Deploy.** Merge the release into `main` and push. Vercel builds and
+   - `sources_from_editor`: the drivers whose source list an admin saved in
+     the previous editor. That list becomes their sources; each entry shows
+     how many rows it has and how many rows the old sources table held;
+   - `orphans_skipped`: per previous child table, the rows whose driver no
+     longer exists. They are not copied; the archive keeps them;
+   - `descriptions.edited_left_alone` and `journey.texts_edited_left_alone`:
+     each entry is a text an admin changed, which the migration keeps as it
+     is.
+
+   The migration locks the tables it changes for its whole transaction, so
+   while the dry run runs the live dashboard's database reads wait. Run it at
+   a quiet moment; it takes about a minute.
+
+4. **Deploy.** Merge the release into `main` and push. Vercel builds and
    promotes it in about two minutes (watch it in the Vercel dashboard). From
-   now until step 4 the dashboard reports that the service is unavailable.
+   now until step 5 the dashboard reports that PRISM is being updated.
 
-4. **Migrate** as soon as the deployment is live:
+5. **Migrate** as soon as the deployment is live:
 
    ```bash
    python3 migrations/0001_driver_schema/migrate.py --postgres
@@ -64,14 +100,16 @@ the Neon database.
    `Migrated. Archive of everything dropped: <path>`. Keep that file: it holds
    every dropped row and column (it is git-ignored and must never be
    committed). If the script fails it rolls back by itself, exits with code 2
-   and the database is unchanged; see Rollback.
+   and the database is unchanged; see Rollback. It waits at most ten seconds
+   for its locks: if a long request of the live service holds one, it stops
+   the same way, and running it again is safe.
 
-5. **Check.** `https://prism-hcb.vercel.app/api/v1/health` answers
+6. **Check.** `https://prism-hcb.vercel.app/api/v1/health` answers
    `"status": "ok"` with `"driver_count": 51` and `"has_simulation": true`.
    Open the dashboard: the Shift Analysis shows the persisted run with its
    2035 portfolio median of -5.6 percent.
 
-6. **Write a fresh run** so the served run carries the current labels (the
+7. **Write a fresh run** so the served run carries the current labels (the
    numbers stay the same, and its input-drift event reports no changes):
 
    ```bash
@@ -90,8 +128,8 @@ python3 migrations/0001_driver_schema/migrate.py --sqlite data/prism.db --dry-ru
 python3 migrations/0001_driver_schema/migrate.py --sqlite data/prism.db
 ```
 
-It needs SQLite 3.35 or later (for `DROP COLUMN`). A local copy can also simply
-be deleted: the API creates a new one on its next start.
+A local copy can also be deleted instead: the API creates a new one on its
+next start.
 
 ## Rollback
 
@@ -102,7 +140,7 @@ be deleted: the API creates a new one on its next start.
 - **A problem shows after the migration committed:** promote the previous
   production deployment and restore the Neon branch from step 1 (in Neon,
   restore the production branch from the backup branch, or point
-  `DATABASE_URL` at the backup branch). The archive file of step 4 holds the
+  `DATABASE_URL` at the backup branch). The archive file of step 5 holds the
   dropped rows as well.
 
 ## Exit codes

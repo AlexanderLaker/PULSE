@@ -151,7 +151,6 @@ def _scorer_block(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         out.append({
             "user_id": r.get("user_id"),
             "name": r.get("user_name") or r.get("user_id"),
-            "role": r.get("user_role") or "viewer",
             "probability": r.get("probability"),
             "gp1_pct_affected": r.get("gp1_pct_affected"),
             "peak_year": r.get("peak_year"),

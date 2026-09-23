@@ -17,8 +17,9 @@ from typing import Optional
 
 from prism.config import vc_epicentre_of
 
-#: Fingerprint fields beyond probability, GP1 share, direction and force.
-STRUCTURE_KEYS = ("ce", "ve", "re", "s", "pk", "dc", "u")
+#: Fingerprint fields beyond probability, GP1 share and direction: a driver
+#: moved to another force, its exposures, onset, peak year, curve or uncertainty.
+STRUCTURE_KEYS = ("f", "ce", "ve", "re", "s", "pk", "dc", "u")
 
 
 def _exposure_map(m) -> dict:
@@ -52,6 +53,22 @@ def driver_fingerprint(drivers) -> dict:
             "u": int(d.uncertainty) if d.uncertainty is not None else None,
         }
     return fp
+
+
+def _differs(a: dict, b: dict) -> bool:
+    """Whether two drivers' fingerprints differ in anything that moves the simulation."""
+    return (any(a.get(k) != b.get(k) for k in ("p", "g", "d"))
+            or any(key in a and key in b and a[key] != b[key] for key in STRUCTURE_KEYS))
+
+
+def changed_drivers(current_fp: dict, previous_fp: dict) -> dict:
+    """{"changed", "added", "removed"}: the driver ids that differ between two fingerprints."""
+    common = sorted(set(current_fp) & set(previous_fp))
+    return {
+        "changed": [i for i in common if _differs(previous_fp[i], current_fp[i])],
+        "added": sorted(set(current_fp) - set(previous_fp)),
+        "removed": sorted(set(previous_fp) - set(current_fp)),
+    }
 
 
 def _force_balance(fp: dict) -> dict:
@@ -127,8 +144,8 @@ def compute_input_drift_event(
             "detail": detail,
         }
 
-    struct_txt = (f", {len(structure_changes)} structural change(s) (exposures, onset, peak year, curve, uncertainty)"
-                  if structure_changes else "")
+    struct_txt = (f", {len(structure_changes)} structural change(s) "
+                  f"(force, exposures, onset, peak year, curve or uncertainty)" if structure_changes else "")
     add_rm_txt = f", {len(added)} driver(s) added, {len(removed)} removed" if (added or removed) else ""
     bal_txt = ("; per-force balance change: " + ", ".join(f"{f} {d:+d}" for f, d in balance_delta.items())
                if balance_delta else "")

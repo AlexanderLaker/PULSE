@@ -31,7 +31,7 @@ from prism.config import (FORCES, REGIONS, VC_STEPS, FORCE_MATERIALIZATION_OVERR
                           ModelConfig, build_driver_correlation_matrix,
                           compute_materialization_schedule, peak_jitter_for,
                           vc_epicentre_step_of)
-from prism.drivers import DriverSet
+from prism.drivers import DriverSet, InvalidDriversError, simulation_problems
 
 beta_ppf = _beta_dist.ppf
 norm_cdf = _norm_dist.cdf
@@ -42,6 +42,37 @@ NUMERICS_BACKEND = f"scipy {_scipy.__version__} · numpy {np.__version__}"
 logger = logging.getLogger(__name__)
 
 PERCENTILES = [10, 25, 50, 75, 90]
+
+#: Seed of the bootstrap behind mc_standard_error, fixed so the reported
+#: standard errors of a run are reproducible.
+MC_SE_BOOTSTRAP_SEED = 20260713
+
+
+def region_presence(driver) -> np.ndarray:
+    """A driver's weight in each region (REGIONS order): regional exposure / 5.
+
+    A driver without any regional exposure counts as present everywhere (1 in
+    every region) rather than being dropped; the shift and the region lens
+    both use this rule, and the run reports such drivers.
+    """
+    reg = driver.regional_exposure or {}
+    vals = np.array([min(float(reg.get(r, 0.0)), 5.0) / 5.0 for r in REGIONS])
+    return vals if vals.sum() > 0 else np.ones(len(REGIONS))
+
+
+def floor_event(count: int) -> dict:
+    """The integrity event for compounding factors floored at -100 percent."""
+    return {
+        "type": "compounding_floor",
+        "severity": "warning",
+        "message": (
+            f"{count} compounding factors (iteration x force x cell x year) were at or below zero, "
+            f"a single force removing more than a cell's whole pool, and were floored at -100%. If "
+            f"the count is material relative to the iterations, review the driver magnitudes and "
+            f"attenuation."
+        ),
+        "detail": {"count": int(count)},
+    }
 
 
 class BayesianMonteCarloEngine:
@@ -94,6 +125,8 @@ class BayesianMonteCarloEngine:
                     len(self.config.path_years))
 
         category_samples, regional_samples = self._simulate_samples(db, n_iter)
+        if self._floored_factor_cells:
+            self._integrity_events.append(floor_event(self._floored_factor_cells))
         result = self._compile_results(category_samples, db)
         result["regional_shift_matrix"] = self._build_regional_matrix(regional_samples)
         result.update(self._weights_used())
@@ -194,6 +227,9 @@ class BayesianMonteCarloEngine:
         n_regions = len(REGIONS)
         n_years = len(self.config.path_years)
         drivers = db.drivers
+        problems = simulation_problems(drivers)
+        if problems:
+            raise InvalidDriversError(problems)
 
         corr_matrix = self._build_correlation_matrix(drivers)
         raw_samples = self._generate_copula_samples(drivers, corr_matrix, n_iter)
@@ -291,14 +327,7 @@ class BayesianMonteCarloEngine:
         for j, driver in enumerate(drivers):
             a_p, b_p = driver.probability_prior
             prob_01 = beta_ppf(U[:, j], a_p, b_p)
-            gp1 = driver.gp1_pct_affected
-            if gp1 is None or gp1 <= 0 or gp1 > 1.0:
-                raise ValueError(
-                    f"Driver '{driver.id}' ({driver.name}) has an invalid "
-                    f"gp1_pct_affected={gp1!r}. Every driver needs a value in "
-                    f"(0, 1] before it can be simulated."
-                )
-            samples[:, j] = prob_01 * gp1 * driver.direction_sign
+            samples[:, j] = prob_01 * driver.gp1_pct_affected * driver.direction_sign
         return samples
 
     def _peak_schedule_table(self, drivers: list) -> tuple:
@@ -387,20 +416,13 @@ class BayesianMonteCarloEngine:
         force_list = list(FORCES)
         n_forces = len(force_list)
         force_idx_map = {f: i for i, f in enumerate(force_list)}
-        driver_force_idx = np.array([force_idx_map.get(d.force, 0) for d in drivers])
+        driver_force_idx = np.array([force_idx_map[d.force] for d in drivers])
         fw = np.array([self.config.force_weights.get(f, 1.0 / n_forces) for f in force_list])
 
-        # Regional weight per driver. A driver without any regional exposure is
-        # treated as present everywhere rather than dropped, and reported.
-        region_weight = np.zeros((n_drivers, n_regions))
-        regionless: list = []
-        for j, driver in enumerate(drivers):
-            reg_map = driver.regional_exposure or {}
-            vals = np.array([min(float(reg_map.get(r, 0.0)), 5.0) / 5.0 for r in REGIONS])
-            if vals.sum() <= 0:
-                vals = np.ones(n_regions)
-                regionless.append(driver.id)
-            region_weight[j, :] = vals
+        # Regional weight per driver (region_presence); drivers without any
+        # regional exposure count as present everywhere and are reported.
+        region_weight = np.array([region_presence(d) for d in drivers])
+        regionless = [d.id for d in drivers if not any((d.regional_exposure or {}).values())]
 
         exposure_matrix = np.zeros((n_drivers, n_cells))
         for j, driver in enumerate(drivers):
@@ -481,18 +503,6 @@ class BayesianMonteCarloEngine:
                 factors = np.maximum(factors, 0.0)
             product = np.prod(factors, axis=1)
             shift_samples[:, :, y_idx] = product - 1.0
-
-        if self._floored_factor_cells > 0:
-            self._integrity_events.append({
-                "type": "compounding_floor",
-                "severity": "warning",
-                "message": (
-                    f"{self._floored_factor_cells} compounding factors (iteration x force x "
-                    f"cell x year) were at or below zero, a single force removing more than a "
-                    f"cell's whole pool, and were floored at -100%. If the count is material "
-                    f"relative to the iterations, review the driver magnitudes and attenuation."
-                ),
-            })
         return shift_samples
 
     # ── Results ─────────────────────────────────────────────────────────────
@@ -595,6 +605,7 @@ class BayesianMonteCarloEngine:
         # Region lens: each (category, region) cell weighted by its own share
         # of the category's gross profit.
         Wn_lens = self._row_normalised_cell_weights()
+        presences = [region_presence(d) for d in drivers]
         force_shares: dict = {}
         region_shares: dict = {}
         for cat in cats:
@@ -614,11 +625,11 @@ class BayesianMonteCarloEngine:
             c_idx_lens = cats.index(cat)
             for r_idx_lens, region in enumerate(REGIONS):
                 rw = float(Wn_lens[c_idx_lens, r_idx_lens])
-                for driver in drivers:
+                for j, driver in enumerate(drivers):
                     cat_exp = driver.category_exposure.get(cat, 0)
                     if cat_exp > 0:
-                        r_exp = float((driver.regional_exposure or {}).get(region, 0.0))
-                        rsum[region] += abs(driver.normalized_score) * (cat_exp / 5.0) * (r_exp / 5.0) * rw
+                        presence = float(presences[j][r_idx_lens])
+                        rsum[region] += abs(driver.normalized_score) * (cat_exp / 5.0) * presence * rw
             rtot = sum(rsum.values())
             if rtot > 0:
                 region_shares[cat] = {r: v / rtot for r, v in rsum.items()}
@@ -699,7 +710,7 @@ class BayesianMonteCarloEngine:
         n_iter, n_cats, n_years = samples.shape
         last = n_years - 1
         terminal_year = int(self.config.path_years[-1])
-        rng = np.random.default_rng(20260713)
+        rng = np.random.default_rng(MC_SE_BOOTSTRAP_SEED)
         out: dict = {}
         for c_idx, cat in enumerate(self.config.category_names):
             col = samples[:, c_idx, last]
@@ -770,10 +781,15 @@ class BayesianMonteCarloEngine:
         result["regional_shift_matrix"] = self._build_regional_matrix(pooled_reg)
         result.update(self._weights_used())
 
-        # The data-driven events (correlation, regional coverage, floor) are the
-        # same in every chain: report chain 0's once. The value-chain events come
-        # from the pooled compilation; cell-weight events are merged by type.
+        # The input-driven events (correlation repair, regional coverage) are the
+        # same in every chain: report chain 0's once. Floored factors depend on
+        # the draws, so their count is summed over the chains. The value-chain
+        # events come from the pooled compilation; cell-weight events are merged
+        # by type.
         merged = list(chain_engines[0]._integrity_events)
+        floored = sum(engine._floored_factor_cells for engine in chain_engines)
+        if floored:
+            merged.append(floor_event(floored))
         seen = {e.get("type") for e in merged}
         for e in result.get("integrity_events", []):
             if e.get("type") in ("cell_weight_zero_row", "cell_weights_fallback") and e.get("type") in seen:

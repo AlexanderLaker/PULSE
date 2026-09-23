@@ -1,17 +1,19 @@
 """Load the repository's .env file into the process environment.
 
-Import this module for its side effect in command-line entry points:
+Import this module for its side effect, before anything reads the database
+URL, in every entry point that runs on a developer's or the owner's machine:
 
     import prism.env_loader  # noqa: F401
 
 Variables already set in the shell take precedence over the file
 (``override=False``), so a single run can be pointed at another database with
-``DATABASE_URL=... python scripts/run_production.py``.
+``POSTGRES_URL=... DATABASE_URL=... python3 scripts/run_production.py`` (both,
+because POSTGRES_URL wins when the file sets it). Without a .env file
+(a Vercel deployment, where the variables come from the project settings)
+nothing happens and python-dotenv is not needed.
 """
 import logging
 from pathlib import Path
-
-from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +21,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = PROJECT_ROOT / ".env"
 
 if ENV_FILE.exists():
+    from dotenv import load_dotenv
+
     load_dotenv(ENV_FILE, override=False)
     logger.info("Loaded environment from %s (shell variables take precedence)", ENV_FILE)
-else:
-    logger.info(".env not found at %s; using the process environment only", ENV_FILE)

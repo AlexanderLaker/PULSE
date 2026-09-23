@@ -22,7 +22,14 @@ import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-from prism.config import FORCES, REGIONS, ModelConfig
+from prism.config import (
+    DEFAULT_PEAK_YEAR_JITTER,
+    FORCES,
+    REGIONS,
+    UNCERTAINTY_KAPPA,
+    UNCERTAINTY_PEAK_JITTER,
+    ModelConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +72,9 @@ READING_NOTES = (
      "epicentre. Propagation along the chain is not modelled."),
     ("Uncertainty",
      "P10 to P90 bands are Monte Carlo percentiles. The concentration of a driver's Beta prior follows "
-     "its uncertainty score 0 to 5 (24, 16, 10, 6, 4, 3; 6 when unscored), and so does its peak-year "
-     "jitter (0, 1, 1, 2, 3, 4 years; 1 year when unscored). A driver's start year gates its onset."),
+     f"its uncertainty score 0 to 5 ({', '.join(str(UNCERTAINTY_KAPPA[u]) for u in range(6))}; 6 when "
+     f"unscored), and so does its peak-year jitter ({', '.join(str(UNCERTAINTY_PEAK_JITTER[u]) for u in range(6))} "
+     f"years; {DEFAULT_PEAK_YEAR_JITTER} year when unscored). A driver's start year gates its onset."),
     ("Score to prior",
      "Probability scores 1 to 5 give Beta prior means of 0.17, 0.33, 0.50, 0.67 and 0.83 (score / 6): "
      "a deliberate shrinkage, so a 5 means five in six, not certainty."),

@@ -14,7 +14,7 @@ if os.environ.get("PRISM_TEST_ALLOW_POSTGRES") != "1":
 
 import pytest  # noqa: E402
 
-from prism.config import CATEGORIES, FORCES, REGIONS, VC_STEPS, ModelConfig  # noqa: E402
+from prism.config import CATEGORIES, REGIONS, VC_STEPS, ModelConfig  # noqa: E402
 from prism.drivers import Driver, DriverSet  # noqa: E402
 
 
@@ -36,7 +36,7 @@ def mock_driver() -> Driver:
     driver = Driver(
         id="test_driver_01", force="Consumer", name="Test natural movement",
         description="A test driver about natural products", direction="Expansion",
-        gp1_pct_affected=0.15, probability=4, start_year=2025, data_source="test", confidence="High",
+        gp1_pct_affected=0.15, probability=4, start_year=2025, confidence="High",
     )
     driver.category_exposure = {c: (2 if "Hair" in c else 1) for c in CATEGORIES}
     driver.vc_exposure = {s: 2 for s in VC_STEPS}
@@ -59,8 +59,7 @@ def mock_drivers_database() -> DriverSet:
       which share Commercial, so the attribution lens groups a stage. The value
       chain feeds only that lens, never the shift.
     """
-    def driver(**kwargs) -> Driver:
-        return Driver(data_source="test", **kwargs)
+    driver = Driver
 
     consumer = driver(id="consumer_01", force="Consumer", name="Natural/Clean Beauty",
                       description="Growing demand for natural products", direction="Expansion",
@@ -100,8 +99,7 @@ def mock_drivers_database() -> DriverSet:
 
     for d in (consumer, government, technology, environmental, competitive):
         d.recompute()
-    return DriverSet(drivers=[consumer, government, technology, environmental, competitive],
-                     categories=list(CATEGORIES), forces=list(FORCES))
+    return DriverSet(drivers=[consumer, government, technology, environmental, competitive])
 
 
 @pytest.fixture

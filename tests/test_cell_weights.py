@@ -48,7 +48,7 @@ def _europe_driver(**overrides) -> DriverSet:
                   category_exposure={"Hair: Color": 5}, regional_exposure={"Europe": 5},
                   vc_exposure={"Marketing": 5})
     kwargs.update(overrides)
-    return DriverSet(drivers=[Driver(**kwargs)], categories=list(CATEGORIES), forces=["Consumer"])
+    return DriverSet(drivers=[Driver(**kwargs)])
 
 
 class TestRollUpAlgebra:

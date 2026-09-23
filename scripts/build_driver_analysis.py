@@ -328,7 +328,7 @@ def inputs_hash(config: ModelConfig, drivers: list) -> str:
 
 def reference_run(config: ModelConfig, drivers: list, chains: int, iterations: int) -> dict:
     """The production recipe: run_multichain(3 x 50k, master seed 42)."""
-    db = DriverSet(drivers=list(drivers), categories=list(config.category_names), forces=list(FORCES))
+    db = DriverSet(drivers=list(drivers))
     eng = BayesianMonteCarloEngine(config, seed=42)
     res = eng.run_multichain(db, n_chains=chains, iterations=iterations)
     tot = res["totals"]["portfolio"]

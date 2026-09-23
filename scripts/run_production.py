@@ -9,11 +9,12 @@ The database comes from POSTGRES_URL or DATABASE_URL (the repository's .env
 is loaded; shell variables win). Without one the script refuses to run
 unless --allow-sqlite is passed, which uses the local SQLite file instead.
 
-Steps: load the drivers, check that the copula correlations are positive
-definite on this driver mix, run three independently seeded chains (master
-seed 42) and pool them, compare the drivers' scoring state with the previous
-run's (the input-drift integrity event), persist the results bundle as a new
-simulation run and write the QA workbook to runs/.
+Steps: load the drivers, check that every driver can be simulated and that
+the copula correlations are positive definite on this driver mix, run three
+independently seeded chains (master seed 42) and pool them, compare the
+drivers' scoring state with the previous run's (the input-drift integrity
+event), persist the results bundle as a new simulation run and write the QA
+workbook to runs/.
 
 --cell-weights FILE is a JSON object, kept outside the repository:
     {"source": "<label shown with the run>",
@@ -31,6 +32,9 @@ Exit codes
     3  the simulation ran but persisting it failed; the dashboard keeps the previous run
     4  the correlation matrix is not positive definite on this driver mix (--allow-nonpsd overrides)
     5  the --cell-weights file is missing or invalid
+    6  a driver cannot be simulated (an unknown force, direction or diffusion
+       curve, a missing GP1 share, a score outside its scale, an exposure on a
+       name outside the taxonomy, a duplicate id); every problem is listed
 """
 from __future__ import annotations
 
@@ -46,11 +50,11 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 import prism.env_loader  # noqa: E402,F401  (loads .env before prism.database reads the URL)
-from prism.config import CATEGORIES, FORCES, REGIONS, ModelConfig  # noqa: E402
+from prism.config import CATEGORIES, REGIONS, ModelConfig  # noqa: E402
 from prism.config_validation import correlation_lambda_min, validate_model_config  # noqa: E402
 from prism.database import (POSTGRES_URL, USE_POSTGRES, LegacySchemaError, init_db, load_drivers,  # noqa: E402
                             load_latest_run, save_simulation_run)
-from prism.drivers import DriverSet  # noqa: E402
+from prism.drivers import DriverSet, simulation_problems  # noqa: E402
 from prism.input_drift import compute_input_drift_event, driver_fingerprint, previous_fingerprint  # noqa: E402
 from prism.simulation.bayesian_mc import BayesianMonteCarloEngine  # noqa: E402
 from prism.workbook import write_workbook  # noqa: E402
@@ -163,11 +167,18 @@ def main(argv: list[str] | None = None) -> int:
     if not drivers:
         log.error("The database holds no drivers.")
         return 2
+    problems = simulation_problems(drivers)
+    if problems:
+        log.error("These drivers cannot be simulated:")
+        for line in problems:
+            log.error("  %s", line)
+        log.error("Scores and exposures can be corrected on the Drivers page; anything else needs a database fix.")
+        return 6
     from prism.seed_drivers import DRIVERS as SEED
     if len(drivers) != len(SEED):
         log.warning("The database holds %d drivers, the driver base %d; the input-drift event will show the "
                     "difference.", len(drivers), len(SEED))
-    driver_set = DriverSet(drivers=drivers, categories=list(CATEGORIES), forces=list(FORCES))
+    driver_set = DriverSet(drivers=drivers)
 
     config = ModelConfig().copy_with(iterations=args.iterations)
     if args.cell_weights:

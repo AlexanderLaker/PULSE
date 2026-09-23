@@ -272,8 +272,10 @@ DEFAULT_WITHIN_FORCE_OVERLAP = {
     "Competitive":     0.100,
 }
 
-# O[i][j]: the share of force i's signal already carried by force j. Not
-# symmetric by design.
+# O[i][j]: the share of force i's signal already carried by force j (not
+# symmetric by design). It is the derivation input of the attenuation above,
+# 0.5 x (1 - mean of the force's row); the engine reads only the attenuation.
+# The dashboard's configuration sheet shows it as the attenuation's provenance.
 DEFAULT_FORCE_OVERLAP_MATRIX = {
     "Consumer": {"Consumer": 0.000, "Customer": 0.050, "Technology": 0.000, "Government": 0.030, "Environmental": 0.000, "Competitive": 0.050},
     "Customer": {"Consumer": 0.050, "Customer": 0.000, "Technology": 0.245, "Government": 0.206, "Environmental": 0.223, "Competitive": 0.110},
@@ -423,7 +425,6 @@ class ModelConfig:
     peak_year_jitter: int = DEFAULT_PEAK_YEAR_JITTER
     within_force_rho: float = DEFAULT_WITHIN_FORCE_RHO
     force_correlation_matrix: dict = field(default_factory=lambda: copy.deepcopy(DEFAULT_FORCE_CORRELATIONS))
-    force_overlap_matrix: dict = field(default_factory=lambda: copy.deepcopy(DEFAULT_FORCE_OVERLAP_MATRIX))
     within_force_overlap: dict = field(default_factory=lambda: dict(DEFAULT_WITHIN_FORCE_OVERLAP))
     region_weights: dict = field(init=False)
     category_weights: dict = field(init=False)

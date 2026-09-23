@@ -26,7 +26,7 @@ import numpy as np
 import pytest
 
 from prism import seed_drivers
-from prism.config import FORCES, ModelConfig
+from prism.config import ModelConfig
 from prism.drivers import DriverSet
 from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
 
@@ -111,7 +111,7 @@ class TestDecomposition:
         config = ModelConfig()
         dec = build.decompose(config, drivers)
         det = float(dec["port"][:, -1].sum())
-        db = DriverSet(drivers=list(drivers), categories=list(config.category_names), forces=list(FORCES))
+        db = DriverSet(drivers=list(drivers))
         res = BayesianMonteCarloEngine(config, seed=42).run(db, iterations=4000)
         median = res["totals"]["portfolio"][2035]["median"]
         # the sum at the means sits within a few per cent of the MC median

@@ -99,8 +99,10 @@ class TestRoutes:
             "for path in ['/api/v1/health', '/api/v1/diagnostics', '/api/v1/drivers', '/api/v1/simulation',\n"
             "             '/api/v1/config', '/api/v1/drivers/consumer_r01/proposals']:\n"
             "    assert client.get(path, headers=headers).status_code == 200, path\n"
-            "assert client.put('/api/v1/drivers/consumer_r01', headers=headers, json={'probability': 3}).status_code == 200\n"
-            "assert client.put('/api/v1/journey', headers=headers, json={'lhc': [], 'hair': []}).status_code == 200\n"
+            "body = {'revision': 1, 'probability': 3}\n"
+            "assert client.put('/api/v1/drivers/consumer_r01', headers=headers, json=body).status_code == 200\n"
+            "body = {'base_version': 0, 'content': {'lhc': [], 'hair': []}}\n"
+            "assert client.put('/api/v1/journey', headers=headers, json=body).status_code == 200\n"
         )
         env = {**os.environ, "TEST_TOKEN": token("admin")}
         result = subprocess.run([sys.executable, "-c", script], cwd=REPO, env=env, capture_output=True, text=True,
@@ -136,8 +138,10 @@ class TestAuthentication:
         assert api.get("/api/v1/drivers", headers=bearer(secret="short")).status_code == 401
 
     def test_a_viewer_cannot_write(self, api):
-        assert api.put("/api/v1/drivers/consumer_r01", json={"probability": 2}, headers=bearer()).status_code == 403
-        assert api.put("/api/v1/journey", json={"lhc": [], "hair": []}, headers=bearer()).status_code == 403
+        edit = {"revision": 1, "probability": 2}
+        assert api.put("/api/v1/drivers/consumer_r01", json=edit, headers=bearer()).status_code == 403
+        save = {"base_version": 0, "content": {"lhc": [], "hair": []}}
+        assert api.put("/api/v1/journey", json=save, headers=bearer()).status_code == 403
 
     def test_health_and_diagnostics_are_anonymous(self, api):
         assert api.get("/api/v1/health").status_code == 200
@@ -174,7 +178,7 @@ class TestHealthAndDiagnostics:
         assert api.get("/api/v1/health").json()["status"] == "degraded"
         diag = api.get("/api/v1/diagnostics").json()
         assert diag["db_reachable"] is False and diag["simulation_reason"] == "db_error"
-        assert "no route to host" in diag["error"]
+        assert diag["error"] == "database error (RuntimeError)"   # the raw message stays in the log
 
     def test_a_database_of_the_previous_schema_asks_for_the_migration(self, api, monkeypatch, tmp_path):
         legacy = tmp_path / "legacy.db"
@@ -183,7 +187,19 @@ class TestHealthAndDiagnostics:
         state.reset()
         response = api.get("/api/v1/drivers", headers=bearer())
         assert response.status_code == 503 and "migrations/0001_driver_schema" in response.json()["detail"]
-        assert api.get("/api/v1/health").json()["status"] == "degraded"
+        health = api.get("/api/v1/health").json()
+        assert health["status"] == "degraded" and health["simulation_reason"] == "legacy_schema"
+        diag = api.get("/api/v1/diagnostics").json()
+        assert diag["simulation_reason"] == "legacy_schema" and "migrate.py" in diag["error"]
+
+    def test_on_vercel_a_missing_database_url_is_named(self, api, monkeypatch):
+        monkeypatch.setenv("VERCEL", "1")
+        state.reset()
+        health = api.get("/api/v1/health").json()
+        assert health["status"] == "degraded" and health["simulation_reason"] == "no_database"
+        assert api.get("/api/v1/diagnostics").json()["simulation_reason"] == "no_database"
+        response = api.get("/api/v1/drivers", headers=bearer())
+        assert response.status_code == 503 and "DATABASE_URL" in response.json()["detail"]
 
 
 class TestSimulation:
@@ -196,13 +212,30 @@ class TestSimulation:
         persist(valid_run, 100)
         newest = persist(valid_run, 200)
         body = api.get("/api/v1/simulation", headers=bearer()).json()
-        assert set(body) == (set(REQUIRED_KEYS) - {"meta"}) | {"run_meta"}
+        assert set(body) == (set(REQUIRED_KEYS) - {"meta"}) | {"run_meta", "inputs_since_run"}
         meta = body["run_meta"]
-        assert meta["run_id"] == newest and meta["iterations"] == 200 and meta["run_date"]
+        assert meta["run_id"] == newest and meta["iterations"] == 200
+        assert meta["run_date"].endswith("+00:00")   # stored in UTC, said so
         assert set(META_KEYS) <= set(meta) and meta["driver_count"] == 5
         assert "driver_fingerprint" not in meta
         assert body["totals"]["portfolio"]["2030"]["median"] == pytest.approx(
             valid_run["totals"]["portfolio"][2030]["median"])
+
+    def test_edits_since_the_run_are_named(self, api, valid_run):
+        from prism.input_drift import driver_fingerprint
+        from prism.seed_drivers import get_seed_drivers
+        persist({**valid_run, "meta": {**valid_run["meta"], "driver_fingerprint": driver_fingerprint(
+            get_seed_drivers())}})
+        path = "/api/v1/simulation"
+        assert api.get(path, headers=bearer()).json()["inputs_since_run"] == {"changed": [], "added": [], "removed": []}
+        api.put("/api/v1/drivers/technology_r01", headers=bearer("admin"), json={"revision": 1, "probability": 1})
+        api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"revision": 1, "name": "text only"})
+        assert api.get(path, headers=bearer()).json()["inputs_since_run"] == {
+            "changed": ["technology_r01"], "added": [], "removed": []}
+
+    def test_a_run_without_a_fingerprint_names_nothing(self, api, valid_run):
+        persist({**valid_run, "meta": {k: v for k, v in valid_run["meta"].items() if k != "driver_fingerprint"}})
+        assert api.get("/api/v1/simulation", headers=bearer()).json()["inputs_since_run"] is None
 
 
 class TestDrivers:
@@ -213,18 +246,19 @@ class TestDrivers:
         assert set(first) == {
             "id", "force", "name", "description", "direction", "probability", "start_year", "peak_year",
             "diffusion_curve", "gp1_pct_affected", "uncertainty", "confidence", "normalized_score",
-            "category_exposure", "vc_exposure", "regional_exposure", "analysis", "data_source", "sources",
-            "baseline", "scores_edited", "proposal_summary"}
+            "category_exposure", "vc_exposure", "regional_exposure", "analysis", "sources",
+            "baseline", "scores_edited", "revision", "proposal_summary"}
         assert first["baseline"]["probability"] == first["probability"] and first["scores_edited"] is False
+        assert first["revision"] == 1
         assert first["proposal_summary"]["count"] == 0 and first["analysis"].startswith("Weight in the answer:")
 
     def test_an_admin_edit(self, api):
         from prism.database import get_db_connection
         response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"),
-                           json={"probability": 4, "uncertainty": 3, "name": "Private label, edited"})
+                           json={"revision": 1, "probability": 4, "uncertainty": 3, "name": "Private label, edited"})
         assert response.status_code == 200
         assert response.json() == {"status": "updated", "driver_id": "consumer_r01",
-                                   "changed": ["name", "probability", "uncertainty"]}
+                                   "changed": ["name", "probability", "uncertainty"], "revision": 2}
         edited = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["id"] == "consumer_r01")
         assert (edited["probability"], edited["uncertainty"], edited["name"]) == (4, 3, "Private label, edited")
         assert edited["scores_edited"] is True and edited["baseline"]["probability"] == 5
@@ -241,40 +275,74 @@ class TestDrivers:
     def test_text_edits_do_not_mark_the_scores_as_edited(self, api):
         sources = [{"title": "Circana, April 2026", "url": "https://example.org/c", "tier": "A", "note": "Apr 2026"}]
         response = api.put("/api/v1/drivers/consumer_r02", headers=bearer("admin"),
-                           json={"description": "New text.", "confidence": "Low", "sources": sources})
+                           json={"revision": 1, "description": "New text.", "confidence": "Low", "sources": sources})
         assert response.status_code == 200
         driver = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["id"] == "consumer_r02")
         assert driver["description"] == "New text." and driver["confidence"] == "Low"
         assert driver["sources"] == sources and driver["scores_edited"] is False
 
     def test_an_unchanged_edit_writes_nothing(self, api):
-        response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"probability": 5})
-        assert response.json() == {"status": "unchanged", "driver_id": "consumer_r01"}
+        response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"revision": 1, "probability": 5})
+        assert response.json() == {"status": "unchanged", "driver_id": "consumer_r01", "revision": 1}
+
+    def test_an_edit_made_on_an_older_revision_is_refused(self, api):
+        """Two admins open the same driver: the first save lands, the second is refused and writes nothing."""
+        first = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"revision": 1, "probability": 4})
+        assert first.status_code == 200 and first.json()["revision"] == 2
+        second = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"),
+                         json={"revision": 1, "probability": 2, "name": "Overwritten?"})
+        assert second.status_code == 409 and "Reload" in second.json()["detail"]
+        driver = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["id"] == "consumer_r01")
+        assert (driver["probability"], driver["revision"]) == (4, 2) and driver["name"] != "Overwritten?"
+
+    def test_a_concurrent_save_between_the_check_and_the_write_is_refused(self, api, monkeypatch):
+        """The revision check in the API passes, but another save lands before the write: the database refuses."""
+        from prism.database import load_drivers, save_drivers
+        import prism.database as dbm
+        original = dbm.save_driver_edit
+
+        def someone_else_first(driver, expected):
+            other = next(d for d in load_drivers() if d.id == "consumer_r01")
+            other.name = "saved in between"
+            save_drivers([other])
+            return original(driver, expected)
+        monkeypatch.setattr(dbm, "save_driver_edit", someone_else_first)
+        response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"revision": 1, "probability": 4})
+        assert response.status_code == 409
+        driver = next(d for d in load_drivers() if d.id == "consumer_r01")
+        assert (driver.name, driver.probability) == ("saved in between", 5)
+
+    def test_an_edit_needs_the_revision(self, api):
+        assert api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"probability": 4}).status_code == 422
 
     @pytest.mark.parametrize("body", [
         {"probability": 9}, {"uncertainty": 6}, {"gp1_pct_affected": 0}, {"direction": "Sideways"},
         {"diffusion_curve": "exponential"}, {"name": None}, {"analysis": "typed by hand"},
-        {"category_exposure": {"Hair: Care": "high"}}, {"sources": [{"title": "", "url": ""}]},
-        {"sources": [{"title": "x", "tier": "Z"}]},
+        {"category_exposure": {"Hair: Care": "high"}}, {"category_exposure": {"Hair: Colour": 3}},
+        {"regional_exposure": {"Latin America": 2}}, {"vc_exposure": {"Retail": 5}},
+        {"sources": [{"title": "", "url": ""}]}, {"sources": [{"title": "x", "tier": "Z"}]},
     ])
     def test_invalid_edits_are_refused(self, api, body):
-        assert api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json=body).status_code == 422
+        response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"revision": 1, **body})
+        assert response.status_code == 422
 
     @pytest.mark.parametrize("score", [9, -2, 2.5, "3", True])
     def test_an_exposure_score_is_a_whole_number_from_0_to_5(self, api, score):
         response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"),
-                           json={"category_exposure": {"Hair: Care": score}})
+                           json={"revision": 1, "category_exposure": {"Hair: Care": score}})
         assert response.status_code == 422
 
-    def test_an_exposure_map_is_stored_as_sent(self, api):
-        exposure = {c: 3 for c in CATEGORIES} | {"Hair: Care": 5}
+    def test_an_exposure_map_changes_only_the_cells_sent(self, api):
+        before = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["id"] == "consumer_r01")
         api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"),
-                json={"category_exposure": {**exposure, "Hair: Color": 4.0}})
+                json={"revision": 1, "category_exposure": {"Hair: Care": 5, "Hair: Color": 4.0}})
         driver = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["id"] == "consumer_r01")
-        assert driver["category_exposure"] == exposure | {"Hair: Color": 4}
+        assert driver["category_exposure"] == before["category_exposure"] | {"Hair: Care": 5, "Hair: Color": 4}
+        assert set(driver["category_exposure"]) == set(CATEGORIES)
 
     def test_an_unknown_driver_is_404(self, api):
-        assert api.put("/api/v1/drivers/nope", headers=bearer("admin"), json={"probability": 3}).status_code == 404
+        response = api.put("/api/v1/drivers/nope", headers=bearer("admin"), json={"revision": 1, "probability": 3})
+        assert response.status_code == 404
 
     def test_a_change_made_elsewhere_reaches_the_next_request(self, api):
         """Another server instance or a script writes the database; the cached drivers follow."""
@@ -304,21 +372,33 @@ class TestProposals:
         assert body["aggregate"]["probability"] == {"avg": 3.0, "count": 2}
         assert body["aggregate"]["category_exposure"] == {"Hair: Care": {"avg": 4.0, "count": 1}}
         assert [s["name"] for s in body["scorers"]] == ["Ana", "ben"]
+        assert "role" not in body["scorers"][0]
         assert body["my"]["probability"] == 2
         summary = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json()
                        if d["id"] == "consumer_r01")["proposal_summary"]
         assert summary["count"] == 2 and summary["probability"] == {"avg": 3.0, "count": 2}
 
+    def test_a_field_is_cleared_with_null_and_a_map_with_null_or_empty(self, api):
+        path = "/api/v1/drivers/consumer_r01/proposals"
+        api.put(path, headers=bearer(sub="ana"), json={"probability": 4, "peak_year": 2030,
+                                                       "category_exposure": {"Hair: Care": 4},
+                                                       "regional_exposure": {"Europe": 5}})
+        body = api.put(path, headers=bearer(sub="ana"), json={"probability": None, "category_exposure": {},
+                                                              "regional_exposure": None}).json()
+        assert body["my"]["probability"] is None and body["my"]["peak_year"] == 2030
+        assert body["my"]["category_exposure"] is None and body["my"]["regional_exposure"] is None
+
     def test_a_proposal_survives_an_admin_edit(self, api):
         path = "/api/v1/drivers/consumer_r01/proposals"
         api.put(path, headers=bearer(sub="ana"), json={"probability": 4})
-        api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"probability": 4})
+        api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"revision": 1, "probability": 4})
         assert len(api.get(path, headers=bearer()).json()["scorers"]) == 1
 
     def test_invalid_proposals(self, api):
         path = "/api/v1/drivers/consumer_r01/proposals"
         assert api.put(path, headers=bearer(), json={"diffusion_curve": "exponential"}).status_code == 422
         assert api.put(path, headers=bearer(), json={"category_exposure": {"Hair: Care": 7}}).status_code == 422
+        assert api.put(path, headers=bearer(), json={"regional_exposure": {"Mars": 2}}).status_code == 422
         assert api.put(path, headers=bearer(), json={"probability": 0}).status_code == 422
         assert api.put(path, headers=bearer(), json={"user_id": "someone-else"}).status_code == 422
         assert api.put("/api/v1/drivers/nope/proposals", headers=bearer(), json={"probability": 3}).status_code == 404
@@ -326,29 +406,59 @@ class TestProposals:
 
 class TestConfig:
     def test_the_configuration_is_read_only(self, api):
-        from prism.config import DEFAULT_CELL_WEIGHTS_SOURCE, DEFAULT_PER_FORCE_ATTENUATION
+        from prism.config import DEFAULT_CELL_WEIGHTS_SOURCE, DEFAULT_FORCE_OVERLAP_MATRIX, DEFAULT_PER_FORCE_ATTENUATION
         body = api.get("/api/v1/config", headers=bearer()).json()
         assert body["per_force_attenuation"] == DEFAULT_PER_FORCE_ATTENUATION
+        assert body["force_overlap_matrix"] == DEFAULT_FORCE_OVERLAP_MATRIX
+        assert "iterations" not in body   # a production run sets its own; the served run reports it
         assert body["cell_weights_source"] == DEFAULT_CELL_WEIGHTS_SOURCE
         assert body["path_years"] == list(range(2026, 2036)) and body["base_year"] == 2025
         assert api.put("/api/v1/config", headers=bearer("admin"), json={}).status_code == 405
 
 
 class TestJourney:
-    BLOB = {"lhc": [{"id": "sorting", "label": "Sorting", "benefiting": [{
+    CONTENT = {"lhc": [{"id": "sorting", "label": "Sorting", "benefiting": [{
         "id": "lhc.sorting.exp.test", "name": "AI stain recognition", "type": "tech", "driverCodes": ["T-01"],
         "driverNote": "T-01", "intensity": 2, "analysis": None,
         "provenance": {"author": "strategist", "date": "2026-09", "grade": "estimate"}}],
         "negativelyImpacted": []}], "hair": []}
 
     def test_the_bundled_content_applies_until_an_admin_saves(self, api):
-        assert api.get("/api/v1/journey", headers=bearer()).status_code == 404
+        assert api.get("/api/v1/journey", headers=bearer()).json() == {"version": 0, "content": None}
 
     def test_save_and_read(self, api):
-        response = api.put("/api/v1/journey", headers=bearer("admin"), json=self.BLOB)
-        assert response.json() == {"status": "saved", "tiles": 1}
-        assert api.get("/api/v1/journey", headers=bearer()).json() == self.BLOB
+        response = api.put("/api/v1/journey", headers=bearer("admin"), json={"base_version": 0, "content": self.CONTENT})
+        assert response.status_code == 200
+        saved = response.json()
+        assert saved["status"] == "saved" and saved["tiles"] == 1 and saved["version"] >= 1
+        assert api.get("/api/v1/journey", headers=bearer()).json() == {"version": saved["version"],
+                                                                       "content": self.CONTENT}
 
-    def test_a_malformed_body_is_refused(self, api):
-        assert api.put("/api/v1/journey", headers=bearer("admin"), json={"lhc": "x", "hair": []}).status_code == 422
-        assert api.put("/api/v1/journey", headers=bearer("admin"), json={"lhc": []}).status_code == 422
+    def test_a_save_from_an_older_version_is_refused(self, api):
+        """Two admins open the journey: the first save lands, the second is refused and writes nothing."""
+        first = api.put("/api/v1/journey", headers=bearer("admin"), json={"base_version": 0, "content": self.CONTENT})
+        second = api.put("/api/v1/journey", headers=bearer("admin"),
+                         json={"base_version": 0, "content": {"lhc": [], "hair": []}})
+        assert second.status_code == 409 and "Reload" in second.json()["detail"]
+        assert api.get("/api/v1/journey", headers=bearer()).json()["version"] == first.json()["version"]
+        third = api.put("/api/v1/journey", headers=bearer("admin"),
+                        json={"base_version": first.json()["version"], "content": {"lhc": [], "hair": []}})
+        assert third.status_code == 200
+
+    @pytest.mark.parametrize("content", [
+        {"lhc": "x", "hair": []}, {"lhc": []}, {"lhc": [], "hair": [], "extra": []},
+        {"lhc": [{"id": "s", "label": "S", "benefiting": [{"name": "no id"}], "negativelyImpacted": []}], "hair": []},
+        {"lhc": [{"id": "s", "label": "S", "benefiting": [], "negativelyImpacted": "none"}], "hair": []},
+        {"lhc": [{"id": "s", "label": "S", "benefiting": [{"id": "t", "name": "a"}, {"id": "t", "name": "b"}],
+                  "negativelyImpacted": []}], "hair": []},
+        {"lhc": [{"id": "s", "label": "S", "benefiting": [{"id": "t", "name": "x" * 2_100_000}],
+                  "negativelyImpacted": []}], "hair": []},
+    ], ids=["not-a-list", "missing-journey", "extra-key", "tile-without-id", "side-not-a-list", "duplicate-tile",
+            "too-large"])
+    def test_a_malformed_body_is_refused(self, api, content):
+        response = api.put("/api/v1/journey", headers=bearer("admin"), json={"base_version": 0, "content": content})
+        assert response.status_code == 422
+
+    def test_the_body_needs_the_base_version(self, api):
+        assert api.put("/api/v1/journey", headers=bearer("admin"), json={"content": self.CONTENT}).status_code == 422
+        assert api.put("/api/v1/journey", headers=bearer("admin"), json=self.CONTENT).status_code == 422

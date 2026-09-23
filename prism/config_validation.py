@@ -42,7 +42,6 @@ class ModelConfigValidator(BaseModel):
     peak_year_jitter: int
     within_force_rho: float
     force_correlation_matrix: Dict[str, Dict[str, float]]
-    force_overlap_matrix: Dict[str, Dict[str, float]]
     within_force_overlap: Dict[str, float]
 
     @field_validator("per_force_attenuation")
@@ -123,19 +122,6 @@ class ModelConfigValidator(BaseModel):
                 raise ValueError(f"within_force_overlap['{force}'] = {val} is outside [0, 0.5]")
         return v
 
-    @field_validator("force_overlap_matrix")
-    @classmethod
-    def _force_overlap_matrix(cls, v):
-        _require_keys("force_overlap_matrix", v, FORCES)
-        for f, row in v.items():
-            _require_keys(f"force_overlap_matrix['{f}']", row, FORCES)
-            if abs(float(row[f])) > 1e-9:
-                raise ValueError(f"force_overlap_matrix diagonal ({f},{f}) must be 0.0")
-            for g, val in row.items():
-                if g != f and not 0.0 <= float(val) <= 0.45:
-                    raise ValueError(f"force_overlap_matrix ({f},{g}) = {val} is outside [0, 0.45]")
-        return v
-
     @field_validator("force_correlation_matrix")
     @classmethod
     def _force_correlation_matrix(cls, v):
@@ -202,7 +188,6 @@ def validate_model_config(config: ModelConfig) -> None:
             peak_year_jitter=config.peak_year_jitter,
             within_force_rho=config.within_force_rho,
             force_correlation_matrix=dict(config.force_correlation_matrix),
-            force_overlap_matrix=dict(config.force_overlap_matrix),
             within_force_overlap=dict(config.within_force_overlap),
         )
     except ValidationError as err:

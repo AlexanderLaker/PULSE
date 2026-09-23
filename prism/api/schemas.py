@@ -23,11 +23,15 @@ class SourceRef(BaseModel):
 class DriverUpdate(BaseModel):
     """Admin edit of a driver (PUT /api/v1/drivers/{id}).
 
-    Every field is optional; only the fields sent change. ``uncertainty`` may
-    be sent as null to clear the score.
+    ``revision`` is the driver revision the edit was made on (from GET
+    /api/v1/drivers); the edit is refused if the driver has changed since.
+    Every other field is optional and only the fields sent change;
+    ``uncertainty`` may be sent as null to clear the score, and an exposure
+    map may name only the cells that change.
     """
     model_config = ConfigDict(extra="forbid")
 
+    revision: int = Field(..., ge=1)
     name: Optional[str] = Field(None, min_length=1, max_length=300)
     description: Optional[str] = Field(None, max_length=20000)
     direction: Optional[str] = Field(None, pattern="^(Expansion|Contraction)$")
@@ -46,8 +50,9 @@ class DriverUpdate(BaseModel):
 class ProposalUpdate(BaseModel):
     """An expert's partial score proposal (PUT /api/v1/drivers/{id}/proposals).
 
-    Only the fields sent are merged into the caller's own proposal; the
-    caller's identity comes from the verified token, never from the body.
+    Only the fields sent are merged into the caller's own proposal; a field
+    sent as null is cleared. The caller's identity comes from the verified
+    token, never from the body.
     """
     model_config = ConfigDict(extra="forbid")
 

@@ -41,8 +41,7 @@ class TestDeterminism:
         reordered driver list gives different numbers. That is why the database
         always returns drivers ordered by id; if this ever stops holding, the
         ordering contract in prism.database.load_drivers can be revisited."""
-        reordered = DriverSet(drivers=list(reversed(mock_drivers_database.drivers)),
-                              categories=mock_drivers_database.categories, forces=mock_drivers_database.forces)
+        reordered = DriverSet(drivers=list(reversed(mock_drivers_database.drivers)))
         r1 = _run(mock_model_config, mock_drivers_database)
         r2 = _run(mock_model_config, reordered)
         assert r1["shift_matrix"]["Hair: Color"]["path"][2030]["median"] != \

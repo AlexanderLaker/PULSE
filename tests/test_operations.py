@@ -1,6 +1,7 @@
 """The operator's tools: the production run, its QA workbook and the analysis sync."""
 import importlib.util
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -69,6 +70,15 @@ class TestProductionRun:
         events = seeded.load_latest_run()["results"]["integrity_events"]
         assert [e["type"] for e in events] == ["input_drift"]
         assert f"vs run #{run['id']}" in events[0]["message"] and "no changes" in events[0]["message"]
+
+    def test_a_driver_that_cannot_be_simulated_is_exit_6(self, production, seeded, caplog):
+        with seeded.get_db_connection() as conn:
+            conn.cursor().execute("UPDATE drivers SET gp1_pct_affected = NULL WHERE id = 'consumer_r02'")
+            conn.cursor().execute("UPDATE drivers SET direction = 'Sideways' WHERE id = 'technology_r01'")
+        assert production.main(["--allow-sqlite", "--iterations", "200"]) == 6
+        assert "driver consumer_r02: gp1_pct_affected None" in caplog.text
+        assert "driver technology_r01: direction 'Sideways'" in caplog.text
+        assert seeded.load_latest_run() is None
 
     def test_the_correlation_check_stops_the_run(self, production, seeded, monkeypatch):
         monkeypatch.setattr(production, "correlation_lambda_min", lambda *a: -0.01)
@@ -199,3 +209,38 @@ class TestSyncAnalysis:
 def test_the_admin_script_imports():
     module = _load("promote_admin", REPO / "scripts" / "promote_admin.py")
     assert callable(module.main)
+
+
+@pytest.mark.skipif(not os.environ.get("PRISM_TEST_POSTGRES_URL"), reason="PRISM_TEST_POSTGRES_URL is not set")
+def test_the_admin_script_changes_the_role_with_or_without_an_audit_log(capsys):
+    """A database the API never started on has user_roles (the dashboard's) but no audit_log."""
+    import uuid
+    from urllib.parse import quote
+
+    import psycopg2
+    url = os.environ["PRISM_TEST_POSTGRES_URL"]
+    schema = f"admin_{uuid.uuid4().hex[:8]}"
+    admin = psycopg2.connect(url)
+    admin.autocommit = True
+    cur = admin.cursor()
+    cur.execute(f"CREATE SCHEMA {schema}")
+    try:
+        cur.execute(f"CREATE TABLE {schema}.user_roles (clerk_user_id TEXT PRIMARY KEY, email TEXT, role TEXT, "
+                    "updated_at TIMESTAMP)")
+        cur.execute(f"INSERT INTO {schema}.user_roles VALUES ('u1', 'Ana@Example.com', 'viewer', NULL)")
+        dsn = f"{url}{'&' if '?' in url else '?'}options={quote(f'-c search_path={schema}')}"
+        module = _load("promote_admin", REPO / "scripts" / "promote_admin.py")
+        assert module.main(["ana@example.com", "--dsn", dsn]) == 0
+        assert "(no audit log yet, so not logged)" in capsys.readouterr().out
+        cur.execute(f"SELECT role FROM {schema}.user_roles")
+        assert cur.fetchone()[0] == "admin"
+
+        cur.execute(f"CREATE TABLE {schema}.audit_log (id SERIAL PRIMARY KEY, action TEXT, entity_type TEXT, "
+                    "entity_id TEXT, old_value TEXT, new_value TEXT, reason TEXT, user_id TEXT)")
+        assert module.main(["ana@example.com", "--role", "viewer", "--dsn", dsn]) == 0
+        cur.execute(f"SELECT action, old_value, new_value FROM {schema}.audit_log")
+        assert cur.fetchall() == [("role_change", "admin", "viewer")]
+        assert module.main(["nobody@example.com", "--dsn", dsn]) == 3
+    finally:
+        cur.execute(f"DROP SCHEMA {schema} CASCADE")
+        admin.close()

@@ -29,7 +29,6 @@ def _driver(driver_id="consumer_r01", **overrides) -> Driver:
         id=driver_id, force="Consumer", name="original name", description="original description",
         direction="Contraction", probability=3, gp1_pct_affected=0.10, start_year=2025, peak_year=2030,
         diffusion_curve="linear", confidence="Medium", uncertainty=2, analysis="the reading",
-        data_source="Circana (Apr 2026)",
         category_exposure={c: 1 for c in CATEGORIES}, regional_exposure={r: 1 for r in REGIONS},
         vc_exposure={v: 1 for v in VC_STEPS},
         sources=[{"title": "original source", "url": "https://example.org/a", "tier": "A", "note": "Apr 2026"}],
@@ -55,8 +54,8 @@ def db(monkeypatch, tmp_path):
     d.baseline = d.scores()
     dbm.save_drivers([d])
     dbm.upsert_driver_proposal("consumer_r01", "expert-a", {"probability": 2, "uncertainty": 4, "comment": "keep me"},
-                               "Expert A", "viewer")
-    dbm.upsert_driver_proposal("consumer_r01", "expert-b", {"gp1_pct_affected": 0.30}, "Expert B", "viewer")
+                               "Expert A")
+    dbm.upsert_driver_proposal("consumer_r01", "expert-b", {"gp1_pct_affected": 0.30}, "Expert B")
     return dbm
 
 
@@ -100,10 +99,10 @@ class TestDrivers:
         expected = _driver()
         for field in ("id", "force", "name", "description", "direction", "probability", "gp1_pct_affected",
                       "start_year", "peak_year", "diffusion_curve", "confidence", "uncertainty", "analysis",
-                      "data_source", "category_exposure", "regional_exposure", "vc_exposure", "sources"):
+                      "category_exposure", "regional_exposure", "vc_exposure", "sources"):
             assert getattr(loaded, field) == getattr(expected, field), field
         assert loaded.baseline == expected.scores()
-        assert loaded.scores_edited is False
+        assert loaded.scores_edited is False and loaded.revision == 1
         assert loaded.normalized_score == pytest.approx(expected.normalized_score)
 
     def test_drivers_come_back_ordered_by_id(self, db):
@@ -159,6 +158,29 @@ class TestDrivers:
             stamps.append(db.drivers_stamp())
         assert len(set(stamps)) == 4 and stamps[-1] == (1, 4)
 
+    def test_an_admin_edit_lands_only_on_the_revision_it_was_made_on(self, db):
+        """Two edits from the same loaded state: the first lands, the second is refused and changes nothing."""
+        loaded = db.load_drivers()[0]
+        first, second = _driver(probability=5), _driver(probability=1, name="stale edit")
+        assert db.save_driver_edit(first, loaded.revision) == loaded.revision + 1
+        with pytest.raises(db.StaleRevisionError) as refused:
+            db.save_driver_edit(second, loaded.revision)
+        assert (refused.value.expected, refused.value.current) == (loaded.revision, loaded.revision + 1)
+        now = db.load_drivers()[0]
+        assert (now.probability, now.name, now.revision) == (5, "original name", loaded.revision + 1)
+        assert len(db.load_driver_proposals("consumer_r01")) == 2
+
+    def test_an_admin_edit_rewrites_the_exposures_and_sources(self, db):
+        edit = _driver(category_exposure={"Hair: Care": 4}, sources=[])
+        db.save_driver_edit(edit, db.load_drivers()[0].revision)
+        assert _count(db, "SELECT COUNT(*) FROM driver_category_exposure") == 1
+        assert _count(db, "SELECT COUNT(*) FROM driver_sources") == 0
+
+    def test_an_edit_of_a_missing_driver_is_refused(self, db):
+        with pytest.raises(db.StaleRevisionError) as refused:
+            db.save_driver_edit(_driver("technology_r99", force="Technology"), 1)
+        assert refused.value.current is None
+
     def test_deleting_a_driver_removes_its_proposals(self, db):
         with db.get_db_connection() as conn:
             conn.cursor().execute("DELETE FROM drivers WHERE id = 'consumer_r01'")
@@ -173,13 +195,17 @@ class TestDrivers:
 
 class TestProposals:
     def test_a_partial_proposal_merges(self, db):
-        merged = db.upsert_driver_proposal("consumer_r01", "expert-a", {"peak_year": 2031}, "Expert A", "viewer")
+        merged = db.upsert_driver_proposal("consumer_r01", "expert-a", {"peak_year": 2031}, "Expert A")
         assert (merged["probability"], merged["uncertainty"], merged["peak_year"]) == (2, 4, 2031)
 
+    def test_a_field_can_be_cleared(self, db):
+        merged = db.upsert_driver_proposal("consumer_r01", "expert-a", {"probability": None}, "Expert A")
+        assert merged["probability"] is None and merged["uncertainty"] == 4
+
     def test_maps_round_trip_and_can_be_cleared(self, db):
-        db.upsert_driver_proposal("consumer_r01", "expert-c", {"category_exposure": {"Hair: Care": 4}}, "C", "viewer")
+        db.upsert_driver_proposal("consumer_r01", "expert-c", {"category_exposure": {"Hair: Care": 4}}, "C")
         assert db.load_driver_proposals("consumer_r01")[-1]["category_exposure"] == {"Hair: Care": 4}
-        db.upsert_driver_proposal("consumer_r01", "expert-c", {"category_exposure": None}, "C", "viewer")
+        db.upsert_driver_proposal("consumer_r01", "expert-c", {"category_exposure": None}, "C")
         row = next(r for r in db.load_driver_proposals("consumer_r01") if r["user_id"] == "expert-c")
         assert row["category_exposure"] is None
 
@@ -205,11 +231,18 @@ class TestRunsJourneyAudit:
         assert run_id == db.latest_run_summary()["id"]
 
     def test_journey_content_is_versioned(self, db):
-        assert db.load_journey_content() is None
-        db.save_journey_content({"lhc": [], "hair": [], "v": 1}, updated_by="a@example.com")
-        db.save_journey_content({"lhc": [], "hair": [], "v": 2}, updated_by="b@example.com")
-        assert db.load_journey_content()["v"] == 2
+        assert db.load_journey_content() == {"version": 0, "content": None}
+        v1 = db.save_journey_content({"lhc": [], "hair": [], "v": 1}, "a@example.com", base_version=0)
+        v2 = db.save_journey_content({"lhc": [], "hair": [], "v": 2}, "b@example.com", base_version=v1)
+        assert v2 > v1 and db.load_journey_content() == {"version": v2, "content": {"lhc": [], "hair": [], "v": 2}}
         assert _count(db, "SELECT COUNT(*) FROM journey_content") == 2
+
+    def test_a_journey_save_from_an_older_version_is_refused(self, db):
+        v1 = db.save_journey_content({"lhc": [], "hair": [], "v": 1}, "a@example.com", base_version=0)
+        with pytest.raises(db.StaleVersionError) as refused:
+            db.save_journey_content({"lhc": [], "hair": [], "v": "stale"}, "b@example.com", base_version=0)
+        assert (refused.value.expected, refused.value.current) == (0, v1)
+        assert db.load_journey_content()["content"]["v"] == 1
 
     def test_audit_entries_are_appended(self, db):
         db.log_audit("driver_updated", "driver", "consumer_r01", old_value="3", new_value="4",
@@ -226,8 +259,29 @@ class TestRunsJourneyAudit:
         monkeypatch.setattr(db, "_connect", lambda: (_ for _ in ()).throw(RuntimeError("no route")))
         monkeypatch.setattr(db.time, "sleep", lambda s: None)
         broken = db.diagnose_connection()
-        assert broken["db_reachable"] is False and "no route" in broken["error"]
-        assert json.dumps(broken)
+        assert broken["db_reachable"] is False and broken["error"] == "database error (RuntimeError)"
+        assert broken["reason"] == "db_error" and json.dumps(broken)
+
+    @pytest.mark.parametrize("message, words", [
+        ('FATAL: password authentication failed for user "owner"', "the database refused the credentials"),
+        ('invalid percent-encoded token: "s3cr%t"', "the database URL is malformed"),
+        ('could not translate host name "ep-secret.neon.tech" to address', "the database host name does not resolve"),
+        ("connection timed out", "the database did not answer in time"),
+    ])
+    def test_errors_are_described_without_credentials(self, db, monkeypatch, message, words):
+        monkeypatch.setattr(db, "_connect", lambda: (_ for _ in ()).throw(RuntimeError(message)))
+        monkeypatch.setattr(db.time, "sleep", lambda s: None)
+        error = db.diagnose_connection()["error"]
+        assert error.startswith(words)
+        assert not any(secret in error for secret in ("owner", "s3cr", "ep-secret"))
+
+    @pytest.mark.skipif(ON_POSTGRES, reason="the refusal concerns the SQLite fallback")
+    def test_on_vercel_without_a_database_url_nothing_falls_back_to_sqlite(self, db, monkeypatch):
+        monkeypatch.setenv("VERCEL", "1")
+        with pytest.raises(db.DatabaseNotConfiguredError):
+            db.load_drivers()
+        diag = db.diagnose_connection()
+        assert diag["reason"] == "no_database" and diag["error"] == "no database URL is set for this deployment"
 
 
 @pytest.mark.skipif(not POSTGRES_URL or ON_POSTGRES, reason="PRISM_TEST_POSTGRES_URL is not set")

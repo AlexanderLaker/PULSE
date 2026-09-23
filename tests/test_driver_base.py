@@ -53,7 +53,7 @@ class TestSeed:
             assert set(d.category_exposure) == set(CATEGORIES) and set(d.regional_exposure) == set(REGIONS)
             assert set(d.vc_exposure) == set(VC_STEPS) and vc_epicentre_step_of(d.vc_exposure) is not None
             assert max(d.category_exposure.values()) > 0 and max(d.regional_exposure.values()) > 0
-            assert d.name and d.description and d.analysis and d.data_source
+            assert d.name and d.description and d.analysis
             assert d.sources and all(s["url"].startswith("http") and s["tier"] in ("S", "A", "B") for s in d.sources)
             assert d.baseline is None and d.scores_edited is False
 
@@ -71,7 +71,7 @@ class TestSeed:
             b = from_base[d.id]
             for field in ("force", "name", "description", "direction", "probability", "start_year", "gp1_pct_affected",
                           "peak_year", "diffusion_curve", "uncertainty", "confidence", "category_exposure",
-                          "vc_exposure", "regional_exposure", "data_source", "sources"):
+                          "vc_exposure", "regional_exposure", "sources"):
                 assert getattr(d, field) == getattr(b, field), (d.id, field)
 
     def test_the_committed_files_are_the_generator_output(self):

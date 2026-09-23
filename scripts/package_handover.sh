@@ -36,10 +36,16 @@ for forbidden in .env .env.deploy .clerk _NOT_FOR_HANDOVER data/prism.db runs; d
     fail=1
   fi
 done
-SECRET_PATTERN="(sk_(live|test)_[A-Za-z0-9]{8,}|postgres(ql)?://[^ '\"]*:[^ '\"]*@)"
-if grep -rIlE "$SECRET_PATTERN" "$STAGE" >/dev/null 2>&1; then
-  echo "Secret-shaped strings in the exported tree:" >&2
-  grep -rInE "$SECRET_PATTERN" "$STAGE" | head -5 >&2
+# A Clerk secret key, or a connection string with a password. The test
+# database on localhost (CI and docs/OPERATIONS.md) is not a secret.
+# Each match is checked on its own, so a local URL cannot hide a real one on
+# the same line.
+SECRET_PATTERN="(sk_(live|test)_[A-Za-z0-9]{8,}|postgres(ql)?://[^ '\"]*:[^ '\"]*@[^ '\"/:?]*)"
+LOCAL_DATABASE="@(localhost|127\.0\.0\.1)$"
+hits="$(grep -rIonE "$SECRET_PATTERN" "$STAGE" | grep -vE "$LOCAL_DATABASE" || true)"
+if [ -n "$hits" ]; then
+  echo "Secret-shaped strings in the exported tree (file:line; the strings are not printed):" >&2
+  echo "$hits" | sed -E 's/^([^:]+:[0-9]+):.*/\1/' | sed "s|^$STAGE/||" | sort -u | head -10 >&2
   fail=1
 fi
 [ "$fail" -ne 0 ] && exit 1

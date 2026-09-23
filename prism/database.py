@@ -2,8 +2,10 @@
 
 Setting ``POSTGRES_URL`` or ``DATABASE_URL`` selects PostgreSQL (psycopg2);
 otherwise the database is the SQLite file at ``PRISM_DB_PATH`` (default
-``data/prism.db``). All SQL is written once, with ``placeholder()`` / ``ph()``
-for the parameter style of the active backend.
+``data/prism.db``). On Vercel a database URL is required: a SQLite file there
+would live in one function instance's scratch space and silently vanish. All
+SQL is written once, with ``placeholder()`` / ``ph()`` for the parameter style
+of the active backend.
 
 The database holds relative figures only (scores, shares, percentage shifts);
 no currency amount is ever stored.
@@ -41,6 +43,26 @@ class LegacySchemaError(RuntimeError):
     """The database predates the current schema and must be migrated first."""
 
 
+class DatabaseNotConfiguredError(RuntimeError):
+    """No database URL is set where one is required (a Vercel deployment)."""
+
+
+class StaleRevisionError(RuntimeError):
+    """A driver changed after the editor loaded it; the edit was not written."""
+
+    def __init__(self, driver_id: str, expected: int, current: Optional[int]):
+        self.driver_id, self.expected, self.current = driver_id, expected, current
+        super().__init__(f"driver {driver_id} is at revision {current}, not {expected}")
+
+
+class StaleVersionError(RuntimeError):
+    """The journey content changed after the editor loaded it; the save was not written."""
+
+    def __init__(self, expected: int, current: int):
+        self.expected, self.current = expected, current
+        super().__init__(f"the journey content is at version {current}, not {expected}")
+
+
 # ── JSON ────────────────────────────────────────────────────────────────────
 
 def _json_default(o):
@@ -65,10 +87,13 @@ def _loads(val):
 
 # ── Connections ─────────────────────────────────────────────────────────────
 
+def on_vercel() -> bool:
+    return bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+
+
 def sqlite_path() -> Path:
-    """Path of the SQLite file (``/tmp`` on Vercel, whose code folder is read-only)."""
-    on_vercel = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
-    return Path(os.environ.get("PRISM_DB_PATH", "/tmp/prism.db" if on_vercel else "data/prism.db"))
+    """Path of the SQLite file: PRISM_DB_PATH, or data/prism.db when that is unset or empty."""
+    return Path(os.environ.get("PRISM_DB_PATH") or "data/prism.db")
 
 
 def _connect():
@@ -78,6 +103,9 @@ def _connect():
         conn.autocommit = False
         conn.cursor_factory = psycopg2.extras.RealDictCursor
         return conn
+    if on_vercel():
+        raise DatabaseNotConfiguredError(
+            "No DATABASE_URL or POSTGRES_URL is set for this deployment; add it in the Vercel project settings.")
     path = sqlite_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(path))
@@ -98,6 +126,8 @@ def get_db_connection():
         try:
             conn = _connect()
             break
+        except DatabaseNotConfiguredError:
+            raise
         except Exception as e:  # noqa: BLE001 (any driver error is retried)
             last_error = e
             if attempt < 2:
@@ -105,13 +135,14 @@ def get_db_connection():
                 logger.warning("Database connection attempt %d failed: %s; retrying in %.1fs", attempt + 1, e, wait)
                 time.sleep(wait)
     if conn is None:
-        raise RuntimeError(f"Failed to connect to the database after 3 attempts: {last_error}")
+        raise ConnectionError(f"Failed to connect to the database after 3 attempts: {last_error}") from last_error
     try:
         yield conn
         conn.commit()
     except Exception as e:
         conn.rollback()
-        logger.error("Database error: %s", e)
+        if not isinstance(e, (StaleRevisionError, StaleVersionError)):  # conflicts are expected answers
+            logger.error("Database error: %s", e)
         raise
     finally:
         conn.close()
@@ -154,7 +185,6 @@ def _schema() -> List[str]:
             uncertainty INTEGER,
             confidence TEXT DEFAULT 'Medium',
             analysis TEXT,
-            data_source TEXT,
             baseline TEXT,
             scores_edited BOOLEAN DEFAULT FALSE,
             revision INTEGER NOT NULL DEFAULT 1,
@@ -194,7 +224,6 @@ def _schema() -> List[str]:
             driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
             user_id TEXT NOT NULL,
             user_name TEXT,
-            user_role TEXT,
             probability INTEGER,
             gp1_pct_affected REAL,
             peak_year INTEGER,
@@ -274,37 +303,86 @@ def init_db() -> None:
     logger.info("Database initialised (%s)", "postgres" if USE_POSTGRES else "sqlite")
 
 
+def failure_reason(e: BaseException) -> str:
+    """legacy_schema (the database needs migration 0001), no_database (no URL
+    where one is required) or db_error (anything else)."""
+    if isinstance(e, LegacySchemaError):
+        return "legacy_schema"
+    if isinstance(e, DatabaseNotConfiguredError):
+        return "no_database"
+    return "db_error"
+
+
+def describe_error(e: BaseException) -> str:
+    """A database failure in words that name no host, user or password.
+
+    Driver messages can quote the connection string (a malformed
+    percent-escape echoes part of the password), so /api/v1/diagnostics shows
+    this category instead of the raw text; the raw text goes to the log.
+    """
+    if isinstance(e, LegacySchemaError):
+        return "the database uses the previous schema; run migrations/0001_driver_schema/migrate.py"
+    if isinstance(e, DatabaseNotConfiguredError):
+        return "no database URL is set for this deployment"
+    cause = e.__cause__ or e
+    text = str(cause).lower()
+    for needles, words in (
+        (("password authentication failed", "authentication failed"), "the database refused the credentials"),
+        (("could not translate host name", "name or service not known", "nodename nor servname"),
+         "the database host name does not resolve"),
+        (("timeout", "timed out"), "the database did not answer in time"),
+        (("connection refused",), "the database refused the connection"),
+        (("ssl", "certificate"), "the TLS connection to the database failed"),
+        (("percent-encoded", "invalid dsn", "invalid connection option", "missing \"=\""),
+         "the database URL is malformed"),
+        (("does not exist",), "a database object does not exist"),
+    ):
+        if any(n in text for n in needles):
+            return f"{words} ({type(cause).__name__})"
+    return f"database error ({type(cause).__name__})"
+
+
 def diagnose_connection() -> Dict[str, Any]:
     """What this process sees of the database, for /api/v1/diagnostics.
 
-    Never raises: a failure is reported in ``error``, so the dashboard can tell
-    "cannot reach the database" from "reachable but empty".
+    Never raises: a failure is reported in ``error`` as describe_error()
+    words, so the dashboard can tell "cannot reach the database" from
+    "reachable but empty" without a credential ever reaching a response.
     """
     which_env = "POSTGRES_URL" if os.environ.get("POSTGRES_URL") else (
         "DATABASE_URL" if os.environ.get("DATABASE_URL") else None)
     out: Dict[str, Any] = {
         "db_mode": "postgres" if USE_POSTGRES else "sqlite",
-        "db_host": (urlparse(POSTGRES_URL).hostname or "unknown") if USE_POSTGRES else f"<sqlite:{sqlite_path()}>",
+        "db_host": None,
         "db_url_env": which_env,
         "db_reachable": False,
         "simulation_run_count": 0,
         "latest_run_id": None,
         "latest_run_date": None,
         "error": None,
+        "reason": None,
     }
     try:
+        out["db_host"] = (urlparse(POSTGRES_URL).hostname or "unknown") if USE_POSTGRES else "local SQLite file"
         with get_db_connection() as conn:
             cursor = conn.cursor()
+            tables = table_names(cursor)
+            out["db_reachable"] = True
+            if "trends" in tables and "drivers" not in tables:
+                legacy = LegacySchemaError()
+                out["error"], out["reason"] = describe_error(legacy), failure_reason(legacy)
+                return out
+            if "simulation_runs" not in tables:   # a new database the API has not initialised yet
+                return out
             cursor.execute("SELECT COUNT(*) AS n FROM simulation_runs")
             out["simulation_run_count"] = int(_row(cursor.fetchone())["n"] or 0)
-            out["db_reachable"] = True
         latest = latest_run_summary()
         if latest:
             out["latest_run_id"] = latest["id"]
             out["latest_run_date"] = latest["run_date"]
     except Exception as e:  # noqa: BLE001 (reported, never raised)
-        out["error"] = f"{type(e).__name__}: {e}"
-        logger.warning("diagnose_connection: database probe failed: %s", out["error"])
+        out["error"], out["reason"] = describe_error(e), failure_reason(e)
+        logger.warning("diagnose_connection: database probe failed: %s", e)
     return out
 
 
@@ -313,20 +391,44 @@ def diagnose_connection() -> Dict[str, Any]:
 _DRIVER_COLUMNS = (
     "id", "force", "name", "description", "direction", "probability", "start_year",
     "peak_year", "diffusion_curve", "gp1_pct_affected", "uncertainty", "confidence",
-    "analysis", "data_source", "baseline", "scores_edited",
+    "analysis", "baseline", "scores_edited",
 )
+
+
+def _driver_values(d: Driver) -> tuple:
+    """The values of _DRIVER_COLUMNS for one driver, in that order."""
+    return (d.id, d.force, d.name, d.description, d.direction, d.probability, d.start_year,
+            d.peak_year, d.diffusion_curve, d.gp1_pct_affected, d.uncertainty, d.confidence,
+            d.analysis, dumps(d.baseline) if d.baseline else None, d.scores_edited)
+
+
+def _write_driver_children(cursor, d: Driver) -> None:
+    """Rewrite a driver's exposure and source rows from the object."""
+    p = placeholder()
+    for table in ("driver_category_exposure", "driver_vc_exposure", "driver_regional_exposure", "driver_sources"):
+        cursor.execute(f"DELETE FROM {table} WHERE driver_id = {p}", (d.id,))
+    for category, score in d.category_exposure.items():
+        cursor.execute(f"INSERT INTO driver_category_exposure (driver_id, category, exposure_score) VALUES ({ph(3)})",
+                       (d.id, category, score))
+    for step, score in d.vc_exposure.items():
+        cursor.execute(f"INSERT INTO driver_vc_exposure (driver_id, vc_step, exposure_score) VALUES ({ph(3)})",
+                       (d.id, step, score))
+    for region, score in d.regional_exposure.items():
+        cursor.execute(f"INSERT INTO driver_regional_exposure (driver_id, region, exposure_score) VALUES ({ph(3)})",
+                       (d.id, region, score))
+    for src in d.sources or []:
+        cursor.execute(f"INSERT INTO driver_sources (driver_id, title, url, tier, note) VALUES ({ph(5)})",
+                       (d.id, src.get("title", ""), src.get("url", ""), src.get("tier", ""), src.get("note", "")))
 
 
 def save_drivers(drivers: List[Driver]) -> None:
     """Insert or replace drivers, keeping each row (and its proposals) alive.
 
-    The driver row is upserted, never deleted, because expert proposals
-    reference it with ON DELETE CASCADE: deleting and re-inserting on every
-    edit would erase them. The exposure and source rows are rewritten from the
-    object. ``created_at`` survives an edit; ``updated_at`` is refreshed and
-    ``revision`` goes up by one (see drivers_stamp).
+    Used to seed a new database. The driver row is upserted, never deleted,
+    because expert proposals reference it with ON DELETE CASCADE. The exposure
+    and source rows are rewritten from the object. ``created_at`` survives;
+    ``updated_at`` is refreshed and ``revision`` goes up by one.
     """
-    p = placeholder()
     cols = ", ".join(_DRIVER_COLUMNS)
     updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in _DRIVER_COLUMNS if c != "id")
     with get_db_connection() as conn:
@@ -336,27 +438,34 @@ def save_drivers(drivers: List[Driver]) -> None:
                 f"""INSERT INTO drivers ({cols}) VALUES ({ph(len(_DRIVER_COLUMNS))})
                     ON CONFLICT (id) DO UPDATE SET {updates}, revision = drivers.revision + 1,
                         updated_at = CURRENT_TIMESTAMP""",
-                (d.id, d.force, d.name, d.description, d.direction, d.probability, d.start_year,
-                 d.peak_year, d.diffusion_curve, d.gp1_pct_affected, d.uncertainty, d.confidence,
-                 d.analysis, d.data_source, dumps(d.baseline) if d.baseline else None, d.scores_edited),
+                _driver_values(d),
             )
-            for table in ("driver_category_exposure", "driver_vc_exposure", "driver_regional_exposure", "driver_sources"):
-                cursor.execute(f"DELETE FROM {table} WHERE driver_id = {p}", (d.id,))
-            for category, score in d.category_exposure.items():
-                cursor.execute(f"INSERT INTO driver_category_exposure (driver_id, category, exposure_score) VALUES ({ph(3)})",
-                               (d.id, category, score))
-            for step, score in d.vc_exposure.items():
-                cursor.execute(f"INSERT INTO driver_vc_exposure (driver_id, vc_step, exposure_score) VALUES ({ph(3)})",
-                               (d.id, step, score))
-            for region, score in d.regional_exposure.items():
-                cursor.execute(f"INSERT INTO driver_regional_exposure (driver_id, region, exposure_score) VALUES ({ph(3)})",
-                               (d.id, region, score))
-            for src in d.sources or []:
-                cursor.execute(
-                    f"INSERT INTO driver_sources (driver_id, title, url, tier, note) VALUES ({ph(5)})",
-                    (d.id, src.get("title", ""), src.get("url", ""), src.get("tier", ""), src.get("note", "")),
-                )
+            _write_driver_children(cursor, d)
     logger.info("Saved %d drivers", len(drivers))
+
+
+def save_driver_edit(driver: Driver, expected_revision: int) -> int:
+    """Write an admin edit of one stored driver; returns its new revision.
+
+    The row is written only if it is still at ``expected_revision`` (the
+    revision the editor loaded), in the same statement that raises it, so of
+    two edits made from the same state only the first lands. The second
+    raises StaleRevisionError and changes nothing.
+    """
+    p = placeholder()
+    columns = [c for c in _DRIVER_COLUMNS if c != "id"]
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"UPDATE drivers SET {', '.join(f'{c} = {p}' for c in columns)}, revision = revision + 1, "
+            f"updated_at = CURRENT_TIMESTAMP WHERE id = {p} AND revision = {p}",
+            _driver_values(driver)[1:] + (driver.id, int(expected_revision)))
+        if cursor.rowcount != 1:
+            cursor.execute(f"SELECT revision FROM drivers WHERE id = {p}", (driver.id,))
+            row = cursor.fetchone()
+            raise StaleRevisionError(driver.id, int(expected_revision), int(_row(row)["revision"]) if row else None)
+        _write_driver_children(cursor, driver)
+    return int(expected_revision) + 1
 
 
 def load_drivers() -> List[Driver]:
@@ -402,7 +511,6 @@ def load_drivers() -> List[Driver]:
             category_exposure=e["category"],
             vc_exposure=e["vc"],
             regional_exposure=e["region"],
-            data_source=r["data_source"] or "",
             sources=sources[r["id"]],
             confidence=r["confidence"] or "Medium",
             # A missing GP1 share stays missing so the engine refuses to run.
@@ -412,6 +520,7 @@ def load_drivers() -> List[Driver]:
             uncertainty=_int_or_none(r["uncertainty"]),
             baseline=_loads(r["baseline"]),
             scores_edited=bool(r["scores_edited"]),
+            revision=int(r["revision"]),
         ))
     logger.info("Loaded %d drivers", len(drivers))
     return drivers
@@ -481,22 +590,50 @@ def latest_run_summary() -> Optional[Dict[str, Any]]:
 
 
 # ── Consumer Journey content ────────────────────────────────────────────────
+# Each save appends a row; the newest row is the content and its id is the
+# content's version. A save names the version it was edited from, so two
+# admins editing at once cannot silently overwrite each other.
 
-def save_journey_content(content: dict, updated_by: str = "") -> None:
-    """Store a new version of the journey content ({lhc, hair} tile map)."""
-    with get_db_connection() as conn:
-        conn.cursor().execute(f"INSERT INTO journey_content (content, updated_by) VALUES ({ph(2)})",
-                              (dumps(content), updated_by or ""))
-    logger.info("Saved journey content (by %s)", updated_by or "unknown")
-
-
-def load_journey_content() -> Optional[dict]:
-    """The newest journey content, or None when only the bundled seed exists."""
+def load_journey_content() -> Dict[str, Any]:
+    """{"version": id of the newest row, "content": its tile map}; version 0 and
+    content None while nothing is stored (the dashboard's bundled content applies)."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT content FROM journey_content ORDER BY id DESC LIMIT 1")
+        cursor.execute("SELECT id, content FROM journey_content ORDER BY id DESC LIMIT 1")
         row = cursor.fetchone()
-    return _loads(_row(row)["content"]) if row else None
+    if row is None:
+        return {"version": 0, "content": None}
+    r = _row(row)
+    return {"version": int(r["id"]), "content": _loads(r["content"])}
+
+
+def save_journey_content(content: dict, updated_by: str, base_version: int) -> int:
+    """Store a new version of the journey content ({lhc, hair}); returns its version.
+
+    ``base_version`` is the version the editor loaded (0 for the bundled
+    content). If another save has happened since, StaleVersionError is raised
+    and nothing is written. The check and the insert run under a lock that
+    serialises saves (PostgreSQL) or under SQLite's write lock.
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        if USE_POSTGRES:
+            cursor.execute("LOCK TABLE journey_content IN SHARE ROW EXCLUSIVE MODE")
+        elif not conn.in_transaction:
+            cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute("SELECT COALESCE(MAX(id), 0) AS v FROM journey_content")
+        current = int(_row(cursor.fetchone())["v"] or 0)
+        if current != int(base_version):
+            raise StaleVersionError(int(base_version), current)
+        sql = f"INSERT INTO journey_content (content, updated_by) VALUES ({ph(2)})"
+        if USE_POSTGRES:
+            cursor.execute(sql + " RETURNING id", (dumps(content), updated_by or ""))
+            version = int(_row(cursor.fetchone())["id"])
+        else:
+            cursor.execute(sql, (dumps(content), updated_by or ""))
+            version = int(cursor.lastrowid)
+    logger.info("Saved journey content version %d (by %s)", version, updated_by or "unknown")
+    return version
 
 
 # ── Expert score proposals ──────────────────────────────────────────────────
@@ -506,7 +643,7 @@ def load_journey_content() -> Optional[dict]:
 _PROPOSAL_SCALAR_FIELDS = ("probability", "gp1_pct_affected", "peak_year", "diffusion_curve", "uncertainty")
 _PROPOSAL_MAP_FIELDS = ("category_exposure", "regional_exposure", "vc_exposure")
 _PROPOSAL_TEXT_FIELDS = ("comment",)
-_PROPOSAL_COLUMNS = ("user_id, user_name, user_role, probability, gp1_pct_affected, peak_year, "
+_PROPOSAL_COLUMNS = ("user_id, user_name, probability, gp1_pct_affected, peak_year, "
                      "diffusion_curve, uncertainty, category_exposure, regional_exposure, vc_exposure, "
                      "comment, updated_at")
 
@@ -516,7 +653,6 @@ def _proposal(raw) -> dict:
     return {
         "user_id": r.get("user_id"),
         "user_name": r.get("user_name"),
-        "user_role": r.get("user_role"),
         "probability": r.get("probability"),
         "gp1_pct_affected": r.get("gp1_pct_affected"),
         "peak_year": r.get("peak_year"),
@@ -553,7 +689,7 @@ def load_all_driver_proposals() -> Dict[str, List[Dict[str, Any]]]:
 
 
 def upsert_driver_proposal(driver_id: str, user_id: str, fields: Dict[str, Any],
-                           user_name: str = "", user_role: str = "") -> Dict[str, Any]:
+                           user_name: str = "") -> Dict[str, Any]:
     """Merge a partial proposal into this expert's row and return the merged row.
 
     Only the keys present in ``fields`` change; everything else on an existing
@@ -574,7 +710,7 @@ def upsert_driver_proposal(driver_id: str, user_id: str, fields: Dict[str, Any],
         def enc(v):
             return dumps(v) if v is not None else None
 
-        values = (user_name or "", user_role or "",
+        values = (user_name or "",
                   merged.get("probability"), merged.get("gp1_pct_affected"), merged.get("peak_year"),
                   merged.get("diffusion_curve"), merged.get("uncertainty"),
                   enc(merged.get("category_exposure")), enc(merged.get("regional_exposure")),
@@ -582,7 +718,7 @@ def upsert_driver_proposal(driver_id: str, user_id: str, fields: Dict[str, Any],
         if existing:
             cursor.execute(
                 f"""UPDATE driver_score_proposals
-                    SET user_name = {p}, user_role = {p}, probability = {p}, gp1_pct_affected = {p},
+                    SET user_name = {p}, probability = {p}, gp1_pct_affected = {p},
                         peak_year = {p}, diffusion_curve = {p}, uncertainty = {p},
                         category_exposure = {p}, regional_exposure = {p}, vc_exposure = {p},
                         comment = {p}, updated_at = CURRENT_TIMESTAMP
@@ -590,13 +726,13 @@ def upsert_driver_proposal(driver_id: str, user_id: str, fields: Dict[str, Any],
                 values + (driver_id, user_id))
         else:
             cursor.execute(
-                f"""INSERT INTO driver_score_proposals (driver_id, user_id, user_name, user_role, probability,
+                f"""INSERT INTO driver_score_proposals (driver_id, user_id, user_name, probability,
                         gp1_pct_affected, peak_year, diffusion_curve, uncertainty, category_exposure,
                         regional_exposure, vc_exposure, comment)
-                    VALUES ({ph(13)})""",
+                    VALUES ({ph(12)})""",
                 (driver_id, user_id) + values)
 
-    merged.update(user_id=user_id, user_name=user_name or "", user_role=user_role or "")
+    merged.update(user_id=user_id, user_name=user_name or "")
     return merged
 
 

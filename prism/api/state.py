@@ -14,7 +14,7 @@ import logging
 import threading
 from typing import Optional
 
-from prism.config import CATEGORIES, FORCES, ModelConfig
+from prism.config import ModelConfig
 from prism.drivers import DriverSet
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def driver_set() -> DriverSet:
             save_drivers(get_seed_drivers())
             stamp = drivers_stamp()
         if _cache["drivers"] is None or _cache["drivers_stamp"] != stamp:
-            _cache["drivers"] = DriverSet(drivers=load_drivers(), categories=list(CATEGORIES), forces=list(FORCES))
+            _cache["drivers"] = DriverSet(drivers=load_drivers())
             _cache["drivers_stamp"] = stamp
         return _cache["drivers"]
 
@@ -77,6 +77,6 @@ def reset_drivers() -> None:
 
 
 def reset() -> None:
-    """Forget everything cached (used by tests and after a failed request)."""
+    """Forget everything cached, including that the schema exists (for tests)."""
     with _lock:
         _cache.update(db_ready=False, drivers=None, drivers_stamp=None, run=None)

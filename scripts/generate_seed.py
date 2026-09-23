@@ -68,16 +68,6 @@ def canonical_vc_profile(epicentre: str) -> dict:
             for i, step in enumerate(VC_STEPS)}
 
 
-def data_source_text(d: dict) -> str:
-    """The one-line evidence summary: the first three publishers with their dates."""
-    out = []
-    for src in d["sources"][:3]:
-        pub = src["title"].split(":")[0].strip()
-        pub = pub if len(pub) <= 48 else pub[:47].rstrip() + "…"
-        out.append(f"{pub} ({src['published']})" if src.get("published") else pub)
-    return "; ".join(out)
-
-
 def validate(drivers: list) -> None:
     """Refuse a base the engine or the dashboard could not use."""
     problems = []
@@ -131,7 +121,6 @@ def driver_from_base(d: dict, analysis: str = ""):
         category_exposure={c: d["category_exposure"][c] for c in CATEGORIES},
         vc_exposure=canonical_vc_profile(d["vc_epicentre"]),
         regional_exposure={r: d["regional_exposure"][r] for r in REGIONS},
-        data_source=data_source_text(d),
         sources=[{"title": s["title"], "url": s["url"], "tier": s["tier"], "note": s.get("published", "")}
                  for s in d["sources"]],
         analysis=analysis,
@@ -224,7 +213,6 @@ def render_seed(drivers: list, texts: dict) -> str:
         a("        vc_exposure=_value_chain(" + ", ".join(str(vc[s]) for s in VC_STEPS)
           + f"),  # epicentre {d['vc_epicentre']}")
         a("        regional_exposure=_regions(" + ", ".join(str(reg[r]) for r in REGIONS) + "),")
-        a(f"        data_source={q(data_source_text(d))},")
         a("        sources=[")
         for s in d["sources"]:
             a(f"            {{\"title\": {q(s['title'])}, \"url\": {q(s['url'])}, "

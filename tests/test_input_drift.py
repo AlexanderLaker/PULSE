@@ -49,7 +49,13 @@ def test_structural_changes_are_counted_separately():
 def test_the_onset_year_is_structural():
     event = compute_input_drift_event(_fp(_driver("a", start_year=2029)), _fp(_driver("a", start_year=2027)))
     assert event["detail"]["structure_changes"] == ["a"]
-    assert "(exposures, onset, peak year, curve, uncertainty)" in event["message"]
+    assert "(force, exposures, onset, peak year, curve or uncertainty)" in event["message"]
+
+
+def test_a_move_to_another_force_is_structural():
+    event = compute_input_drift_event(_fp(_driver("a", force="Customer")), _fp(_driver("a", force="Consumer")))
+    assert event["detail"]["structure_changes"] == ["a"]
+    assert event["detail"]["per_force_balance_delta"]
 
 
 def test_a_key_the_previous_fingerprint_lacks_is_not_drift():

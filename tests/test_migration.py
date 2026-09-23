@@ -32,6 +32,16 @@ MIGRATION_DIR = REPO / "migrations" / "0001_driver_schema"
 SEED = {d.id: d for d in DRIVERS}
 PREVIOUS_DESCRIPTION = "An earlier description."
 ADMIN_DESCRIPTION = "Wording an admin chose."
+#: The source list the previous editor saved for consumer_r02 as JSON in
+#: data_source: the table rows as the dashboard showed them (the old "data"
+#: field held the source_type), one tier changed and one source added, plus an
+#: empty row that editor would have filtered out.
+EDITOR_SOURCES = [
+    *({"title": s["title"], "url": s["url"], "data": f"analyst report ({s['note']})" if s["note"] else "",
+       "tier": "S" if i == 0 else s["tier"]} for i, s in enumerate(SEED["consumer_r02"].sources)),
+    {"title": "Added in the editor", "url": "https://example.org/added", "data": "Company filing, FY2025"},
+    {"title": "", "url": "  "},
+]
 
 
 def sha(text: str) -> str:
@@ -40,11 +50,31 @@ def sha(text: str) -> str:
 
 # ── the previous schema ─────────────────────────────────────────────────────
 
-def previous_schema(serial: str, json_type: str) -> list:
-    """The tables of the previous schema, and older leftovers (users, scanned_trends,
-    simulation_runs.allocation_recommendation). user_roles is the dashboard's own
-    table, which the migration must leave alone."""
+def older_leftovers(serial: str) -> list:
+    """What a database created by much older versions can still hold: the Delphi
+    tables with their foreign keys (to trends and to each other) and a
+    simulation_runs table with a foreign key to config_snapshots and columns
+    since removed. Replaces the simulation_runs of previous_schema."""
     return [
+        f"""CREATE TABLE simulation_runs (id {serial}, run_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            scenario TEXT, iterations INTEGER, model_type TEXT,
+            config_snapshot_id INTEGER REFERENCES config_snapshots(id), results TEXT,
+            causal_decomposition TEXT, allocation_recommendation TEXT, convergence_diagnostics TEXT)""",
+        """CREATE TABLE delphi_sessions (id TEXT PRIMARY KEY, name TEXT NOT NULL)""",
+        f"""CREATE TABLE delphi_rounds (id {serial}, round_number INTEGER, trend_id TEXT REFERENCES trends(id),
+            scorer_id TEXT, session_id TEXT REFERENCES delphi_sessions(id))""",
+        f"""CREATE TABLE delphi_calibration (id {serial}, session_id TEXT REFERENCES delphi_sessions(id),
+            scorer_id TEXT NOT NULL)""",
+        "CREATE INDEX idx_simulation_runs_date ON simulation_runs(run_date)",
+    ]
+
+
+def previous_schema(serial: str, json_type: str, older: bool = False) -> list:
+    """The tables of the previous schema, and older leftovers (users, scanned_trends,
+    simulation_runs.allocation_recommendation; with ``older``, those of
+    older_leftovers too). user_roles is the dashboard's own table, which the
+    migration must leave alone."""
+    statements = [
         f"""CREATE TABLE trends (
             id TEXT PRIMARY KEY, force TEXT NOT NULL, sub_category TEXT, name TEXT NOT NULL,
             description TEXT, direction TEXT, probability INTEGER, start_year INTEGER,
@@ -97,6 +127,13 @@ def previous_schema(serial: str, json_type: str) -> list:
         "CREATE INDEX idx_audit_log_timestamp ON audit_log(timestamp)",
         "CREATE INDEX idx_session_snapshots_created_at ON session_snapshots(created_at)",
     ]
+    if not older:
+        return statements
+    # config_snapshots must exist before the older simulation_runs references it.
+    kept = [st for st in statements if "CREATE TABLE simulation_runs" not in st
+            and "idx_simulation_runs_date" not in st]
+    config_first = sorted(kept, key=lambda st: "CREATE TABLE config_snapshots" not in st)
+    return config_first + older_leftovers(serial)
 
 
 STORED_JOURNEY = {
@@ -132,12 +169,12 @@ FIRST_RUN = {
 }
 
 
-def fill_previous_database(conn, p: str, serial: str, json_type: str = "TEXT") -> None:
+def fill_previous_database(conn, p: str, serial: str, json_type: str = "TEXT", older: bool = False) -> None:
     """Create the previous schema and fill it the way production holds it: the
     seed drivers with an earlier analysis text, one admin edit, expert proposals,
     stored runs, stored journey content and a row in each side table."""
     cur = conn.cursor()
-    for statement in previous_schema(serial, json_type):
+    for statement in previous_schema(serial, json_type, older):
         cur.execute(statement)
     for d in DRIVERS:
         admin_edit = d.id == "consumer_r02"
@@ -148,7 +185,8 @@ def fill_previous_database(conn, p: str, serial: str, json_type: str = "TEXT") -
             f"uncertainty) VALUES ({', '.join([p] * 21)})",
             (d.id, d.force, "", d.name, STORED_DESCRIPTION.get(d.id, d.description), d.direction,
              4 if admin_edit else d.probability, d.start_year, d.normalized_score, f"Earlier analysis of {d.id}.",
-             d.data_source, "", d.confidence, False, admin_edit, None, d.gp1_pct_affected, d.peak_year,
+             json.dumps(EDITOR_SOURCES) if admin_edit else "Circana (Apr 2026); YouGov (Jul 2026)", "",
+             d.confidence, False, admin_edit, None, d.gp1_pct_affected, d.peak_year,
              d.diffusion_curve, None if d.id == "technology_r01" else json.dumps(d.scores()), d.uncertainty))
         for table, key, values in (("trend_category_exposure", "category", d.category_exposure),
                                    ("trend_vc_exposure", "vc_step", d.vc_exposure),
@@ -165,7 +203,8 @@ def fill_previous_database(conn, p: str, serial: str, json_type: str = "TEXT") -
                 ("consumer_r01", "ana", "Ana", "viewer", 4, json.dumps({"Hair: Care": 4}), "Looks high"))
     cur.execute(f"INSERT INTO trend_score_proposals (trend_id, user_id, user_name, user_role, uncertainty) "
                 f"VALUES ({p}, {p}, {p}, {p}, {p})", ("consumer_r02", "ben", "Ben", "viewer", 3))
-    cur.execute(f"INSERT INTO simulation_runs (iterations, model_type, results, force_attribution, "
+    attribution = "causal_decomposition" if older else "force_attribution"   # renamed in the previous release
+    cur.execute(f"INSERT INTO simulation_runs (iterations, model_type, results, {attribution}, "
                 f"allocation_recommendation) VALUES ({p}, {p}, {p}, {p}, {p})",
                 (150000, "bayesian", json.dumps(FIRST_RUN), '{"Consumer": 0.5}', '{"a": 1}'))
     if json_type == "TEXT":   # a JSONB column cannot hold a malformed bundle
@@ -183,6 +222,12 @@ def fill_previous_database(conn, p: str, serial: str, json_type: str = "TEXT") -
     cur.execute("INSERT INTO audit_log (action, entity_type, entity_id, user_id) "
                 "VALUES ('trend_updated', 'trend', 'consumer_r02', 'admin-1')")
     cur.execute("INSERT INTO user_roles (clerk_user_id, email, role) VALUES ('user_1', 'a@example.com', 'admin')")
+    if older:
+        cur.execute("INSERT INTO delphi_sessions (id, name) VALUES ('s1', 'Round one')")
+        cur.execute("INSERT INTO delphi_rounds (round_number, trend_id, scorer_id, session_id) "
+                    "VALUES (1, 'consumer_r01', 'x', 's1')")
+        cur.execute("INSERT INTO delphi_calibration (session_id, scorer_id) VALUES ('s1', 'x')")
+        cur.execute("UPDATE simulation_runs SET scenario = 'base', config_snapshot_id = 1 WHERE iterations = 150000")
     conn.commit()
 
 
@@ -210,6 +255,16 @@ def previous(tmp_path) -> Path:
     path = tmp_path / "previous.db"
     conn = sqlite3.connect(path)
     fill_previous_database(conn, "?", "INTEGER PRIMARY KEY AUTOINCREMENT")
+    conn.close()
+    return path
+
+
+@pytest.fixture
+def older(tmp_path) -> Path:
+    """A SQLite database of the previous schema that still holds older leftovers."""
+    path = tmp_path / "older.db"
+    conn = sqlite3.connect(path)
+    fill_previous_database(conn, "?", "INTEGER PRIMARY KEY AUTOINCREMENT", older=True)
     conn.close()
     return path
 
@@ -251,8 +306,14 @@ def sqlite_schema(path: Path) -> dict:
 
 
 DRIVER_FIELDS = ("force", "name", "description", "direction", "probability", "start_year", "gp1_pct_affected",
-                 "peak_year", "diffusion_curve", "uncertainty", "confidence", "analysis", "data_source",
+                 "peak_year", "diffusion_curve", "uncertainty", "confidence", "analysis",
                  "category_exposure", "regional_exposure", "vc_exposure", "sources", "baseline", "scores_edited")
+#: consumer_r02's sources after the migration: the list saved in the editor.
+MIGRATED_EDITOR_SOURCES = [
+    *({"title": s["title"], "url": s["url"], "tier": "S" if i == 0 else s["tier"], "note": s["note"]}
+      for i, s in enumerate(SEED["consumer_r02"].sources)),
+    {"title": "Added in the editor", "url": "https://example.org/added", "tier": "", "note": "Company filing, FY2025"},
+]
 
 
 def expected_driver(d) -> dict:
@@ -260,7 +321,7 @@ def expected_driver(d) -> dict:
     out = {f: getattr(d, f) for f in DRIVER_FIELDS}
     out.update(baseline=None if d.id == "technology_r01" else d.scores(), scores_edited=False)
     if d.id == "consumer_r02":
-        out.update(probability=4, scores_edited=True)
+        out.update(probability=4, scores_edited=True, sources=MIGRATED_EDITOR_SOURCES)
     if d.id == "consumer_r04":
         out.update(description=ADMIN_DESCRIPTION)
     return out
@@ -286,7 +347,11 @@ class TestMigration:
     def test_the_database_is_migrated(self, migration, previous, capsys, monkeypatch):
         assert migration.main(["--sqlite", str(previous)]) == 0
         report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])
-        assert report["copied"] == {"drivers": 51, "sources": sum(len(d.sources) for d in DRIVERS), "proposals": 2}
+        assert report["copied"] == {"drivers": 51, "sources": sum(len(d.sources) for d in DRIVERS) + 1, "proposals": 2}
+        assert report["sources_from_editor"] == {
+            "consumer_r02": {"saved_in_editor": len(SEED["consumer_r02"].sources) + 1,
+                             "table_rows": len(SEED["consumer_r02"].sources)}}
+        assert report["orphans_skipped"] == {}
         assert report["analysis_updated"] == 51
         assert report["descriptions"] == {"updated": 1, "already_current": 1, "edited_left_alone": ["consumer_r04"]}
         assert report["runs_with_renamed_keys"] == 1
@@ -377,6 +442,57 @@ class TestMigration:
             "model_type": {"1": "bayesian"}, "config_snapshot_id": {}, "force_attribution": {"1": '{"Consumer": 0.5}'},
             "convergence_diagnostics": {}, "allocation_recommendation": {"1": '{"a": 1}'}}
 
+    def test_the_archive_is_readable_by_its_owner_only(self, migration, previous):
+        assert migration.main(["--sqlite", str(previous)]) == 0
+        [archive_file] = list(migration.ARCHIVE_DIR.glob("*.json"))
+        assert archive_file.stat().st_mode & 0o077 == 0 and migration.ARCHIVE_DIR.stat().st_mode & 0o077 == 0
+
+    def test_child_rows_without_their_driver_are_skipped_and_reported(self, migration, previous, capsys):
+        conn = sqlite3.connect(previous)   # SQLite never enforced the previous foreign keys
+        conn.execute("INSERT INTO trend_category_exposure VALUES ('gone_r01', 'Hair: Care', 3)")
+        conn.execute("INSERT INTO trend_sources (trend_id, title, url) VALUES ('gone_r01', 'orphan', 'https://x')")
+        conn.execute("INSERT INTO trend_score_proposals (trend_id, user_id, probability) VALUES ('gone_r01', 'z', 2)")
+        conn.commit()
+        conn.close()
+        assert migration.main(["--sqlite", str(previous)]) == 0
+        report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])
+        assert report["orphans_skipped"] == {"trend_category_exposure": 1, "trend_sources": 1,
+                                             "trend_score_proposals": 1}
+        assert report["copied"]["proposals"] == 2
+        for table in ("driver_category_exposure", "driver_sources", "driver_score_proposals"):
+            assert query(previous, f"SELECT COUNT(*) AS n FROM {table} WHERE driver_id = 'gone_r01'") == [{"n": 0}]
+        [archive_file] = list(migration.ARCHIVE_DIR.glob("*.json"))
+        archive = json.loads(archive_file.read_text(encoding="utf-8"))
+        assert any(r["trend_id"] == "gone_r01" for r in archive["tables"]["trend_score_proposals"])
+
+    def test_older_leftovers_are_dropped_in_order(self, migration, older, capsys, monkeypatch, tmp_path):
+        """Delphi tables with foreign keys, and a simulation_runs column that references config_snapshots."""
+        assert migration.main(["--sqlite", str(older)]) == 0
+        report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])
+        assert {"delphi_rounds", "delphi_calibration", "delphi_sessions", "config_snapshots"} <= set(
+            report["dropped_tables"])
+        assert set(report["dropped_simulation_run_columns"]) == {
+            "scenario", "model_type", "config_snapshot_id", "causal_decomposition", "allocation_recommendation",
+            "convergence_diagnostics"}
+        rows = query(older, "SELECT * FROM simulation_runs ORDER BY id")
+        assert [r["iterations"] for r in rows] == [150000, 10, 20] and [r["id"] for r in rows] == [1, 2, 3]
+        # the autoincrement counter carried over: a new run continues after the last id
+        conn = sqlite3.connect(older)
+        conn.execute("INSERT INTO simulation_runs (iterations, results) VALUES (5, '{}')")
+        conn.commit()
+        assert conn.execute("SELECT MAX(id) FROM simulation_runs").fetchone()[0] == 4
+        conn.close()
+        fresh = tmp_path / "fresh.db"
+        monkeypatch.setenv("PRISM_DB_PATH", str(fresh))
+        import prism.database as dbm
+        dbm.init_db()
+        migrated, new = sqlite_schema(older), sqlite_schema(fresh)
+        assert migrated["simulation_runs"] == new["simulation_runs"]
+        [archive_file] = list(migration.ARCHIVE_DIR.glob("*.json"))
+        archive = json.loads(archive_file.read_text(encoding="utf-8"))
+        assert archive["simulation_runs_columns"]["scenario"] == {"1": "base"}
+        assert archive["tables"]["delphi_rounds"][0]["session_id"] == "s1"
+
     def test_a_second_run_does_nothing(self, migration, previous, capsys):
         assert migration.main(["--sqlite", str(previous)]) == 0
         after = dump(previous)
@@ -433,6 +549,17 @@ class TestHelpers:
         assert migration.rename_run_keys(results) is False
         assert migration.rename_run_keys({"meta": {"driver_count": 5, "trend_count": 4}}) is False
         assert migration.rename_run_keys({"integrity_events": ["not a dict"]}) is False
+
+    def test_editor_sources(self, migration):
+        saved = [{"title": "A", "url": "https://a", "data": "analyst report (Aug 2026)", "tier": "A"},
+                 {"title": "B", "url": "", "source_type": "trade press"},
+                 {"title": " ", "url": ""}]
+        assert migration.editor_sources(json.dumps(saved)) == [
+            {"title": "A", "url": "https://a", "tier": "A", "note": "Aug 2026"},
+            {"title": "B", "url": "", "tier": "", "note": ""}]
+        for not_a_list in (None, "", "Circana (Apr 2026)", "[not json", '{"a": 1}', "[]", '["a"]',
+                           json.dumps([{"title": "", "url": ""}])):
+            assert migration.editor_sources(not_a_list) is None, not_a_list
 
     def test_json_columns_arrive_as_text_or_decoded(self, migration):
         assert migration.json_text({"a": 1}) == '{"a": 1}' and migration.json_text('{"a": 1}') == '{"a": 1}'
@@ -531,6 +658,78 @@ def postgres_schema(conn, schema: str) -> dict:
     return out
 
 
+@pytest.fixture
+def pg_previous(request):
+    """A fresh PostgreSQL schema holding a previous-schema database: (admin connection, schema name).
+
+    Parametrise indirectly with {"json_type": ..., "older": ...} to vary it."""
+    import psycopg2
+    options = getattr(request, "param", {})
+    name = f"m_previous_{uuid.uuid4().hex[:8]}"
+    admin = psycopg2.connect(POSTGRES_URL)
+    admin.autocommit = True
+    admin.cursor().execute(f"CREATE SCHEMA {name}")
+    try:
+        conn = psycopg2.connect(schema_url(name))
+        fill_previous_database(conn, "%s", "SERIAL PRIMARY KEY", options.get("json_type", "TEXT"),
+                               options.get("older", False))
+        conn.close()
+        yield admin, name
+    finally:
+        admin.cursor().execute(f"DROP SCHEMA IF EXISTS {name} CASCADE")
+        admin.close()
+
+
+def pg_tables(admin, schema: str) -> set:
+    cur = admin.cursor()
+    cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = %s", (schema,))
+    return {r[0] for r in cur.fetchall()}
+
+
+@pytest.mark.skipif(not POSTGRES_URL, reason="PRISM_TEST_POSTGRES_URL is not set")
+@pytest.mark.parametrize("pg_previous", [{"older": True}], indirect=True)
+def test_postgres_older_leftovers_need_no_cascade(migration, monkeypatch, capsys, pg_previous):
+    """PostgreSQL enforces the Delphi and config_snapshots foreign keys; the drop order alone satisfies them."""
+    admin, schema = pg_previous
+    monkeypatch.setenv("POSTGRES_URL", schema_url(schema))
+    assert migration.main(["--postgres"]) == 0
+    report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])
+    assert {"delphi_rounds", "delphi_calibration", "delphi_sessions", "config_snapshots"} <= set(report["dropped_tables"])
+    assert "config_snapshot_id" in report["dropped_simulation_run_columns"]
+    assert not pg_tables(admin, schema) & set(migration.DROP_TABLES)
+
+
+@pytest.mark.skipif(not POSTGRES_URL, reason="PRISM_TEST_POSTGRES_URL is not set")
+def test_postgres_an_unknown_dependent_stops_the_migration(migration, monkeypatch, capsys, pg_previous):
+    """A table this migration does not know references trends: nothing is dropped with CASCADE, so it stops."""
+    admin, schema = pg_previous
+    admin.cursor().execute(f"CREATE TABLE {schema}.notes (trend_id TEXT REFERENCES {schema}.trends(id))")
+    before = pg_tables(admin, schema)
+    monkeypatch.setenv("POSTGRES_URL", schema_url(schema))
+    assert migration.main(["--postgres"]) == 2
+    out = capsys.readouterr().out
+    assert "rolled back" in out and "notes" in out
+    assert pg_tables(admin, schema) == before and "drivers" not in before
+
+
+@pytest.mark.skipif(not POSTGRES_URL, reason="PRISM_TEST_POSTGRES_URL is not set")
+def test_postgres_a_busy_table_times_out_instead_of_waiting(migration, monkeypatch, capsys, pg_previous):
+    """Another session holding a lock on a table the migration needs: the run gives up after the lock timeout."""
+    import psycopg2
+    admin, schema = pg_previous
+    other = psycopg2.connect(schema_url(schema))
+    try:
+        other.cursor().execute("LOCK TABLE journey_content IN ROW EXCLUSIVE MODE")   # an open write transaction
+        monkeypatch.setattr(migration, "LOCK_TIMEOUT", "1s")
+        monkeypatch.setenv("POSTGRES_URL", schema_url(schema))
+        assert migration.main(["--postgres"]) == 2
+        assert "lock timeout" in capsys.readouterr().out
+    finally:
+        other.rollback()
+        other.close()
+    assert "drivers" not in pg_tables(admin, schema)
+
+
 @pytest.mark.skipif(not POSTGRES_URL, reason="PRISM_TEST_POSTGRES_URL is not set")
 @pytest.mark.parametrize("json_type", ["TEXT", "JSONB"])
 def test_postgres(migration, monkeypatch, capsys, json_type):
@@ -575,7 +774,7 @@ def test_postgres(migration, monkeypatch, capsys, json_type):
             "import json; import prism.database as d; r = d.load_latest_run(); c = d.load_journey_content(); "
             "print(json.dumps({'meta': r['results']['meta'], 'journey': c}))")))
         assert served["meta"] == {"driver_count": 51}
-        assert served["journey"]["lhc"][0]["benefiting"][0]["analysis"] == "Current read A."
+        assert served["journey"]["content"]["lhc"][0]["benefiting"][0]["analysis"] == "Current read A."
     finally:
         for name in (previous_schema_name, fresh_schema_name):
             admin.cursor().execute(f"DROP SCHEMA IF EXISTS {name} CASCADE")

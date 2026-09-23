@@ -10,9 +10,12 @@ router = APIRouter()
 
 @router.get("/api/v1/simulation")
 def get_simulation(user: dict = Depends(require_auth)):
-    """The newest run written by the production job; 404 if there is none to serve."""
+    """The newest run written by the production job; 404 if there is none to serve.
+
+    ``inputs_since_run`` names the drivers edited since the run was computed.
+    """
     run = state.latest_run()
     status = run_status(run)
     if not status["has"]:
         raise HTTPException(404, {"reason": status["reason"], "error": status["error"]})
-    return simulation_payload(run)
+    return simulation_payload(run, state.driver_set().drivers)
