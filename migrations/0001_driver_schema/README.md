@@ -171,8 +171,8 @@ python3 migrations/0001_driver_schema/migrate.py --sqlite data/prism.db --dry-ru
 python3 migrations/0001_driver_schema/migrate.py --sqlite data/prism.db
 ```
 
-A local copy can also be deleted instead: the API creates a new one on its
-next start.
+A local copy can also be deleted instead: the API creates a new one, seeded
+with the driver base, the first time a request needs the database.
 
 ## Rollback
 

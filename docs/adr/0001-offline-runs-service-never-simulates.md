@@ -1,4 +1,4 @@
-# 0001. Offline production runs, a read-only service
+# 0001. Offline production runs, a service that never simulates
 
 Status: accepted
 
@@ -12,11 +12,15 @@ scipy was missing would give different numbers on different hosts.
 
 ## Decision
 
-- The simulation runs only in `scripts/run_production.py`, on a machine with
-  the full Python environment, and stores its result as a run.
-- The API serves stored runs and never simulates. Its runtime installs only
-  FastAPI, pydantic and psycopg2 and never imports the engine; a test runs the
-  API with numpy and scipy blocked.
+- The published simulation runs only in `scripts/run_production.py`, on a
+  machine with the full Python environment, and stores its result as a run.
+  The PRISM Analysis build repeats that recipe as its reference run, to
+  check that it reproduces the published run (docs/DRIVER_ANALYSIS.md).
+- The API serves stored runs and never simulates. It writes only driver
+  edits, expert proposals and Consumer Journey saves (and, on an empty
+  database, the schema and the seed drivers). Its runtime installs only
+  FastAPI, pydantic and psycopg2 and never imports the engine; a test runs
+  the API with numpy and scipy blocked.
 - scipy is a hard requirement of the engine: it refuses to import without it,
   and there is no approximate fallback. Every run records the scipy and numpy
   versions it used.

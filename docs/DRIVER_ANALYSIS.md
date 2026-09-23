@@ -37,8 +37,9 @@ The reading answers one question per driver, in four labelled paragraphs:
 A basis line closes the reading: "Figures: model attribution on the estimated
 HCB gross-profit mix, reconciled to a 2035 portfolio median of -5.6 percent
 (3 x 50,000 iterations, seed 42). Read as exposure if nobody acts, not as a
-forecast." When the run the dashboard shows has another median, the card says
-under the basis line that its figures come from the run the line names.
+forecast." When the 2035 median of the run the dashboard shows differs, at
+one decimal, from the one the basis line names, the card says under the
+basis line that its figures come from the run the line names.
 
 The reading interprets the model's arithmetic. It does not restate scores,
 forecast or recommend: under the ceteris-paribus design every contribution is
@@ -216,7 +217,8 @@ production run reads the database. The reference run reproduces a
 production run only when both hold the same scores, and the check fails
 otherwise. No tool carries scores between the two: a score changed on the
 Drivers page is copied into the base by hand, and a score changed in the base
-is entered on the Drivers page.
+is entered on the Drivers page, except the onset and the force, which the
+page does not edit: those take SQL or a migration.
 
 When the scores or the model's parameters change:
 
@@ -244,8 +246,9 @@ comparisons next to the finance figures. The renderer therefore refuses a
 record built on any other cell weights, and the build has no option for them.
 
 When the production run uses the finance file, the dashboard's headline moves
-away from the median the basis line names, and every card says so under its
-basis line. Readings on the finance shares are a decision for the owner:
+away from the median the basis line names, and a card says so under its basis
+line whenever the two differ at one decimal. Readings on the finance shares
+are a decision for the owner:
 they need templates rewritten so that no comparison depends on the mix, and
 a build that keeps the finance shares out of the repository.
 

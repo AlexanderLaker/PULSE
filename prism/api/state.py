@@ -2,9 +2,10 @@
 
 Both are loaded on first use and refreshed when the database changes: the
 driver set when database.drivers_stamp() moves (it changes with every saved
-driver row), the run when a newer run id appears. A production run, a content
-sync or an edit made through another server instance therefore reaches every
-instance on its next request, without a restart.
+driver row), the run when the newest run's id is no longer the one held (a
+newer run, or the held one removed). A production run, a content sync or an
+edit made through another server instance therefore reaches every instance
+on its next request that reads them, without a restart.
 
 The model configuration is the code's default ModelConfig: production runs
 use exactly that (plus the cell weights they record), so it is what the

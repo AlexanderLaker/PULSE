@@ -189,9 +189,10 @@ previous run.
 
 When scores or model parameters changed, regenerate the PRISM Analysis
 readings after the run as docs/DRIVER_ANALYSIS.md describes. A run on the
-finance file leaves the readings on the estimate, and every card says that
-its figures come from another run; readings on the finance shares need
-rewritten templates first (the same document, "On the finance shares").
+finance file leaves the readings on the estimate, and a card says that its
+figures come from another run whenever the served 2035 median differs, at one
+decimal, from the one its basis line names; readings on the finance shares
+need rewritten templates first (the same document, "On the finance shares").
 
 ## Deploying
 
@@ -259,8 +260,11 @@ back as that migration's runbook says.
   driver.
 - **The audit log** records every driver edit (one row per changed field),
   journey save, analysis sync and migration in the same transaction as the
-  change, with the acting identity, and every role change where it can (a
-  failed audit write does not undo a role change). Nothing deletes from it.
+  change, with the acting identity. Role changes are recorded where the
+  entry can be written: `scripts/promote_admin.py` writes it in the same
+  transaction when the database has an audit log, and the dashboard's routes
+  write it after the change, so a failed entry there does not undo the
+  change. Nothing deletes from it.
 
 ## Roles and users
 
@@ -343,8 +347,9 @@ PRISM needs four things, which Vercel, Neon and Clerk provide today:
 - a Python host for the ASGI app `prism.api.app:app`, reachable on the
   dashboard's origin under `/api/v1`: the browser's reads carry a cookie
   scoped to that path. The dashboard's admin routes call it on
-  `PRISM_API_ORIGIN` when that is set, else on the same origin. It needs only
-  `api/requirements.txt`;
+  `PRISM_API_ORIGIN` when that is set, else on the same origin. It needs
+  `api/requirements.txt` and an ASGI server such as uvicorn (Vercel brings
+  its own);
 - PostgreSQL. The dashboard reaches it through Neon's serverless driver
   (`lib/db.ts`); another PostgreSQL service means replacing that driver;
 - an identity provider. Clerk is used in `lib/roles.ts`, `proxy.ts`,

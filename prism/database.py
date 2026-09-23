@@ -190,10 +190,11 @@ def one_of(values) -> str:
 
 
 def _schema() -> List[str]:
-    """The current schema. Every score of a driver is required and checked
-    against its scale and the taxonomy, so a stored driver can always be
-    simulated; a proposal may leave any score empty, but a score it holds is
-    on its scale."""
+    """The current schema. Every field of a driver is required, each score and
+    share is checked against its scale and each name against the taxonomy;
+    the years and the completeness of the exposure maps are checked when a
+    driver is written (_require_simulatable). A proposal may leave any score
+    empty, but a score it holds is on its scale."""
     serial = "SERIAL PRIMARY KEY" if USE_POSTGRES else "INTEGER PRIMARY KEY AUTOINCREMENT"
     return [
         f"""CREATE TABLE IF NOT EXISTS drivers (
@@ -482,10 +483,13 @@ def _driver_values(d: Driver) -> tuple:
 def _require_simulatable(drivers: Sequence[Driver]) -> None:
     """Refuse to store drivers the engine could not simulate.
 
-    The constraints of the schema hold every score of a driver row on its
-    scale; that the exposure maps name every category and every region is
-    checked here, before anything is written, so every stored driver can be
-    simulated as it stands.
+    The constraints of the schema hold each score of a driver row on its
+    scale and each name in its taxonomy. The engine's own check runs here as
+    well, before anything is written, and adds what the constraints do not
+    hold: the onset and peak years (the peak after the onset depends on the
+    model's base year, which the schema does not know) and a score for every
+    category and every region. So every stored driver can be simulated as it
+    stands.
     """
     problems = simulation_problems(list(drivers))
     if problems:

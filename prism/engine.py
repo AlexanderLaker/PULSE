@@ -15,8 +15,8 @@ the engine updates them from data. A Gaussian copula has no tail dependence.
 Every percentile uses ``np.percentile`` with linear interpolation.
 
 scipy is a hard requirement: the engine computes with exact numerics or not
-at all. The read-only API runtime does not install scipy and never imports
-this module.
+at all. The API runtime never simulates: it does not install scipy and never
+imports this module.
 """
 
 import logging

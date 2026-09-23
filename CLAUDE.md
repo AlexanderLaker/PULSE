@@ -3,9 +3,9 @@
 PRISM (Profit Pool Risk & Intelligence Simulation Model) estimates how 51
 scored Profit Pool Drivers shift the gross profit (GP1) of Henkel Consumer
 Brands' 13 categories in 4 regions, 2026 to 2035. A Monte Carlo engine
-(Python, scipy) computes offline; a read-only FastAPI service and a Next.js
-dashboard on Vercel show the latest stored run. Start with README.md; the
-documents in `docs/` explain everything below in full.
+(Python, scipy) computes offline; a FastAPI service that never simulates and
+a Next.js dashboard on Vercel show the latest stored run. Start with
+README.md; the documents in `docs/` explain everything below in full.
 
 ## How the system works
 
@@ -48,10 +48,12 @@ documents in `docs/` explain everything below in full.
 - **The model configuration is code** (`prism/config.py`); the dashboard shows
   it read-only.
 - **A driver is complete or refused.** Every score present and on its scale,
-  every category and region scored: the schema's constraints, the database
-  writes, the API and the engine (`prism/drivers.py`, `simulation_problems`)
-  all refuse anything less. The engine has no defaults and no fallbacks for a
-  driver's inputs; never add one.
+  every category and region scored, the peak after the onset: the engine and
+  the database writes run the same check (`simulation_problems` in
+  `prism/drivers.py`), the API validates every edit, and the schema's
+  constraints hold each score and name on its scale or in its taxonomy. The
+  engine has no defaults and no fallbacks for a driver's inputs; never add
+  one.
 - **Honest display.** One decimal for shifts and shares (docs/DESIGN.md
   names the three exceptions); the portfolio band is the joint percentile; the
   lenses are labelled attribution; sampling quality is the Monte Carlo

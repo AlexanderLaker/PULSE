@@ -32,11 +32,10 @@ export interface TileProvenance {
 export type PoolImpactGrade = 'Low' | 'Med' | 'High';
 
 export interface PoolImpactInfo {
-  /** Profit-pool impact intensity: an authored grade anchored on the modelled
-   *  drivers the tile cites. The larger their expected effect
-   *  (|expected_effect| x probability / 5 x gp1_pct_affected) times the
-   *  tile's intensity, the higher the grade; a tile without a modelled driver
-   *  is Low. */
+  /** Profit-pool impact intensity: an authored grade, anchored on a score of
+   *  the modelled drivers the tile cites (the largest, over them, of
+   *  |expected_effect| x probability / 5 x gp1_pct_affected, times the
+   *  tile's intensity); a tile without a modelled driver is Low. */
   grade: PoolImpactGrade;
   /** tailwind: the tile benefits (green); headwind: it declines (red). */
   direction: 'tailwind' | 'headwind';

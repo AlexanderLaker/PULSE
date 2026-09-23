@@ -6,7 +6,7 @@ record, and the old one is marked superseded.
 
 | Record | Decision |
 |---|---|
-| [0001](0001-offline-runs-read-only-service.md) | Offline production runs, a read-only service |
+| [0001](0001-offline-runs-service-never-simulates.md) | Offline production runs, a service that never simulates |
 | [0002](0002-relative-shifts-ceteris-paribus.md) | Relative shifts, ceteris paribus, structured judgment |
 | [0003](0003-beta-priors-and-uncertainty.md) | Beta priors from the scores; one uncertainty score per driver |
 | [0004](0004-gaussian-copula.md) | A Gaussian copula with correlations valid as entered |

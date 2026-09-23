@@ -121,11 +121,11 @@ added on the Drivers page may be left unrated:
 | E | Social media or unverified |
 
 A- and B+ sit between A and B, nearer A and nearer B; B- sits between B and C,
-nearer B. The base uses S, A and B only. It grades the company results it
-cites from SEC filings (the 8-K exhibits of Amazon and P&G, five citations)
-S, where the table puts a company's results at A. `prism/drivers.py` and
-`lib/format.ts` hold the scale (`SOURCE_TIERS`), and the database refuses a
-tier outside it.
+nearer B. The base uses S, A and B only. It grades the results exhibits it
+cites from SEC 8-K filings (Amazon and P&G, five citations) S, where the
+table puts a company's results at A; another filing, such as X-18's Olaplex
+10-K, stays at A. `prism/drivers.py` and `lib/format.ts` hold the scale
+(`SOURCE_TIERS`), and the database refuses a tier outside it.
 
 Every driver of the base needs at least one source of tier S, A or B; a base
 that lacks one is refused before anything is generated from it. The Drivers
@@ -199,8 +199,11 @@ texts. After an edit to `driver_base.json`, in this order:
    PRISM Analysis as docs/DRIVER_ANALYSIS.md describes; an added driver needs
    its template in `data/drivers/driver_analysis.json` first;
 3. run `scripts/generate_seed.py`. The seed carries the analysis texts, so it
-   comes after them; a change to texts alone (a name, a description, a
-   source) needs only this step;
+   comes after them. A changed source needs only this step, a changed
+   description this step and step 4. A changed name needs
+   `python3 scripts/build_driver_analysis.py` before it (without
+   `--reference`: the attribution record carries each driver's name, the
+   reference run does not depend on it);
 4. until migration 0001 has run on every database, it is what carries a
    changed description to them: the new text becomes the `text` of the
    driver's entry in `migrations/0001_driver_schema/descriptions.json` (an

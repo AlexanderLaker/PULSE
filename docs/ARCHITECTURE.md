@@ -110,11 +110,13 @@ wrong (`/health` with status `degraded`, both with the reason). Any other
 database error is logged and answered 500.
 
 Each instance keeps the drivers and the latest run in memory
-(`prism/api/state.py`) and checks on every request whether the database moved
-on: the drivers are reloaded when their stamp changes (the row count and the
-sum of the row revisions, raised by every saved driver row), the run when a
-newer id appears. A production run, a script or an edit made through another
-instance is therefore visible on the next request.
+(`prism/api/state.py`). A request that reads them first checks whether the
+database moved on (the driver routes, the run and `/health` read the
+drivers; the run and `/diagnostics` read the run): the drivers are reloaded
+when their stamp changes (the row count and the sum of the row revisions,
+raised by every saved driver row), the run when the newest run's id is no
+longer the one held. A production run, a script or an edit made through
+another instance is therefore visible on the next such request.
 
 On an empty database the API creates the tables and seeds the driver base
 (`prism/seed_drivers.py`). On a database that still needs a migration it
@@ -214,10 +216,12 @@ tiles. The Profit Pool Explorer's data is `lib/profitPoolData.ts`
 
 ## The database
 
-PostgreSQL in production; on a development machine the API and the scripts
-fall back to a SQLite file (`PRISM_DB_PATH`, default `data/prism.db`) when no
-database URL is set, and on Vercel they refuse to. All SQL is written once for
-both (`prism/database.py`). The database holds scores, shares and percentage
+PostgreSQL in production. On a development machine with no database URL set,
+the API, the migration and `scripts/sync_analysis.py` fall back to a SQLite
+file (`PRISM_DB_PATH`, default `data/prism.db`); the production run does so
+only with `--allow-sqlite`, `scripts/promote_admin.py` needs PostgreSQL, and
+on Vercel the API refuses to. All SQL is written once for both
+(`prism/database.py`). The database holds scores, shares and percentage
 shifts, never an HCB financial figure; texts (driver descriptions and
 sources, the Consumer Journey content) may quote public market figures as
 evidence.
@@ -230,18 +234,21 @@ evidence.
 | `driver_score_proposals` | experts | One partial proposal per driver and expert |
 | `simulation_runs` | production run | One results bundle per run |
 | `journey_content` | admins | Versions of the Consumer Journey tile map; the newest wins |
-| `audit_log` | API, dashboard, scripts | Every driver edit, journey save, role change, analysis sync and migration, with the acting identity |
+| `audit_log` | API, dashboard, scripts | Driver edits (one row per changed field, the field named in `reason`, old and new value as JSON), journey saves, role changes where the entry can be written, analysis syncs and migrations, each with the acting identity |
 | `schema_migrations` | API, migrations | The migrations the schema already contains |
 | `user_roles` | dashboard | Clerk user id, email and role |
 
 A stored driver can always be simulated. The constraints of the schema,
 generated from the taxonomies in `prism/config.py`, require every field the
-engine reads and hold it on its scale, and refuse a force, curve, stage or
-exposure key outside the taxonomy; the functions that write drivers
-(`insert_drivers`, `save_driver_edit`) also refuse one without a score for
-every category and every region, which a constraint cannot express. An
-edit updates the driver row in place instead of deleting and inserting it
-again, because the expert proposals reference it with `ON DELETE CASCADE`.
+engine reads, hold each score and share on its scale and refuse a force,
+curve, stage or exposure key outside the taxonomy. The functions that write
+drivers (`insert_drivers`, `save_driver_edit`) run the engine's own check,
+`simulation_problems`, before anything is written, which adds what the
+constraints leave out: the onset and peak years, the peak after the onset
+(a rule that depends on the model's base year) and a score for every
+category and every region. An edit updates the driver row in place instead
+of deleting and inserting it again, because the expert proposals reference
+it with `ON DELETE CASCADE`.
 
 ## Deployment
 

@@ -72,8 +72,8 @@ def _set_role(conn, email: str, role: str) -> int:
             return 0
         cur.execute("UPDATE user_roles SET role = %s, updated_at = NOW() WHERE clerk_user_id = %s",
                     (role, row["clerk_user_id"]))
-        # The audit log is the API's table: a database the API has not started
-        # on yet has none, and the role change stands without the entry.
+        # The audit log is the API's table: a database the API has not used
+        # yet has none, and the role change stands without the entry.
         cur.execute("SELECT to_regclass('audit_log') IS NOT NULL AS present")
         audited = cur.fetchone()["present"]
         if audited:
