@@ -7,7 +7,7 @@ HCB gross-profit shares:
     portfolio         = sum_c sum_r W[c, r] * cell[c, r]
 
 The default W is an estimate built from public reporting
-(data/calibration/cell_weights_estimate.json); the finance shares replace it
+(data/parameters/cell_weight_estimate.json); the finance shares replace it
 at run time.
 """
 import json
@@ -26,12 +26,12 @@ from prism.engine import MonteCarloEngine
 from support import category_map, region_map
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
-RECORD = json.loads((REPO / "data" / "calibration" / "cell_weights_estimate.json").read_text(encoding="utf-8"))
+RECORD = json.loads((REPO / "data" / "parameters" / "cell_weight_estimate.json").read_text(encoding="utf-8"))
 SEED, ITER = 42, 500
 
 
-def _run(cfg, db, iterations=ITER):
-    return MonteCarloEngine(cfg, seed=SEED).run(db, iterations=iterations)
+def _run(cfg, driver_set, iterations=ITER):
+    return MonteCarloEngine(cfg, seed=SEED).run(driver_set, iterations=iterations)
 
 
 def _equal_matrix():
@@ -53,24 +53,24 @@ def _europe_driver(**overrides) -> DriverSet:
 
 
 class TestRollUpAlgebra:
-    def test_equal_weights_give_the_plain_mean_of_the_regions(self, mock_model_config, mock_drivers_database):
+    def test_equal_weights_give_the_plain_mean_of_the_regions(self, mock_model_config, mock_driver_set):
         eng = MonteCarloEngine(mock_model_config.copy_with(cell_weights=_equal_matrix()), seed=SEED)
-        cat_s, reg_s = eng._simulate_samples(mock_drivers_database, ITER)
+        cat_s, reg_s = eng._simulate_samples(mock_driver_set, ITER)
         assert np.allclose(cat_s, reg_s.mean(axis=2), atol=1e-15)
 
-    def test_a_separable_matrix_gives_the_region_weighted_mean(self, mock_model_config, mock_drivers_database):
+    def test_a_separable_matrix_gives_the_region_weighted_mean(self, mock_model_config, mock_driver_set):
         """With W = category weights x region weights, every category is the
         region-weighted mean of its cells, iteration by iteration."""
         rw = {"Europe": 0.38, "North America": 0.26, "Asia": 0.17, "High Growth": 0.19}
         W = _outer({c: 1.0 for c in CATEGORIES}, rw)
         eng = MonteCarloEngine(mock_model_config.copy_with(cell_weights=W), seed=SEED)
-        cat_s, reg_s = eng._simulate_samples(mock_drivers_database, ITER)
+        cat_s, reg_s = eng._simulate_samples(mock_driver_set, ITER)
         weights = np.array([rw[r] for r in REGIONS])
         assert np.allclose(cat_s, (reg_s * weights[None, None, :, None]).sum(axis=2), atol=1e-15)
 
-    def test_the_estimate_actually_weights(self, mock_model_config, mock_drivers_database):
+    def test_the_estimate_actually_weights(self, mock_model_config, mock_driver_set):
         cat_s, reg_s = MonteCarloEngine(mock_model_config, seed=SEED)._simulate_samples(
-            mock_drivers_database, ITER)
+            mock_driver_set, ITER)
         assert not np.allclose(cat_s, reg_s.mean(axis=2), atol=1e-9)
 
     def test_a_zero_share_cell_contributes_nothing(self, mock_model_config):
@@ -88,8 +88,8 @@ class TestRollUpAlgebra:
         W = {c: {r: 0.0 for r in REGIONS} for c in CATEGORIES}
         W["Hair: Color"]["Europe"] = 0.6
         W["Hair: Care"]["Asia"] = 0.4
-        db = _europe_driver(probability=4, gp1_pct_affected=0.20, regional_exposure=region_map({"Europe": 5, "Asia": 3}))
-        r = _run(mock_model_config.copy_with(cell_weights=W), db, iterations=300)
+        driver_set = _europe_driver(probability=4, gp1_pct_affected=0.20, regional_exposure=region_map({"Europe": 5, "Asia": 3}))
+        r = _run(mock_model_config.copy_with(cell_weights=W), driver_set, iterations=300)
         category = r["shift_matrix"]["Hair: Color"]["path"][2030]
         cell = r["regional_shift_matrix"]["Hair: Color"]["Europe"]["path"][2030]
         assert category["median"] == pytest.approx(cell["median"], abs=1e-15)
@@ -99,10 +99,10 @@ class TestRollUpAlgebra:
         zero_rows = [e for e in r["integrity_events"] if e["type"] == "cell_weight_zero_row"]
         assert len(zero_rows) == 1 and "Hair: Styling" in zero_rows[0]["detail"]["categories"]
 
-    def test_marginals_are_row_and_column_sums(self, mock_model_config, mock_drivers_database):
+    def test_marginals_are_row_and_column_sums(self, mock_model_config, mock_driver_set):
         W = _equal_matrix()
         W["Hair: Color"].update({"Europe": 3.0 / 52, "Asia": 0.0, "High Growth": 0.0})
-        r = _run(mock_model_config.copy_with(cell_weights=W), mock_drivers_database, iterations=200)
+        r = _run(mock_model_config.copy_with(cell_weights=W), mock_driver_set, iterations=200)
         rw, cw = cell_weight_marginals(W)
         for region in REGIONS:
             assert r["region_weights_used"][region] == pytest.approx(rw[region])
@@ -111,16 +111,16 @@ class TestRollUpAlgebra:
 
 
 class TestContract:
-    def test_the_result_carries_the_weights_it_used(self, mock_model_config, mock_drivers_database):
-        r = _run(mock_model_config, mock_drivers_database, iterations=200)
+    def test_the_result_carries_the_weights_it_used(self, mock_model_config, mock_driver_set):
+        r = _run(mock_model_config, mock_driver_set, iterations=200)
         assert set(r["cell_weights_used"]) == set(CATEGORIES)
         assert all(set(row) == set(REGIONS) for row in r["cell_weights_used"].values())
         assert sum(sum(row.values()) for row in r["cell_weights_used"].values()) == pytest.approx(1.0)
         assert r["cell_weights_source"] == DEFAULT_CELL_WEIGHTS_SOURCE
 
-    def test_multichain_carries_them_too(self, mock_model_config, mock_drivers_database):
+    def test_multichain_carries_them_too(self, mock_model_config, mock_driver_set):
         r = MonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
-            mock_drivers_database, n_chains=2, iterations=150)
+            mock_driver_set, n_chains=2, iterations=150)
         assert r["cell_weights_used"]["LHC: IC"]["High Growth"] == pytest.approx(RECORD["cells"]["LHC: IC"]["High Growth"])
         assert r["category_weights_used"]["LHC: IC"] == pytest.approx(RECORD["marginals"]["category"]["LHC: IC"])
 

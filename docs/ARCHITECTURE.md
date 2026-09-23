@@ -247,7 +247,7 @@ again, because the expert proposals reference it with `ON DELETE CASCADE`.
 Vercel builds the Next.js app (`next build`) and the Python function from the
 same repository; pushing to `main` deploys to production. `.vercelignore`
 keeps the tests, scripts, migrations, documentation, the driver base and the
-generated records (`data/drivers/`, `data/calibration/`) out of the
+generated records (`data/drivers/`, `data/parameters/`) out of the
 deployment. The production run, the generators and the migrations run
 on a developer machine with the full Python environment. docs/OPERATIONS.md
 has the procedures.

@@ -188,7 +188,7 @@ texts. After an edit to `driver_base.json`:
 1. run `scripts/generate_seed.py`;
 2. if category exposures changed, or drivers were added or removed (the
    correction depends on how many drivers each force has), give
-   `scripts/compute_attenuation.py` a new `CALIBRATION_VERSION` and run it;
+   `scripts/compute_overlap_correction.py` a new `VERSION` and run it;
    it writes the record and `prism/overlap_correction.py`, which
    `prism/config.py` reads. The new correction moves the model's numbers, so
    the same commit carries a new `MODEL_VERSION` and the regenerated golden

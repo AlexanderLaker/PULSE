@@ -34,7 +34,7 @@ export interface DriverScores {
   /** A score 0 to 5 for every category and every region. */
   category_exposure: ExposureMap;
   regional_exposure: ExposureMap;
-  /** The value-chain stage where the impact centres (a VC_STEPS name). */
+  /** The value-chain stage where the impact centres (a VC_STAGES name). */
   vc_epicentre: string;
 }
 
@@ -48,8 +48,9 @@ export interface Driver extends DriverScores {
   /** Year the effect starts to materialise. */
   start_year: number;
   confidence: Confidence;
-  /** Beta mean x GP1 share x direction sign: the driver's signed weight before exposures. */
-  normalized_score: number;
+  /** Beta-prior mean x GP1 share x direction sign: the driver's expected signed effect before exposures
+   *  (the Drivers page's Shift column). */
+  expected_effect: number;
   /** The generated PRISM Analysis text; read-only everywhere. */
   analysis: string;
   sources: DriverSource[];

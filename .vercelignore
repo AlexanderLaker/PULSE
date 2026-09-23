@@ -15,5 +15,5 @@ docs/
 migrations/
 scripts/
 data/drivers/
-data/calibration/
+data/parameters/
 _*

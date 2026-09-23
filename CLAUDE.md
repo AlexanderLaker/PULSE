@@ -35,7 +35,7 @@ documents in `docs/` explain everything below in full.
   new version. Never regenerate pins to make a test pass.
 - **Generated files are never edited by hand**: `prism/seed_drivers.py`,
   `prism/overlap_correction.py`, `prism/cell_weight_estimate.py`,
-  `data/driverCodeMap.ts`, `data/calibration/*.json`,
+  `data/driverCodeMap.ts`, `data/parameters/*.json`,
   `lib/cellWeightProvenance.ts`, `data/drivers/driver_attribution.json`, the
   rendered texts in `data/drivers/driver_analysis.json` and
   `tests/frontend/fixtures/driverAttribution.fixture.json`. Change the input

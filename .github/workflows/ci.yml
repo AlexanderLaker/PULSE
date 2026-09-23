@@ -61,5 +61,5 @@ jobs:
       # The suite checks the generated files too; these steps name a stale one in the log.
       - run: python scripts/generate_seed.py --check
       - run: python scripts/build_cell_weights.py --check
-      - run: python scripts/compute_attenuation.py --check
+      - run: python scripts/compute_overlap_correction.py --check
       - run: python scripts/build_driver_analysis.py --check

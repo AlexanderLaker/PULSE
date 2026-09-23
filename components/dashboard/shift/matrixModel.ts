@@ -4,7 +4,7 @@
  * the category-weighted totals from lib/shiftMatrix.ts.
  */
 import { CATEGORIES, CATEGORY_NAMES, FORCES, REGIONS, YEARS, groupDisplay } from '@/lib/format';
-import { VC_STEPS } from '@/lib/valueChain';
+import { VC_STAGES } from '@/lib/valueChain';
 import { getYearPercentiles, weightedAvg } from '@/lib/shiftMatrix';
 import type { PercentileDistribution, SimulationResult } from '@/types';
 
@@ -16,7 +16,7 @@ type Lens = Exclude<ViewMode, 'time'>;
 /** The columns of each attribution lens, in the engine's order. */
 const LENS_COLUMNS: Record<Lens, string[]> = {
   force: FORCES,
-  vc: [...VC_STEPS],
+  vc: [...VC_STAGES],
   region: REGIONS,
 };
 

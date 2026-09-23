@@ -5,7 +5,7 @@
    {
     "id": "competitive_r15",
     "force": "Competitive",
-    "normalized_score": -0.16666666666666666,
+    "expected_effect": -0.16666666666666666,
     "category_exposure": {
      "Hair: Color": 4,
      "Hair: Care": 5,
@@ -35,7 +35,7 @@
    {
     "id": "competitive_r16",
     "force": "Competitive",
-    "normalized_score": -0.09999999999999999,
+    "expected_effect": -0.09999999999999999,
     "category_exposure": {
      "Hair: Color": 3,
      "Hair: Care": 5,
@@ -65,7 +65,7 @@
    {
     "id": "competitive_r17",
     "force": "Competitive",
-    "normalized_score": 0.04,
+    "expected_effect": 0.04,
     "category_exposure": {
      "Hair: Color": 0,
      "Hair: Care": 1,
@@ -95,7 +95,7 @@
    {
     "id": "competitive_r18",
     "force": "Competitive",
-    "normalized_score": -0.07999999999999999,
+    "expected_effect": -0.07999999999999999,
     "category_exposure": {
      "Hair: Color": 5,
      "Hair: Care": 4,
@@ -125,7 +125,7 @@
    {
     "id": "consumer_r01",
     "force": "Consumer",
-    "normalized_score": -0.18333333333333335,
+    "expected_effect": -0.18333333333333335,
     "category_exposure": {
      "Hair: Color": 2,
      "Hair: Care": 3,
@@ -155,7 +155,7 @@
    {
     "id": "consumer_r02",
     "force": "Consumer",
-    "normalized_score": 0.039999999999999994,
+    "expected_effect": 0.039999999999999994,
     "category_exposure": {
      "Hair: Color": 2,
      "Hair: Care": 5,
@@ -185,7 +185,7 @@
    {
     "id": "consumer_r03",
     "force": "Consumer",
-    "normalized_score": 0.15,
+    "expected_effect": 0.15,
     "category_exposure": {
      "Hair: Color": 4,
      "Hair: Care": 5,
@@ -215,7 +215,7 @@
    {
     "id": "consumer_r04",
     "force": "Consumer",
-    "normalized_score": 0.06666666666666667,
+    "expected_effect": 0.06666666666666667,
     "category_exposure": {
      "Hair: Color": 3,
      "Hair: Care": 5,
@@ -245,7 +245,7 @@
    {
     "id": "consumer_r05",
     "force": "Consumer",
-    "normalized_score": 0.053333333333333344,
+    "expected_effect": 0.053333333333333344,
     "category_exposure": {
      "Hair: Color": 5,
      "Hair: Care": 3,
@@ -275,7 +275,7 @@
    {
     "id": "consumer_r06",
     "force": "Consumer",
-    "normalized_score": -0.16666666666666669,
+    "expected_effect": -0.16666666666666669,
     "category_exposure": {
      "Hair: Color": 2,
      "Hair: Care": 3,
@@ -305,7 +305,7 @@
    {
     "id": "consumer_r07",
     "force": "Consumer",
-    "normalized_score": 0.039999999999999994,
+    "expected_effect": 0.039999999999999994,
     "category_exposure": {
      "Hair: Color": 2,
      "Hair: Care": 5,
@@ -335,7 +335,7 @@
    {
     "id": "consumer_r10",
     "force": "Consumer",
-    "normalized_score": 0.03333333333333333,
+    "expected_effect": 0.03333333333333333,
     "category_exposure": {
      "Hair: Color": 3,
      "Hair: Care": 5,
@@ -365,7 +365,7 @@
    {
     "id": "consumer_r11",
     "force": "Consumer",
-    "normalized_score": -0.05333333333333333,
+    "expected_effect": -0.05333333333333333,
     "category_exposure": {
      "Hair: Color": 2,
      "Hair: Care": 5,
@@ -395,7 +395,7 @@
    {
     "id": "consumer_r16",
     "force": "Consumer",
-    "normalized_score": -0.046666666666666676,
+    "expected_effect": -0.046666666666666676,
     "category_exposure": {
      "Hair: Color": 4,
      "Hair: Care": 5,
@@ -425,7 +425,7 @@
    {
     "id": "consumer_r18",
     "force": "Consumer",
-    "normalized_score": 0.05333333333333333,
+    "expected_effect": 0.05333333333333333,
     "category_exposure": {
      "Hair: Color": 4,
      "Hair: Care": 5,
@@ -455,7 +455,7 @@
    {
     "id": "consumer_r24",
     "force": "Consumer",
-    "normalized_score": 0.039999999999999994,
+    "expected_effect": 0.039999999999999994,
     "category_exposure": {
      "Hair: Color": 2,
      "Hair: Care": 5,
@@ -485,7 +485,7 @@
    {
     "id": "consumer_r25",
     "force": "Consumer",
-    "normalized_score": -0.04,
+    "expected_effect": -0.04,
     "category_exposure": {
      "Hair: Color": 2,
      "Hair: Care": 3,
@@ -515,7 +515,7 @@
    {
     "id": "consumer_r27",
     "force": "Consumer",
-    "normalized_score": 0.026666666666666665,
+    "expected_effect": 0.026666666666666665,
     "category_exposure": {
      "Hair: Color": 0,
      "Hair: Care": 0,
@@ -545,7 +545,7 @@
    {
     "id": "consumer_r28",
     "force": "Consumer",
-    "normalized_score": 0.05333333333333333,
+    "expected_effect": 0.05333333333333333,
     "category_exposure": {
      "Hair: Color": 0,
      "Hair: Care": 0,
@@ -575,7 +575,7 @@
    {
     "id": "consumer_r29",
     "force": "Consumer",
-    "normalized_score": 0.05333333333333333,
+    "expected_effect": 0.05333333333333333,
     "category_exposure": {
      "Hair: Color": 0,
      "Hair: Care": 0,
@@ -605,7 +605,7 @@
    {
     "id": "consumer_r34",
     "force": "Consumer",
-    "normalized_score": -0.05333333333333333,
+    "expected_effect": -0.05333333333333333,
     "category_exposure": {
      "Hair: Color": 2,
      "Hair: Care": 2,
@@ -635,7 +635,7 @@
    {
     "id": "consumer_r35",
     "force": "Consumer",
-    "normalized_score": -0.06666666666666667,
+    "expected_effect": -0.06666666666666667,
     "category_exposure": {
      "Hair: Color": 3,
      "Hair: Care": 5,
@@ -665,7 +665,7 @@
    {
     "id": "consumer_r36",
     "force": "Consumer",
-    "normalized_score": -0.1,
+    "expected_effect": -0.1,
     "category_exposure": {
      "Hair: Color": 5,
      "Hair: Care": 5,
@@ -695,7 +695,7 @@
    {
     "id": "consumer_r37",
     "force": "Consumer",
-    "normalized_score": 0.09999999999999999,
+    "expected_effect": 0.09999999999999999,
     "category_exposure": {
      "Hair: Color": 4,
      "Hair: Care": 5,
@@ -725,7 +725,7 @@
    {
     "id": "customer_r01",
     "force": "Customer",
-    "normalized_score": -0.125,
+    "expected_effect": -0.125,
     "category_exposure": {
      "Hair: Color": 2,
      "Hair: Care": 3,
@@ -755,7 +755,7 @@
    {
     "id": "customer_r02",
     "force": "Customer",
-    "normalized_score": -0.06666666666666667,
+    "expected_effect": -0.06666666666666667,
     "category_exposure": {
      "Hair: Color": 2,
      "Hair: Care": 3,
@@ -785,7 +785,7 @@
    {
     "id": "customer_r03",
     "force": "Customer",
-    "normalized_score": -0.09999999999999999,
+    "expected_effect": -0.09999999999999999,
     "category_exposure": {
      "Hair: Color": 4,
      "Hair: Care": 3,
@@ -815,7 +815,7 @@
    {
     "id": "customer_r04",
     "force": "Customer",
-    "normalized_score": 0.039999999999999994,
+    "expected_effect": 0.039999999999999994,
     "category_exposure": {
      "Hair: Color": 4,
      "Hair: Care": 4,
@@ -845,7 +845,7 @@
    {
     "id": "customer_r07",
     "force": "Customer",
-    "normalized_score": 0.08333333333333334,
+    "expected_effect": 0.08333333333333334,
     "category_exposure": {
      "Hair: Color": 4,
      "Hair: Care": 5,
@@ -875,7 +875,7 @@
    {
     "id": "customer_r12",
     "force": "Customer",
-    "normalized_score": -0.06666666666666668,
+    "expected_effect": -0.06666666666666668,
     "category_exposure": {
      "Hair: Color": 5,
      "Hair: Care": 5,
@@ -905,7 +905,7 @@
    {
     "id": "customer_r13",
     "force": "Customer",
-    "normalized_score": -0.15,
+    "expected_effect": -0.15,
     "category_exposure": {
      "Hair: Color": 3,
      "Hair: Care": 4,
@@ -935,7 +935,7 @@
    {
     "id": "environmental_r01",
     "force": "Environmental",
-    "normalized_score": -0.1,
+    "expected_effect": -0.1,
     "category_exposure": {
      "Hair: Color": 2,
      "Hair: Care": 4,
@@ -965,7 +965,7 @@
    {
     "id": "environmental_r03",
     "force": "Environmental",
-    "normalized_score": -0.06666666666666668,
+    "expected_effect": -0.06666666666666668,
     "category_exposure": {
      "Hair: Color": 4,
      "Hair: Care": 2,
@@ -995,7 +995,7 @@
    {
     "id": "environmental_r07",
     "force": "Environmental",
-    "normalized_score": -0.05,
+    "expected_effect": -0.05,
     "category_exposure": {
      "Hair: Color": 2,
      "Hair: Care": 2,
@@ -1025,7 +1025,7 @@
    {
     "id": "environmental_r12",
     "force": "Environmental",
-    "normalized_score": -0.125,
+    "expected_effect": -0.125,
     "category_exposure": {
      "Hair: Color": 3,
      "Hair: Care": 3,
@@ -1055,7 +1055,7 @@
    {
     "id": "government_r02",
     "force": "Government",
-    "normalized_score": -0.04166666666666667,
+    "expected_effect": -0.04166666666666667,
     "category_exposure": {
      "Hair: Color": 2,
      "Hair: Care": 3,
@@ -1085,7 +1085,7 @@
    {
     "id": "government_r03",
     "force": "Government",
-    "normalized_score": -0.1,
+    "expected_effect": -0.1,
     "category_exposure": {
      "Hair: Color": 5,
      "Hair: Care": 4,
@@ -1115,7 +1115,7 @@
    {
     "id": "government_r04",
     "force": "Government",
-    "normalized_score": -0.125,
+    "expected_effect": -0.125,
     "category_exposure": {
      "Hair: Color": 3,
      "Hair: Care": 3,
@@ -1145,7 +1145,7 @@
    {
     "id": "government_r05",
     "force": "Government",
-    "normalized_score": -0.03333333333333333,
+    "expected_effect": -0.03333333333333333,
     "category_exposure": {
      "Hair: Color": 2,
      "Hair: Care": 3,
@@ -1175,7 +1175,7 @@
    {
     "id": "government_r06",
     "force": "Government",
-    "normalized_score": -0.026666666666666672,
+    "expected_effect": -0.026666666666666672,
     "category_exposure": {
      "Hair: Color": 1,
      "Hair: Care": 4,
@@ -1205,7 +1205,7 @@
    {
     "id": "government_r08",
     "force": "Government",
-    "normalized_score": -0.039999999999999994,
+    "expected_effect": -0.039999999999999994,
     "category_exposure": {
      "Hair: Color": 3,
      "Hair: Care": 2,
@@ -1235,7 +1235,7 @@
    {
     "id": "government_r13",
     "force": "Government",
-    "normalized_score": -0.05,
+    "expected_effect": -0.05,
     "category_exposure": {
      "Hair: Color": 5,
      "Hair: Care": 4,
@@ -1265,7 +1265,7 @@
    {
     "id": "government_r15",
     "force": "Government",
-    "normalized_score": -0.06666666666666667,
+    "expected_effect": -0.06666666666666667,
     "category_exposure": {
      "Hair: Color": 2,
      "Hair: Care": 3,
@@ -1295,7 +1295,7 @@
    {
     "id": "government_r16",
     "force": "Government",
-    "normalized_score": -0.1,
+    "expected_effect": -0.1,
     "category_exposure": {
      "Hair: Color": 0,
      "Hair: Care": 0,
@@ -1325,7 +1325,7 @@
    {
     "id": "government_r17",
     "force": "Government",
-    "normalized_score": -0.09999999999999999,
+    "expected_effect": -0.09999999999999999,
     "category_exposure": {
      "Hair: Color": 5,
      "Hair: Care": 5,
@@ -1355,7 +1355,7 @@
    {
     "id": "technology_r01",
     "force": "Technology",
-    "normalized_score": 0.04,
+    "expected_effect": 0.04,
     "category_exposure": {
      "Hair: Color": 5,
      "Hair: Care": 3,
@@ -1385,7 +1385,7 @@
    {
     "id": "technology_r02",
     "force": "Technology",
-    "normalized_score": 0.025,
+    "expected_effect": 0.025,
     "category_exposure": {
      "Hair: Color": 1,
      "Hair: Care": 3,
@@ -1415,7 +1415,7 @@
    {
     "id": "technology_r03",
     "force": "Technology",
-    "normalized_score": 0.06666666666666667,
+    "expected_effect": 0.06666666666666667,
     "category_exposure": {
      "Hair: Color": 0,
      "Hair: Care": 1,
@@ -1445,7 +1445,7 @@
    {
     "id": "technology_r08",
     "force": "Technology",
-    "normalized_score": -0.025,
+    "expected_effect": -0.025,
     "category_exposure": {
      "Hair: Color": 0,
      "Hair: Care": 0,
@@ -1475,7 +1475,7 @@
    {
     "id": "technology_r11",
     "force": "Technology",
-    "normalized_score": -0.075,
+    "expected_effect": -0.075,
     "category_exposure": {
      "Hair: Color": 1,
      "Hair: Care": 2,
@@ -1505,7 +1505,7 @@
    {
     "id": "technology_r13",
     "force": "Technology",
-    "normalized_score": -0.05333333333333333,
+    "expected_effect": -0.05333333333333333,
     "category_exposure": {
      "Hair: Color": 4,
      "Hair: Care": 5,

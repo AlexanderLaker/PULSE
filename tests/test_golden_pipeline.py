@@ -19,39 +19,39 @@ ITER = 500
 SEED = 42
 
 
-def _run(config, db, seed=SEED, iterations=ITER):
-    return MonteCarloEngine(config, seed=seed).run(db, iterations=iterations)
+def _run(config, driver_set, seed=SEED, iterations=ITER):
+    return MonteCarloEngine(config, seed=seed).run(driver_set, iterations=iterations)
 
 
 class TestDeterminism:
-    def test_same_seed_reproduces_exactly(self, mock_model_config, mock_drivers_database):
-        r1 = _run(mock_model_config, mock_drivers_database)
-        r2 = _run(mock_model_config, mock_drivers_database)
+    def test_same_seed_reproduces_exactly(self, mock_model_config, mock_driver_set):
+        r1 = _run(mock_model_config, mock_driver_set)
+        r2 = _run(mock_model_config, mock_driver_set)
         assert r1["shift_matrix"] == r2["shift_matrix"]
         assert r1["totals"]["portfolio"] == r2["totals"]["portfolio"]
 
-    def test_different_seed_diverges(self, mock_model_config, mock_drivers_database):
-        r1 = _run(mock_model_config, mock_drivers_database, seed=42)
-        r2 = _run(mock_model_config, mock_drivers_database, seed=43)
+    def test_different_seed_diverges(self, mock_model_config, mock_driver_set):
+        r1 = _run(mock_model_config, mock_driver_set, seed=42)
+        r2 = _run(mock_model_config, mock_driver_set, seed=43)
         assert r1["shift_matrix"]["Hair: Color"]["path"][2030]["median"] != \
             r2["shift_matrix"]["Hair: Color"]["path"][2030]["median"]
 
-    def test_driver_order_matters_to_the_draws(self, mock_model_config, mock_drivers_database):
+    def test_driver_order_matters_to_the_draws(self, mock_model_config, mock_driver_set):
         """The copula pairs draws with drivers by position, so the same seed on a
         reordered driver list gives different numbers. That is why the database
         always returns drivers ordered by id; if this ever stops holding, the
         ordering contract in prism.database.load_drivers can be revisited."""
-        reordered = DriverSet(drivers=list(reversed(mock_drivers_database.drivers)))
-        r1 = _run(mock_model_config, mock_drivers_database)
+        reordered = DriverSet(drivers=list(reversed(mock_driver_set.drivers)))
+        r1 = _run(mock_model_config, mock_driver_set)
         r2 = _run(mock_model_config, reordered)
         assert r1["shift_matrix"]["Hair: Color"]["path"][2030]["median"] != \
             r2["shift_matrix"]["Hair: Color"]["path"][2030]["median"]
 
-    def test_multichain_same_seed_reproduces(self, mock_model_config, mock_drivers_database):
+    def test_multichain_same_seed_reproduces(self, mock_model_config, mock_driver_set):
         r1 = MonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
-            mock_drivers_database, n_chains=2, iterations=200)
+            mock_driver_set, n_chains=2, iterations=200)
         r2 = MonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
-            mock_drivers_database, n_chains=2, iterations=200)
+            mock_driver_set, n_chains=2, iterations=200)
         assert r1["chain_seeds"] == r2["chain_seeds"]
         assert r1["shift_matrix"] == r2["shift_matrix"]
 
@@ -68,8 +68,8 @@ class TestGoldenValues:
     #: The joint portfolio band, the number the dashboard headline shows.
     PORTFOLIO_PIN = (-0.005762680071, -0.007472267097, -0.004048590652)
 
-    def test_engine_identity(self, mock_model_config, mock_drivers_database):
-        r = _run(mock_model_config, mock_drivers_database)
+    def test_engine_identity(self, mock_model_config, mock_driver_set):
+        r = _run(mock_model_config, mock_driver_set)
         assert r["model_version"] == "2.12.0"
         assert r["engine_name"] == "beta_copula"
         assert r["seed"] == SEED
@@ -81,8 +81,8 @@ class TestGoldenValues:
         pkg = json.loads((Path(__file__).resolve().parents[1] / "package.json").read_text())
         assert pkg["version"] == MonteCarloEngine.MODEL_VERSION
 
-    def test_category_values(self, mock_model_config, mock_drivers_database):
-        sm = _run(mock_model_config, mock_drivers_database)["shift_matrix"]
+    def test_category_values(self, mock_model_config, mock_driver_set):
+        sm = _run(mock_model_config, mock_driver_set)["shift_matrix"]
         assert max(sm["Hair: Color"]["path"]) == 2030
         for cat, (median, p10, p90) in self.PINS.items():
             cell = sm[cat]["path"][2030]
@@ -94,30 +94,30 @@ class TestGoldenValues:
         """Identical pins could not catch two categories being swapped."""
         assert len(set(self.PINS.values())) == len(self.PINS)
 
-    def test_portfolio_band(self, mock_model_config, mock_drivers_database):
-        cell = _run(mock_model_config, mock_drivers_database)["totals"]["portfolio"][2030]
+    def test_portfolio_band(self, mock_model_config, mock_driver_set):
+        cell = _run(mock_model_config, mock_driver_set)["totals"]["portfolio"][2030]
         median, p10, p90 = self.PORTFOLIO_PIN
         assert cell["median"] == pytest.approx(median, rel=1e-6)
         assert cell["p10"] == pytest.approx(p10, rel=1e-6)
         assert cell["p90"] == pytest.approx(p90, rel=1e-6)
 
-    def test_no_integrity_events_on_the_defaults(self, mock_model_config, mock_drivers_database):
+    def test_no_integrity_events_on_the_defaults(self, mock_model_config, mock_driver_set):
         """The default correlations are positive definite as entered: any repair,
         clip or floor on the defaults is a regression."""
-        assert _run(mock_model_config, mock_drivers_database)["integrity_events"] == []
+        assert _run(mock_model_config, mock_driver_set)["integrity_events"] == []
 
 
 class TestMultichain:
-    def test_seeds(self, mock_model_config, mock_drivers_database):
+    def test_seeds(self, mock_model_config, mock_driver_set):
         r = MonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
-            mock_drivers_database, n_chains=3, iterations=200)
+            mock_driver_set, n_chains=3, iterations=200)
         assert r["seed"] == SEED
-        assert r["n_chains"] == 3
+        assert r["chains"] == 3 and r["iterations"] == 200
         assert len(r["chain_seeds"]) == 3 and r["chain_seeds"][0] == SEED
 
-    def test_seed_stability(self, mock_model_config, mock_drivers_database):
+    def test_seed_stability(self, mock_model_config, mock_driver_set):
         r = MonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
-            mock_drivers_database, n_chains=3, iterations=200)
+            mock_driver_set, n_chains=3, iterations=200)
         ss = r["seed_stability"]
         assert ss["metric"] == "terminal_year_portfolio_median"
         assert ss["n_chains"] == 3 and ss["iterations_per_chain"] == 200 and ss["pooled_iterations"] == 600
@@ -129,17 +129,17 @@ class TestAttributionIdentities:
     """Each lens partitions the median, so the lens rows add up to the Shift Matrix."""
 
     @pytest.mark.parametrize("lens", ["force", "vc", "region"])
-    def test_lens_reconciles_to_the_median(self, lens, mock_model_config, mock_drivers_database):
-        r = _run(mock_model_config, mock_drivers_database)
+    def test_lens_reconciles_to_the_median(self, lens, mock_model_config, mock_driver_set):
+        r = _run(mock_model_config, mock_driver_set)
         for year, by_cat in r["decompositions"][lens].items():
             for cat, row in by_cat.items():
                 median = r["shift_matrix"][cat]["path"][int(year)]["median"]
                 assert sum(row.values()) == pytest.approx(median, rel=1e-9, abs=1e-12), (lens, cat, year)
 
-    def test_value_chain_lens_is_a_partition_by_epicentre(self, mock_model_config, mock_drivers_database):
+    def test_value_chain_lens_is_a_partition_by_epicentre(self, mock_model_config, mock_driver_set):
         """Each driver's contribution sits wholly on its epicentre stage; every other stage carries 0."""
-        r = _run(mock_model_config, mock_drivers_database)
-        stages = {d.vc_epicentre for d in mock_drivers_database.drivers}
+        r = _run(mock_model_config, mock_driver_set)
+        stages = {d.vc_epicentre for d in mock_driver_set.drivers}
         assert stages == {"Formulation", "Manufacturing", "Marketing", "Commercial"}
         for year, by_cat in r["decompositions"]["vc"].items():
             for cat, row in by_cat.items():
@@ -150,13 +150,13 @@ class TestAttributionIdentities:
                     elif abs(median) > 1e-15:
                         assert value != 0.0, (cat, year, step)
 
-    def test_a_category_no_driver_reaches_has_zero_in_every_lens(self, mock_model_config, mock_drivers_database):
+    def test_a_category_no_driver_reaches_has_zero_in_every_lens(self, mock_model_config, mock_driver_set):
         """With no driver in a category, its median is exactly zero, and so is every lens value:
         the lenses still add up to the row total, and nothing is spread over stages no driver named."""
-        db = copy.deepcopy(mock_drivers_database)
-        for d in db.drivers:
+        driver_set = copy.deepcopy(mock_driver_set)
+        for d in driver_set.drivers:
             d.category_exposure["LHC: IC"] = 0
-        r = _run(mock_model_config, db)
+        r = _run(mock_model_config, driver_set)
         for lens in ("force", "vc", "region"):
             for year, by_cat in r["decompositions"][lens].items():
                 assert r["shift_matrix"]["LHC: IC"]["path"][int(year)]["median"] == 0.0

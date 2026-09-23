@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence
 from urllib.parse import urlparse
 
-from prism.config import CATEGORIES, FORCES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS
+from prism.config import CATEGORIES, FORCES, REGIONS, VALID_DIFFUSION_CURVES, VC_STAGES
 from prism.drivers import (CONFIDENCE_LEVELS, DIRECTIONS, SOURCE_TIERS, Driver, InvalidDriversError,
                            simulation_problems)
 
@@ -207,7 +207,7 @@ def _schema() -> List[str]:
             diffusion_curve TEXT NOT NULL CHECK (diffusion_curve IN ({one_of(VALID_DIFFUSION_CURVES)})),
             gp1_pct_affected REAL NOT NULL CHECK (gp1_pct_affected > 0 AND gp1_pct_affected <= 1),
             uncertainty INTEGER NOT NULL CHECK (uncertainty BETWEEN 0 AND 5),
-            vc_epicentre TEXT NOT NULL CHECK (vc_epicentre IN ({one_of(VC_STEPS)})),
+            vc_epicentre TEXT NOT NULL CHECK (vc_epicentre IN ({one_of(VC_STAGES)})),
             confidence TEXT NOT NULL CHECK (confidence IN ({one_of(CONFIDENCE_LEVELS)})),
             analysis TEXT NOT NULL,
             baseline TEXT NOT NULL,
@@ -250,7 +250,7 @@ def _schema() -> List[str]:
             uncertainty INTEGER CHECK (uncertainty BETWEEN 0 AND 5),
             category_exposure TEXT,
             regional_exposure TEXT,
-            vc_epicentre TEXT CHECK (vc_epicentre IN ({one_of(VC_STEPS)})),
+            vc_epicentre TEXT CHECK (vc_epicentre IN ({one_of(VC_STAGES)})),
             comment TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE (driver_id, user_id)

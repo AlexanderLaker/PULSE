@@ -10,7 +10,7 @@ import type {
 import type { PrismStore } from '@/hooks/usePrism';
 import { CATEGORY_NAMES, FORCES, REGIONS, YEARS } from '@/lib/format';
 import { ESTIMATED_CELL_WEIGHTS, ESTIMATE_SOURCE } from '@/lib/cellWeightProvenance';
-import { VC_STEPS } from '@/lib/valueChain';
+import { VC_STAGES } from '@/lib/valueChain';
 
 /** A distribution around a median. */
 export function distribution(median: number, spread = 0.01): PercentileDistribution {
@@ -57,7 +57,7 @@ export function makeDriver(overrides: Partial<Driver> = {}): Driver {
     direction: 'Contraction',
     start_year: 2025,
     confidence: 'Medium',
-    normalized_score: -(5 / 6) * 0.22,
+    expected_effect: -(5 / 6) * 0.22,
     analysis: ANALYSIS,
     sources: [{ title: 'Circana: private label reaches a record share', url: 'https://example.org/circana', tier: 'A', published: 'Apr 2026' }],
     ...scores,
@@ -94,9 +94,9 @@ export function makeSimulation(overrides: Partial<SimulationResult> = {}): Simul
     ]))])),
     decompositions: {
       force: split(FORCES),
-      vc: split(VC_STEPS),
+      vc: split(VC_STAGES),
       region: split(REGIONS),
-      dimensions: { forces: FORCES, vc_steps: [...VC_STEPS], regions: REGIONS, categories: CATEGORY_NAMES, years: YEARS },
+      dimensions: { forces: FORCES, vc_stages: [...VC_STAGES], regions: REGIONS, categories: CATEGORY_NAMES, years: YEARS },
     },
     totals: {
       category_path: Object.fromEntries(CATEGORY_NAMES.map((c) => [c, Object.fromEntries(YEARS.map((y) => [String(y), median(c, y)]))])),

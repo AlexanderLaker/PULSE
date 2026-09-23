@@ -30,7 +30,7 @@ class Driver:
 
     No score has a default: a driver that misses one cannot be simulated
     (simulation_problems says which), and the database stores none without
-    all of them. ``probability_prior`` and ``normalized_score`` are derived
+    all of them. ``probability_prior`` and ``expected_effect`` are derived
     from the scores and cannot be passed in; call ``recompute()`` after
     changing a score.
     """
@@ -45,7 +45,7 @@ class Driver:
     analysis: str = ""                # the PRISM Analysis reading (generated, read-only)
     category_exposure: dict = field(default_factory=dict)  # {category: 0-5}, every category
     regional_exposure: dict = field(default_factory=dict)  # {region: 0-5}, every region
-    vc_epicentre: Optional[str] = None  # the value-chain stage where the impact centres (config.VC_STEPS)
+    vc_epicentre: Optional[str] = None  # the value-chain stage where the impact centres (config.VC_STAGES)
     sources: list = field(default_factory=list)           # [{title, url, tier, published}]
     # High, Medium or Low: how well the present state is evidenced (display only).
     confidence: Optional[str] = None
@@ -65,15 +65,15 @@ class Driver:
     # stored); an admin edit must name it, so a concurrent edit is refused.
     revision: int = 0
     probability_prior: tuple = field(init=False, default=(3, 3))
-    normalized_score: float = field(init=False, default=0.0)
+    expected_effect: float = field(init=False, default=0.0)
 
     def __post_init__(self):
         self.recompute()
 
     def recompute(self) -> None:
-        """Refresh the Beta prior and the expected signed score from the scores.
+        """Refresh the Beta prior and the expected signed effect from the scores.
 
-        normalized_score = E[p] x gp1_pct_affected x direction, the
+        expected_effect = E[p] x gp1_pct_affected x direction, the
         deterministic counterpart of what the engine samples per iteration.
         A score simulation_problems() refuses (a missing probability, say)
         gives neutral values here instead of an exception, so such a driver
@@ -87,7 +87,7 @@ class Driver:
         a, b = self.probability_prior
         gp1 = self.gp1_pct_affected
         gp1 = float(gp1) if isinstance(gp1, (int, float)) and math.isfinite(gp1) else 0.0
-        self.normalized_score = a / (a + b) * gp1 * self.direction_sign
+        self.expected_effect = a / (a + b) * gp1 * self.direction_sign
 
     def scores(self) -> dict:
         """A copy of the driver's SCORE_FIELDS."""
@@ -115,7 +115,7 @@ def simulation_problems(drivers) -> list:
     region, under the taxonomy's names only. Duplicate ids are refused as
     well.
     """
-    from prism.config import CATEGORIES, FORCES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS, first_peak_year
+    from prism.config import CATEGORIES, FORCES, REGIONS, VALID_DIFFUSION_CURVES, VC_STAGES, first_peak_year
     problems = [f"driver id {i!r} appears {n} times" for i, n in Counter(d.id for d in drivers).items() if n > 1]
     for d in drivers:
         where = f"driver {d.id}"
@@ -137,8 +137,8 @@ def simulation_problems(drivers) -> list:
         elif not _score_in_range(d.peak_year, first_peak_year(d.start_year), 2100):
             problems.append(f"{where}: peak year {d.peak_year!r} is not a year after the onset "
                             f"(from {first_peak_year(d.start_year)})")
-        if d.vc_epicentre not in VC_STEPS:
-            problems.append(f"{where}: value-chain epicentre {d.vc_epicentre!r} is not one of {VC_STEPS}")
+        if d.vc_epicentre not in VC_STAGES:
+            problems.append(f"{where}: value-chain epicentre {d.vc_epicentre!r} is not one of {VC_STAGES}")
         for name, exposure, keys in (("category_exposure", d.category_exposure, CATEGORIES),
                                      ("regional_exposure", d.regional_exposure, REGIONS)):
             exposure = exposure if isinstance(exposure, dict) else {}

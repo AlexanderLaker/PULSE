@@ -34,7 +34,7 @@ from prism.config import (
 
 logger = logging.getLogger(__name__)
 
-ESTIMATE_RECORD = Path(__file__).resolve().parents[1] / "data" / "calibration" / "cell_weights_estimate.json"
+ESTIMATE_RECORD = Path(__file__).resolve().parents[1] / "data" / "parameters" / "cell_weight_estimate.json"
 
 PERCENTILES = ("p10", "p25", "median", "p75", "p90")
 
@@ -325,8 +325,9 @@ def _metadata(ws, result: dict, config: ModelConfig, run_id: Optional[int],
         ("Model version", result.get("model_version")),
         ("Engine", f"{result.get('engine_name')} (Beta priors, Gaussian copula)"),
         ("Numerics", result.get("numerics_backend")),
-        ("Iterations", result.get("iterations")),
-        ("Chains", result.get("n_chains")),
+        ("Iterations per chain", result["iterations"]),
+        ("Chains", result["chains"]),
+        ("Pooled iterations", result["iterations"] * result["chains"]),
         ("Seed", result.get("seed")),
         ("Drivers", driver_count),
         ("Path years", ", ".join(str(y) for y in config.path_years)),
@@ -373,7 +374,7 @@ def read_workbook(path: str, terminal_year: int) -> dict:
         "id": int(meta["Run id"]) if meta.get("Run id") is not None else None,
         "generated": str(meta.get("Generated") or ""),
         "model_version": str(meta.get("Model version") or ""),
-        "pooled_iterations": int(meta["Iterations"]) if meta.get("Iterations") is not None else None,
+        "pooled_iterations": int(meta["Pooled iterations"]) if meta.get("Pooled iterations") is not None else None,
         "workbook": Path(path).name,
         "categories_terminal": categories,
     }

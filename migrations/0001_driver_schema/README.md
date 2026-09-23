@@ -30,9 +30,10 @@ What it changes is listed in its docstring; in short:
   is dropped with `CASCADE`: if a table the migration does not know depends on
   one it drops, it stops and changes nothing;
 - the stored runs get the current key names (`meta.driver_count`,
-  `meta.driver_fingerprint`), and each driver fingerprint gains the onset
-  years and the exposure maps on the taxonomy's names, so the next production
-  run compares like with like; no number changes;
+  `meta.driver_fingerprint`, `decompositions.dimensions.vc_stages`), and each
+  driver fingerprint gains the onset years and the exposure maps on the
+  taxonomy's names, so the next production run compares like with like; no
+  number changes;
 - each driver gets its current PRISM Analysis text, and descriptions,
   Consumer Journey tile texts and stage labels that still hold a previously
   shipped text get the current one. A text an admin has edited is left alone

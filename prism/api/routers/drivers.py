@@ -9,7 +9,7 @@ from prism.api import state
 from prism.api.auth import identity_from_user, require_admin, require_auth
 from prism.api.proposals import build_proposal_summary, build_proposals_response
 from prism.api.schemas import DriverUpdate, ProposalUpdate
-from prism.config import CATEGORIES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS, first_peak_year
+from prism.config import CATEGORIES, REGIONS, VALID_DIFFUSION_CURVES, VC_STAGES, first_peak_year
 from prism.drivers import MODEL_FIELDS, InvalidDriversError
 
 #: The names an exposure map may use, per field.
@@ -32,7 +32,7 @@ def _driver_json(d, proposals: list, user_id: str) -> dict:
         "gp1_pct_affected": d.gp1_pct_affected,
         "uncertainty": d.uncertainty,
         "confidence": d.confidence,
-        "normalized_score": d.normalized_score,
+        "expected_effect": d.expected_effect,
         "category_exposure": d.category_exposure,
         "regional_exposure": d.regional_exposure,
         "vc_epicentre": d.vc_epicentre,
@@ -99,8 +99,8 @@ def update_driver(driver_id: str, update: DriverUpdate, user: dict = Depends(req
             raise HTTPException(422, f"{name} cannot be null")
     if "diffusion_curve" in sent and update.diffusion_curve not in VALID_DIFFUSION_CURVES:
         raise HTTPException(422, f"Invalid diffusion_curve. Must be one of {VALID_DIFFUSION_CURVES}")
-    if "vc_epicentre" in sent and update.vc_epicentre not in VC_STEPS:
-        raise HTTPException(422, f"Invalid vc_epicentre. Must be one of {VC_STEPS}")
+    if "vc_epicentre" in sent and update.vc_epicentre not in VC_STAGES:
+        raise HTTPException(422, f"Invalid vc_epicentre. Must be one of {VC_STAGES}")
     if "peak_year" in sent:
         _check_peak_year(driver, update.peak_year)
     if update.revision != driver.revision:
@@ -163,8 +163,8 @@ def put_driver_proposal(driver_id: str, proposal: ProposalUpdate, user: dict = D
     if "diffusion_curve" in sent and proposal.diffusion_curve is not None \
             and proposal.diffusion_curve not in VALID_DIFFUSION_CURVES:
         raise HTTPException(422, f"Invalid diffusion_curve. Must be one of {VALID_DIFFUSION_CURVES}")
-    if "vc_epicentre" in sent and proposal.vc_epicentre is not None and proposal.vc_epicentre not in VC_STEPS:
-        raise HTTPException(422, f"Invalid vc_epicentre. Must be one of {VC_STEPS}")
+    if "vc_epicentre" in sent and proposal.vc_epicentre is not None and proposal.vc_epicentre not in VC_STAGES:
+        raise HTTPException(422, f"Invalid vc_epicentre. Must be one of {VC_STAGES}")
     if "peak_year" in sent:
         _check_peak_year(driver, proposal.peak_year)
 

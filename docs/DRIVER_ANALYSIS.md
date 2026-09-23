@@ -160,10 +160,11 @@ A reading never contains:
   corrected, merged or renamed. The reading describes the driver as it is;
 - **a management response**: no "Henkel should", no lever, no mitigation;
 - **a model figure typed by hand**: every number the model produces is a
-  placeholder, so a re-scored driver, a recalibration or new cell weights can
-  never leave a stale figure behind. Facts of the driver itself, such as the
-  date of a law or a figure its sources report, are typed, because they are
-  inputs. The peak year is a score and appears only as `{peak_year}`;
+  placeholder, so a re-scored driver, a new overlap correction or new cell
+  weights can never leave a stale figure behind. Facts of the driver itself,
+  such as the date of a law or a figure its sources report, are typed,
+  because they are inputs. The peak year is a score and appears only as
+  `{peak_year}`;
 - **a fact outside the driver's own description and sources**: the reading
   adds arithmetic and interpretation, not new evidence;
 - **rhetorical markers**: no dashes as punctuation, no bullet points inside

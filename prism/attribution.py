@@ -102,7 +102,7 @@ def decompose(config: ModelConfig, drivers: list) -> dict:
     # The schedule averaged over each driver's peak-jitter grid.
     sched, offsets, off_probs = eng.peak_schedule_table(drivers)     # (n, n_off, ny)
     e_mat = np.einsum("jk,jky->jy", off_probs, sched)                # (n, ny)
-    s_mean = np.array([float(drv.normalized_score) for drv in drivers])   # E[p] x gp1 x sign
+    s_mean = np.array([float(drv.expected_effect) for drv in drivers])   # E[p] x gp1 x sign
 
     # Additive terms a[j, cell, y] and the per-cell compounding at the means.
     A = (fw[fidx][:, None, None] * att[fidx][:, None, None]
@@ -226,9 +226,9 @@ def inputs_hash(config: ModelConfig, drivers: list) -> str:
 
 def reference_run(config: ModelConfig, drivers: list, chains: int, iterations: int) -> dict:
     """The production recipe (prism.config PRODUCTION_*): run_multichain with the master seed."""
-    db = DriverSet(drivers=list(drivers))
+    driver_set = DriverSet(drivers=list(drivers))
     eng = MonteCarloEngine(config, seed=PRODUCTION_SEED)
-    res = eng.run_multichain(db, n_chains=chains, iterations=iterations)
+    res = eng.run_multichain(driver_set, n_chains=chains, iterations=iterations)
     term = res["totals"]["portfolio"][TERMINAL_YEAR]
     cats = {cat: {k: round(float(block["path"][TERMINAL_YEAR][k]), 6) for k in ("p10", "median", "p90")}
             for cat, block in res["shift_matrix"].items()}
@@ -453,7 +453,7 @@ def build_fixture(config: ModelConfig, drivers: list, dec: dict) -> dict:
     inputs = {
         "drivers": [{
             "id": drv.id, "force": drv.force,
-            "normalized_score": float(drv.normalized_score),
+            "expected_effect": float(drv.expected_effect),
             "category_exposure": {k: int(v) for k, v in drv.category_exposure.items()},
             "regional_exposure": {k: int(v) for k, v in drv.regional_exposure.items()},
             "uncertainty": drv.uncertainty, "peak_year": drv.peak_year,

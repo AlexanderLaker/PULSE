@@ -103,7 +103,7 @@ class TestDrivers:
             assert getattr(loaded, field) == getattr(expected, field), field
         assert loaded.baseline == expected.scores()
         assert loaded.scores_edited is False and loaded.revision == 1
-        assert loaded.normalized_score == pytest.approx(expected.normalized_score)
+        assert loaded.expected_effect == pytest.approx(expected.expected_effect)
 
     def test_drivers_come_back_ordered_by_id(self, db):
         others = [_driver("technology_r01", force="Technology"), _driver("competitive_r15", force="Competitive")]

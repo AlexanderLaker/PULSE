@@ -17,7 +17,7 @@ from prism.engine import MonteCarloEngine
 
 
 @pytest.fixture(scope="module")
-def db():
+def seed_driver_set():
     return DriverSet(drivers=get_seed_drivers())
 
 
@@ -26,8 +26,8 @@ def db():
 @settings(deadline=None, max_examples=5,
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(seed=st.integers(min_value=0, max_value=10_000))
-def test_percentiles_are_monotone(db, seed):
-    r = MonteCarloEngine(ModelConfig(), seed=seed).run(db, iterations=300)
+def test_percentiles_are_monotone(seed_driver_set, seed):
+    r = MonteCarloEngine(ModelConfig(), seed=seed).run(seed_driver_set, iterations=300)
     for cat, cd in r["shift_matrix"].items():
         for year, pct in cd["path"].items():
             p10, p25, med, p75, p90 = (
@@ -44,8 +44,8 @@ def test_percentiles_are_monotone(db, seed):
 @settings(deadline=None, max_examples=5,
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(seed=st.integers(min_value=0, max_value=10_000))
-def test_output_is_finite(db, seed):
-    r = MonteCarloEngine(ModelConfig(), seed=seed).run(db, iterations=300)
+def test_output_is_finite(seed_driver_set, seed):
+    r = MonteCarloEngine(ModelConfig(), seed=seed).run(seed_driver_set, iterations=300)
     for cat, cd in r["shift_matrix"].items():
         for year, pct in cd["path"].items():
             for k, v in pct.items():
@@ -57,9 +57,9 @@ def test_output_is_finite(db, seed):
 @settings(deadline=None, max_examples=3,
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(seed=st.integers(min_value=0, max_value=10_000))
-def test_seed_reproducibility(db, seed):
-    a = MonteCarloEngine(ModelConfig(), seed=seed).run(db, iterations=250)
-    b = MonteCarloEngine(ModelConfig(), seed=seed).run(db, iterations=250)
+def test_seed_reproducibility(seed_driver_set, seed):
+    a = MonteCarloEngine(ModelConfig(), seed=seed).run(seed_driver_set, iterations=250)
+    b = MonteCarloEngine(ModelConfig(), seed=seed).run(seed_driver_set, iterations=250)
     for cat in a["shift_matrix"]:
         for year in a["shift_matrix"][cat]["path"]:
             ma = a["shift_matrix"][cat]["path"][year]["median"]
@@ -96,7 +96,7 @@ def test_copy_with_is_pure(att, iters):
 # pass-through amplifies it).
 
 @pytest.mark.parametrize("seed", [1, 7, 42])
-def test_attenuation_monotonic_in_headline(db, seed):
+def test_attenuation_monotonic_in_headline(seed_driver_set, seed):
     from prism.config import FORCES
     base_pfa = ModelConfig().per_force_attenuation
 
@@ -104,7 +104,7 @@ def test_attenuation_monotonic_in_headline(db, seed):
         scaled = {f: max(0.0, min(1.0, base_pfa[f] * factor)) for f in FORCES}
         cfg = ModelConfig().copy_with(per_force_attenuation=scaled,
                                       attenuation_source=f"test: attenuation x {factor}")
-        r = MonteCarloEngine(cfg, seed=seed).run(db, iterations=400)
+        r = MonteCarloEngine(cfg, seed=seed).run(seed_driver_set, iterations=400)
         return float(r["totals"]["portfolio"][cfg.path_years[-1]]["median"])
 
     h_low = headline(0.70)   # 30 percent below the default

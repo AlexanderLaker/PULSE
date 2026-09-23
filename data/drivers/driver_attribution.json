@@ -6,7 +6,7 @@
  "basis": {
   "drivers": 51,
   "model_version": "2.12.0",
-  "cell_weights_source": "ESTIMATE, not Henkel P&L: HCB gross-profit share per category x region, built from public reporting and category knowledge. Every input is graded B / E / G; the derivation is in Settings under Model configuration and in data/calibration/cell_weights_estimate.json. A finance file passed to run_production.py --cell-weights replaces it.",
+  "cell_weights_source": "ESTIMATE, not Henkel P&L: HCB gross-profit share per category x region, built from public reporting and category knowledge. Every input is graded B / E / G; the derivation is in Settings under Model configuration and in data/parameters/cell_weight_estimate.json. A finance file passed to run_production.py --cell-weights replaces it.",
   "attenuation_source": "overlap-correction-2026-09",
   "force_weights": {
    "Consumer": 0.1667,

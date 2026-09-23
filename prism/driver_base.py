@@ -2,8 +2,8 @@
 
 The base is the reviewed source of every driver's scores, exposures and
 sources. scripts/generate_seed.py writes the seed module and the code map from
-it, and the calibration and the PRISM Analysis are computed from it (never
-from a database), so they describe the same drivers the seed carries.
+it, and the overlap correction and the PRISM Analysis are computed from it
+(never from a database), so they describe the same drivers the seed carries.
 """
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import re
 from pathlib import Path
 
 from prism.config import (CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS,
-                          VALID_DIFFUSION_CURVES, VC_STEPS, display_code)
+                          VALID_DIFFUSION_CURVES, VC_STAGES, display_code)
 from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, Driver
 
 BASE_PATH = Path(__file__).resolve().parents[1] / "data" / "drivers" / "driver_base.json"
@@ -55,7 +55,7 @@ def validate(entries: list) -> None:
             problems.append(f"{tag}: category or regional exposure keys differ from the taxonomy")
         if any(not 0 <= v <= 5 for v in list(d["category_exposure"].values()) + list(d["regional_exposure"].values())):
             problems.append(f"{tag}: an exposure score outside 0-5")
-        if d["vc_epicentre"] not in VC_STEPS:
+        if d["vc_epicentre"] not in VC_STAGES:
             problems.append(f"{tag}: value-chain epicentre {d['vc_epicentre']!r}")
         if not any(s.get("tier") in SOURCE_TIERS for s in d["sources"]):
             problems.append(f"{tag}: no source of tier {'/'.join(SOURCE_TIERS)}")

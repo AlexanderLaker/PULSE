@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from prism import seed_drivers
-from prism.config import CATEGORIES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS, display_code
+from prism.config import CATEGORIES, REGIONS, VALID_DIFFUSION_CURVES, VC_STAGES, display_code
 from prism.driver_base import InvalidBaseError, base_drivers, validate
 from prism.drivers import SCORE_FIELDS
 from support import load_module
@@ -49,7 +49,7 @@ class TestSeed:
             assert d.diffusion_curve in VALID_DIFFUSION_CURVES and d.confidence in ("Low", "Medium", "High")
             assert 0 <= d.uncertainty <= 5
             assert set(d.category_exposure) == set(CATEGORIES) and set(d.regional_exposure) == set(REGIONS)
-            assert d.vc_epicentre in VC_STEPS
+            assert d.vc_epicentre in VC_STAGES
             assert max(d.category_exposure.values()) > 0 and max(d.regional_exposure.values()) > 0
             assert d.name and d.description and d.analysis
             assert d.sources and all(s["url"].startswith("http") and s["tier"] in ("S", "A", "B") for s in d.sources)

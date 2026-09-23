@@ -124,7 +124,7 @@ def results_bundle(result: dict, config: ModelConfig, driver_count: int, fingerp
         "meta": {
             "seed": result["seed"],
             "chain_seeds": result["chain_seeds"],
-            "chains": result["n_chains"],
+            "chains": result["chains"],
             "model_version": result["model_version"],
             "engine_name": result["engine_name"],
             "numerics_backend": result["numerics_backend"],

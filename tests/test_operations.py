@@ -135,20 +135,21 @@ class TestCellWeightsFile:
 
 
 class TestWorkbook:
-    def _result(self, config, db):
+    def _result(self, config, driver_set):
         from prism.engine import MonteCarloEngine
-        return MonteCarloEngine(config, seed=42).run_multichain(db, n_chains=2, iterations=200)
+        return MonteCarloEngine(config, seed=42).run_multichain(driver_set, n_chains=2, iterations=200)
 
-    def test_sheets_and_read_back(self, tmp_path, mock_model_config, mock_drivers_database):
+    def test_sheets_and_read_back(self, tmp_path, mock_model_config, mock_driver_set):
         import openpyxl
         from prism.workbook import read_workbook, write_workbook
-        result = self._result(mock_model_config, mock_drivers_database)
+        result = self._result(mock_model_config, mock_driver_set)
         path = tmp_path / "run.xlsx"
         write_workbook(str(path), result, mock_model_config, run_id=7, driver_count=5)
         wb = openpyxl.load_workbook(path)
         assert wb.sheetnames == ["Shift Matrix", "Regional Shift", "Cell Weights", "Velocity", "Metadata"]
         meta = {row[0]: row[1] for row in wb["Metadata"].iter_rows(values_only=True) if row[0]}
-        assert meta["Run id"] == 7 and meta["Drivers"] == 5 and meta["Iterations"] == 400
+        assert meta["Run id"] == 7 and meta["Drivers"] == 5
+        assert (meta["Iterations per chain"], meta["Chains"], meta["Pooled iterations"]) == (200, 2, 400)
         assert meta["Model version"] == result["model_version"]
         assert "Reading note" in meta and "Confidentiality" in meta
 
@@ -159,25 +160,25 @@ class TestWorkbook:
         with pytest.raises(ValueError, match="no 2035 percentiles"):
             read_workbook(str(path), 2035)
 
-    def test_the_estimate_carries_its_derivation(self, tmp_path, mock_model_config, mock_drivers_database):
+    def test_the_estimate_carries_its_derivation(self, tmp_path, mock_model_config, mock_driver_set):
         import openpyxl
         from prism.workbook import write_workbook
         path = tmp_path / "estimate.xlsx"
-        write_workbook(str(path), self._result(mock_model_config, mock_drivers_database), mock_model_config)
+        write_workbook(str(path), self._result(mock_model_config, mock_driver_set), mock_model_config)
         text = "\n".join(str(c) for row in openpyxl.load_workbook(path)["Cell Weights"].iter_rows(values_only=True)
                          for c in row if c is not None)
         assert "How these shares were built" in text and "NOT Henkel P&L" in text
         assert "Share of block" in text and "Margin index" in text
         assert "run_production.py --cell-weights FILE" in text
 
-    def test_other_weights_get_no_derivation(self, tmp_path, mock_model_config, mock_drivers_database):
+    def test_other_weights_get_no_derivation(self, tmp_path, mock_model_config, mock_driver_set):
         import openpyxl
         from prism.config import CATEGORIES, REGIONS
         from prism.workbook import write_workbook
         cfg = mock_model_config.copy_with(cell_weights={c: {r: 1.0 / 52 for r in REGIONS} for c in CATEGORIES},
                                           cell_weights_source="Finance FY2025")
         path = tmp_path / "finance.xlsx"
-        write_workbook(str(path), self._result(cfg, mock_drivers_database), cfg)
+        write_workbook(str(path), self._result(cfg, mock_driver_set), cfg)
         text = "\n".join(str(c) for row in openpyxl.load_workbook(path)["Cell Weights"].iter_rows(values_only=True)
                          for c in row if c is not None)
         assert "How these shares were built" not in text and "Source: Finance FY2025" in text

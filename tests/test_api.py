@@ -54,14 +54,14 @@ def api(monkeypatch, tmp_path):
 
 
 @pytest.fixture
-def valid_run(mock_model_config, mock_drivers_database):
+def valid_run(mock_model_config, mock_driver_set):
     """A results bundle exactly as the production run persists it."""
     from prism.input_drift import driver_fingerprint
     from prism.engine import MonteCarloEngine
     production = load_module("scripts/run_production.py")
     result = MonteCarloEngine(mock_model_config, seed=42).run_multichain(
-        mock_drivers_database, n_chains=2, iterations=200)
-    return production.results_bundle(result, mock_model_config, 5, driver_fingerprint(mock_drivers_database.drivers))
+        mock_driver_set, n_chains=2, iterations=200)
+    return production.results_bundle(result, mock_model_config, 5, driver_fingerprint(mock_driver_set.drivers))
 
 
 class TestRoutes:
@@ -255,7 +255,7 @@ class TestDrivers:
         first = drivers[0]
         assert set(first) == {
             "id", "force", "name", "description", "direction", "probability", "start_year", "peak_year",
-            "diffusion_curve", "gp1_pct_affected", "uncertainty", "confidence", "normalized_score",
+            "diffusion_curve", "gp1_pct_affected", "uncertainty", "confidence", "expected_effect",
             "category_exposure", "regional_exposure", "vc_epicentre", "analysis", "sources",
             "baseline", "scores_edited", "revision", "proposal_summary"}
         assert first["baseline"]["probability"] == first["probability"] and first["scores_edited"] is False
@@ -272,7 +272,7 @@ class TestDrivers:
         edited = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["id"] == "consumer_r01")
         assert (edited["probability"], edited["uncertainty"], edited["description"]) == (4, 3, "Edited.")
         assert edited["scores_edited"] is True and edited["baseline"]["probability"] == 5
-        assert edited["normalized_score"] == pytest.approx(-4 / 6 * 0.22)
+        assert edited["expected_effect"] == pytest.approx(-4 / 6 * 0.22)
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT reason, old_value, new_value, user_id FROM audit_log "

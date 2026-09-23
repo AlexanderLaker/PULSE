@@ -44,7 +44,7 @@ export interface Decompositions {
   region: Decomposition;
   dimensions: {
     forces: string[];
-    vc_steps: string[];
+    vc_stages: string[];
     regions: string[];
     categories: string[];
     years: number[];

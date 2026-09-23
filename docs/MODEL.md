@@ -32,7 +32,7 @@ arithmetic.
 | Parameter | Default | Where it comes from |
 |---|---|---|
 | Force weights | 1/6 for each of the six forces | Equal by design |
-| Attenuation per force | Consumer 0.487, Customer 0.417, Technology 0.412, Government 0.446, Environmental 0.378, Competitive 0.479 | The overlap correction (below), `scripts/compute_attenuation.py` |
+| Attenuation per force | Consumer 0.487, Customer 0.417, Technology 0.412, Government 0.446, Environmental 0.378, Competitive 0.479 | The overlap correction (below), `scripts/compute_overlap_correction.py` |
 | Within-force overlap | Consumer 0.100, Customer 0.221, Technology 0.384, Government 0.123, Environmental 0.401, Competitive 0.100 | The same |
 | Correlation within a force | 0.3 | Structured judgment |
 | Correlation across forces | a 6 x 6 matrix, values 0.04 to 0.22 | Structured judgment; positive definite as entered |
@@ -94,7 +94,7 @@ with `g_j` the share of the category's gross profit the driver can move at
 full materialisation (in (0, 1]) and `d_j` its direction, +1 for expansion
 and -1 for contraction. A driver without `g_j` stops the run: there is no
 default. The deterministic counterpart, `E[s_j] = (p / 6) x g_j x d_j`, is the
-"Shift" column of the Drivers page and the driver's `normalized_score`.
+"Shift" column of the Drivers page and the driver's `expected_effect`.
 
 ### 3. Timing
 
@@ -250,7 +250,7 @@ Some mechanisms are carried by more than one driver or force: a packaging
 levy is both a Government and an Environmental matter. The overlap
 correction keeps such a mechanism from being counted twice. It is structured
 judgment built on the drivers' category exposure vectors, not a fit to
-outcomes. `scripts/compute_attenuation.py` computes it in five steps:
+outcomes. `scripts/compute_overlap_correction.py` computes it in five steps:
 
 1. the weighted Jaccard similarity of every pair of drivers' 13-category
    exposure vectors;
@@ -267,8 +267,8 @@ cross-force overlap matrix `O`, where `O[i][j]` is the share of force `i`'s
 signal already carried by force `j` (not symmetric by design). The
 attenuation of a force is `0.5 x (1 - m)`, where `m` is the mean of its row
 in `O` over the five other forces. The record is
-`data/calibration/attenuation.json`; the script also writes the three layers
-to `prism/overlap_correction.py`, which the model's defaults read. The
+`data/parameters/overlap_correction.json`; the script also writes the three
+layers to `prism/overlap_correction.py`, which the model's defaults read. The
 correction is computed from the driver base, not from the live database: it
 is recomputed whenever the categories or the base's exposure scores change
 (`--check` fails until it is), and an exposure edit made on the Drivers page
@@ -295,7 +295,7 @@ percent). Each category has its own regional mix, so the matrix is not a
 region vector times a category vector and regional concentration moves the
 category numbers. Every input carries a grade: **B** public reporting
 supports it, **E** defensible but unverified, **G** low-confidence guess. The
-record is `data/calibration/cell_weights_estimate.json`, the matrix the
+record is `data/parameters/cell_weight_estimate.json`, the matrix the
 model's defaults read `prism/cell_weight_estimate.py`; Settings shows the
 whole derivation whenever the served run used this estimate.
 

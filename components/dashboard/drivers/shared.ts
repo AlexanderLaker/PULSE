@@ -6,7 +6,7 @@
 import { EXPANSION } from '@/lib/format';
 import { S } from '@/lib/theme';
 import { UNCERTAINTY_LABELS } from '@/lib/uncertainty';
-import { VC_STEPS, stageIndex } from '@/lib/valueChain';
+import { VC_STAGES, stageIndex } from '@/lib/valueChain';
 
 // ─── Diffusion curves ─────────────────────────────────────────────
 // The shapes of prism/config.py compute_materialization_schedule.
@@ -29,12 +29,12 @@ const vcZone = (index: number): string =>
   index <= 3 ? 'upstream' : index === 4 ? 'mid-chain' : 'downstream';
 /** A stage with its part of the chain ("Marketing · downstream"), or "unscored"
  *  for a proposal that names none. */
-export const vcStageLabel = (step: string | null | undefined): string => {
-  const i = stageIndex(step);
-  return i < 0 ? 'unscored' : `${VC_STEPS[i]} · ${vcZone(i)}`;
+export const vcStageLabel = (stage: string | null | undefined): string => {
+  const i = stageIndex(stage);
+  return i < 0 ? 'unscored' : `${VC_STAGES[i]} · ${vcZone(i)}`;
 };
 /** A stage's pin position on the rail: the centre of its eighth. */
-export const vcPos = (step: string): string => `${(((stageIndex(step) + 0.5) / 8) * 100).toFixed(2)}%`;
+export const vcPos = (stage: string): string => `${(((stageIndex(stage) + 0.5) / 8) * 100).toFixed(2)}%`;
 
 /** The table's mode: Driver List, Expert Rating or Review & Endorse (Drivers.tsx
  *  describes them). */

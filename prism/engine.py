@@ -27,7 +27,7 @@ import scipy as _scipy
 from scipy.linalg import cholesky
 from scipy.stats import beta as _beta_dist, norm as _norm_dist
 
-from prism.config import (CATEGORIES, FORCES, REGIONS, VC_STEPS, ModelConfig, build_driver_correlation_matrix,
+from prism.config import (CATEGORIES, FORCES, REGIONS, VC_STAGES, ModelConfig, build_driver_correlation_matrix,
                           compute_materialization_schedule, peak_jitter_for)
 from prism.drivers import DriverSet, InvalidDriversError, simulation_problems
 
@@ -130,7 +130,7 @@ class MonteCarloEngine:
                     ", ".join(f"{f}={per_force[f]:.3f}" for f in FORCES))
         return per_force
 
-    def run(self, db: DriverSet, iterations: Optional[int] = None) -> dict:
+    def run(self, driver_set: DriverSet, iterations: Optional[int] = None) -> dict:
         """Run one chain and compile the result.
 
         The result carries ``shift_matrix`` (per category: percentile ``path``
@@ -140,21 +140,23 @@ class MonteCarloEngine:
         band), ``mc_standard_error``, the weights actually applied
         (``cell_weights_used``, ``category_weights_used``,
         ``region_weights_used``, ``cell_weights_source``), ``integrity_events``,
-        ``raw_samples`` (iterations x categories x years) and the engine
+        ``raw_samples`` (iterations x categories x years) and the run's
         identity (``model_version``, ``engine_name``, ``numerics_backend``,
-        ``seed``, ``iterations``).
+        ``seed``, ``iterations`` and ``chains``, here 1).
         """
         n_iter = iterations or self.config.iterations
         logger.info("Running Monte Carlo: %d iterations, %d drivers, %d categories, %d regions, %d years",
-                    n_iter, len(db.drivers), len(CATEGORIES), len(REGIONS),
+                    n_iter, len(driver_set.drivers), len(CATEGORIES), len(REGIONS),
                     len(self.config.path_years))
 
-        category_samples, regional_samples = self._simulate_samples(db, n_iter)
+        category_samples, regional_samples = self._simulate_samples(driver_set, n_iter)
         if self._floored_factor_cells:
             self._integrity_events.append(floor_event(self._floored_factor_cells))
-        result = self._compile_results(category_samples, db)
+        result = self._compile_results(category_samples, driver_set)
         result["regional_shift_matrix"] = self._build_regional_matrix(regional_samples)
         result.update(self._weights_used())
+        result["iterations"] = n_iter
+        result["chains"] = 1
 
         terminal = int(self.config.path_years[-1])
         logger.info("Median portfolio shift at %d: %.4f", terminal, result["totals"]["portfolio"][terminal]["median"])
@@ -227,7 +229,7 @@ class MonteCarloEngine:
 
     # ── Sampling ────────────────────────────────────────────────────────────
 
-    def _simulate_samples(self, db: DriverSet, n_iter: int):
+    def _simulate_samples(self, driver_set: DriverSet, n_iter: int):
         """Draw and compound one chain.
 
         Returns ``(category_samples, regional_samples)``: the cell shifts as
@@ -237,7 +239,7 @@ class MonteCarloEngine:
         n_cats = len(CATEGORIES)
         n_regions = len(REGIONS)
         n_years = len(self.config.path_years)
-        drivers = db.drivers
+        drivers = driver_set.drivers
         problems = simulation_problems(drivers)
         if problems:
             raise InvalidDriversError(problems)
@@ -394,7 +396,7 @@ class MonteCarloEngine:
         correction and the effective number of each force's drivers per cell.
 
         n_eff = (sum m)^2 / sum m^2 is the participation ratio of the force's
-        deterministic mean contributions m = |normalized_score| x exposure. It
+        deterministic mean contributions m = |expected_effect| x exposure. It
         equals the count for equal contributions, tends to 1 as one driver
         dominates, and barely moves when a negligible driver is added, so
         adding a small driver can never make a force's total smaller. The
@@ -403,8 +405,8 @@ class MonteCarloEngine:
         """
         n_forces, n_cells = len(FORCES), exposure.shape[1]
         driver_force_idx = np.array([FORCES.index(d.force) for d in drivers])
-        abs_score = np.array([abs(float(d.normalized_score)) for d in drivers])
-        contrib = abs_score[:, np.newaxis] * exposure
+        abs_effect = np.array([abs(float(d.expected_effect)) for d in drivers])
+        contrib = abs_effect[:, np.newaxis] * exposure
         dampening = np.ones((n_forces, n_cells))
         n_eff_all = np.zeros((n_forces, n_cells))
         for f_idx, force in enumerate(FORCES):
@@ -481,12 +483,11 @@ class MonteCarloEngine:
 
     # ── Results ─────────────────────────────────────────────────────────────
 
-    def _compile_results(self, samples: np.ndarray, db: DriverSet) -> dict:
+    def _compile_results(self, samples: np.ndarray, driver_set: DriverSet) -> dict:
         """Percentiles, velocity, Monte Carlo standard error and the three lenses.
 
         ``samples`` is the category roll-up, (iterations, categories, years).
         """
-        n_iter, n_cats, n_years = samples.shape
         years = self.config.path_years
         shift_matrix = {}
 
@@ -510,7 +511,7 @@ class MonteCarloEngine:
         # shares, so every lens adds up to the same row total. They are
         # attributions of one simulated number, not separate simulations.
         #
-        # Value chain: each driver's relevance, |normalized_score| x category
+        # Value chain: each driver's relevance, |expected_effect| x category
         # exposure / 5, goes wholly to its epicentre stage. Propagation along
         # the chain is not modelled.
         # A category no driver reaches has a median of exactly zero; its
@@ -519,7 +520,7 @@ class MonteCarloEngine:
             total = sum(sums.values())
             return {k: (v / total if total > 0 else 0.0) for k, v in sums.items()}
 
-        drivers = db.drivers
+        drivers = driver_set.drivers
         cats = list(CATEGORIES)
         # Region lens: each (category, region) cell weighted by its own share
         # of the category's gross profit.
@@ -529,14 +530,14 @@ class MonteCarloEngine:
         force_shares: dict = {}
         region_shares: dict = {}
         for c_idx, cat in enumerate(cats):
-            vsum = {s: 0.0 for s in VC_STEPS}
+            vsum = {s: 0.0 for s in VC_STAGES}
             fsum = {f: 0.0 for f in FORCES}
             rsum = {r: 0.0 for r in REGIONS}
             for j, driver in enumerate(drivers):
                 cat_exp = driver.category_exposure[cat]
                 if cat_exp == 0:
                     continue
-                relevance = abs(driver.normalized_score) * (cat_exp / 5.0)
+                relevance = abs(driver.expected_effect) * (cat_exp / 5.0)
                 vsum[driver.vc_epicentre] += relevance
                 fsum[driver.force] += relevance * self.config.force_weights[driver.force]
                 for r_idx, region in enumerate(REGIONS):
@@ -553,16 +554,16 @@ class MonteCarloEngine:
             for cat in cats:
                 median_cy = float(shift_matrix[cat]["path"][year]["median"])
                 force_decomp[yi][cat] = {f: float(force_shares[cat][f] * median_cy) for f in FORCES}
-                vc_decomp[yi][cat] = {s: float(vc_shares[cat][s] * median_cy) for s in VC_STEPS}
+                vc_decomp[yi][cat] = {s: float(vc_shares[cat][s] * median_cy) for s in VC_STAGES}
                 region_decomp[yi][cat] = {r: float(region_shares[cat][r] * median_cy) for r in REGIONS}
 
         decompositions = {
             "force": force_decomp,    # year -> category -> force  -> shift
-            "vc": vc_decomp,          # year -> category -> step   -> shift
+            "vc": vc_decomp,          # year -> category -> stage  -> shift
             "region": region_decomp,  # year -> category -> region -> shift
             "dimensions": {
                 "forces": list(FORCES),
-                "vc_steps": list(VC_STEPS),
+                "vc_stages": list(VC_STAGES),
                 "regions": list(REGIONS),
                 "categories": cats,
                 "years": [int(y) for y in years],
@@ -595,7 +596,6 @@ class MonteCarloEngine:
             "decompositions": decompositions,
             "totals": totals,
             "raw_samples": samples,
-            "iterations": n_iter,
             "model_version": self.MODEL_VERSION,
             "engine_name": self.ENGINE_NAME,
             "numerics_backend": NUMERICS_BACKEND,
@@ -636,15 +636,16 @@ class MonteCarloEngine:
             }
         return out
 
-    def run_multichain(self, db: DriverSet, n_chains: int = 3,
+    def run_multichain(self, driver_set: DriverSet, n_chains: int = 3,
                        iterations: Optional[int] = None, seeds: Optional[list] = None) -> dict:
-        """Run ``n_chains`` independently seeded chains and pool them.
+        """Run ``n_chains`` independently seeded chains of ``iterations`` each and pool them.
 
-        The published percentiles, lenses and standard errors come from the
-        pooled sample. ``seed_stability`` reports the spread of the per-chain
-        terminal-year portfolio medians, which is Monte Carlo noise only.
-        Chain seeds derive from the master seed, so the master seed alone
-        reproduces the run.
+        The result has run()'s parts, compiled from the pooled sample: the
+        published percentiles, lenses and standard errors all come from it.
+        ``iterations`` is per chain and ``chains`` the number of chains;
+        ``seed_stability`` reports the spread of the per-chain terminal-year
+        portfolio medians, which is Monte Carlo noise only. Chain seeds derive
+        from the master seed, so the master seed alone reproduces the run.
         """
         if n_chains < 1:
             raise ValueError("n_chains must be >= 1")
@@ -663,7 +664,7 @@ class MonteCarloEngine:
         chain_engines = []
         for s in seeds:
             engine = MonteCarloEngine(self.config, seed=s)
-            cat_s, reg_s = engine._simulate_samples(db, iterations or self.config.iterations)
+            cat_s, reg_s = engine._simulate_samples(driver_set, iterations or self.config.iterations)
             per_chain_cat.append(cat_s)
             per_chain_reg.append(reg_s)
             chain_engines.append(engine)
@@ -680,7 +681,7 @@ class MonteCarloEngine:
 
         pooled_cat = np.concatenate(per_chain_cat, axis=0)
         pooled_reg = np.concatenate(per_chain_reg, axis=0)
-        result = self._compile_results(pooled_cat, db)
+        result = self._compile_results(pooled_cat, driver_set)
         result["regional_shift_matrix"] = self._build_regional_matrix(pooled_reg)
         result.update(self._weights_used())
 
@@ -700,7 +701,8 @@ class MonteCarloEngine:
             merged.append(e)
         result["integrity_events"] = merged
 
-        result["n_chains"] = n_chains
+        result["iterations"] = int(per_chain_cat[0].shape[0])
+        result["chains"] = n_chains
         result["seed"] = int(self.seed)
         result["chain_seeds"] = [int(s) for s in seeds]
         spread_pp = (max(per_chain_portfolio_medians) - min(per_chain_portfolio_medians)) * 100.0

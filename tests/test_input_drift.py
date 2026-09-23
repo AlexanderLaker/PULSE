@@ -1,10 +1,10 @@
 """Input-drift telemetry: every run compares the driver scores with the previous run's."""
-from prism.config import CATEGORIES, REGIONS, VC_STEPS
+from prism.config import CATEGORIES, REGIONS, VC_STAGES
 from prism.drivers import Driver
 from prism.input_drift import compute_input_drift_event, driver_fingerprint, previous_fingerprint
 
 
-def _driver(id_, probability=3, gp1=0.1, direction="Expansion", force="Consumer", vc_epicentre=VC_STEPS[5], **kw):
+def _driver(id_, probability=3, gp1=0.1, direction="Expansion", force="Consumer", vc_epicentre=VC_STAGES[5], **kw):
     scores = dict(start_year=2025, uncertainty=2)
     scores.update(kw)
     return Driver(id=id_, force=force, probability=probability, gp1_pct_affected=gp1, direction=direction,
@@ -66,10 +66,10 @@ def test_every_field_that_moves_the_simulation_is_fingerprinted():
 
 
 def test_the_value_chain_stage_is_fingerprinted_by_its_place_in_the_chain():
-    """"ve" is the epicentre's position in VC_STEPS, 1 to 8, the value the stored
+    """"ve" is the epicentre's position in VC_STAGES, 1 to 8, the value the stored
     runs carry; moving the stage is drift."""
     assert _fp(_driver("a"))["a"]["ve"] == 6
-    moved = _fp(_driver("a", vc_epicentre=VC_STEPS[1]))
+    moved = _fp(_driver("a", vc_epicentre=VC_STAGES[1]))
     assert compute_input_drift_event(moved, _fp(_driver("a")))["detail"]["structure_changes"] == ["a"]
 
 

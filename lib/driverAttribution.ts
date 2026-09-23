@@ -15,10 +15,10 @@
  * additive term of the compounding factor is
  *
  *   a[j,c,r,y] = forceWeight[f] * attenuation[f] * dampening[f,c,r]
- *              * normalizedScore[j] * E[materialisation_j(y)]
+ *              * expectedEffect[j] * E[materialisation_j(y)]
  *              * categoryExposure[j,c]/5 * regionalExposure[j,r]/5
  *
- * with normalizedScore = Beta-prior mean (probability/6) x GP1 share x
+ * with expectedEffect = Beta-prior mean (probability/6) x GP1 share x
  * direction (the value the API serves) and the materialisation averaged over
  * the driver's own peak-year jitter grid. The force sums compound
  * multiplicatively per cell; the second-order cross-terms are spread over
@@ -41,8 +41,8 @@ import type { ForceName } from '@/types';
 export interface AttributionDriver {
   id: string;
   force: ForceName;
-  /** Beta-prior mean x GP1 share x direction sign (the API's normalized_score). */
-  normalized_score: number;
+  /** Beta-prior mean x GP1 share x direction sign, as the API serves it. */
+  expected_effect: number;
   /** A score 0 to 5 for every category and every region. */
   category_exposure: Record<string, number>;
   regional_exposure: Record<string, number>;
@@ -196,7 +196,7 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
 
   // Within-force dampening per (force, cell), from the magnitude-weighted
   // effective number of drivers (the participation ratio).
-  const absScore = drivers.map((d) => Math.abs(d.normalized_score));
+  const absEffect = drivers.map((d) => Math.abs(d.expected_effect));
   const damp: number[][] = FORCES.map(() => new Array<number>(nCell).fill(1));
   FORCES.forEach((force, f) => {
     const ov = config.within_force_overlap[force];
@@ -205,7 +205,7 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
       let s1 = 0, s2 = 0;
       drivers.forEach((_, j) => {
         if (fidx[j] !== f) return;
-        const m = absScore[j] * E[j][cell];
+        const m = absEffect[j] * E[j][cell];
         s1 += m; s2 += m * m;
       });
       const nEff = s2 > 0 ? (s1 * s1) / s2 : 0;
@@ -218,10 +218,10 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
   const mats = drivers.map((d) => expectedMaterialization(d, years, baseYear, jitterOn));
 
   // Additive terms, force sums, compounding and the proportional spread.
-  const score = drivers.map((d) => d.normalized_score);
+  const effect = drivers.map((d) => d.expected_effect);
   const A: number[][][] = drivers.map((_, j) => {
     const f = fidx[j];
-    const k = fw[f] * att[f] * score[j];
+    const k = fw[f] * att[f] * effect[j];
     return Array.from({ length: nCell }, (__, cell) =>
       years.map((___, y) => k * damp[f][cell] * E[j][cell] * mats[j][y]));
   });

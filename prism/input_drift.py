@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from prism.config import VC_STEPS
+from prism.config import VC_STAGES
 
 #: Fingerprint fields beyond probability, GP1 share and direction: a driver
 #: moved to another force, its exposures, value-chain epicentre, onset, peak
@@ -32,7 +32,7 @@ def driver_fingerprint(drivers) -> dict:
 
     Keys per driver: p probability, g GP1 share, d direction, f force,
     ce / re category and regional exposure, ve the value-chain epicentre as its
-    1-based position in VC_STEPS, s onset year, pk peak year, dc diffusion
+    1-based position in VC_STAGES, s onset year, pk peak year, dc diffusion
     curve, u uncertainty.
     """
     return {
@@ -42,7 +42,7 @@ def driver_fingerprint(drivers) -> dict:
             "d": str(d.direction),
             "f": str(d.force),
             "ce": _exposure_map(d.category_exposure),
-            "ve": VC_STEPS.index(d.vc_epicentre) + 1,
+            "ve": VC_STAGES.index(d.vc_epicentre) + 1,
             "re": _exposure_map(d.regional_exposure),
             "s": int(d.start_year),
             "pk": int(d.peak_year),

@@ -76,7 +76,7 @@ class TestDriverModel:
         d.recompute()
         a, b = d.probability_prior
         assert a + b == pytest.approx(16)
-        assert d.normalized_score == pytest.approx(5 / 6 * 0.2)  # mean unchanged
+        assert d.expected_effect == pytest.approx(5 / 6 * 0.2)  # mean unchanged
         d.uncertainty = 7
         d.recompute()
         assert d.uncertainty == 7                              # never rewritten silently
@@ -103,7 +103,7 @@ class TestDriverModel:
         assert ev is not None and "u1" in (ev.get("detail", {}).get("structure_changes") or [])
 
 
-def _db(uncertainties):
+def _driver_set(uncertainties):
     drivers = []
     for i, u in enumerate(uncertainties):
         drivers.append(Driver(
@@ -130,10 +130,10 @@ def _terminal_band(r, cat="Hair: Care"):
 class TestEngine:
     def test_score_0_disables_jitter_and_score_5_widens_it(self, mock_model_config):
         cfg = mock_model_config.copy_with(iterations=3000, peak_year_jitter=True)
-        r_u0_off = MonteCarloEngine(cfg.copy_with(peak_year_jitter=False), seed=11).run(_db([0]))
-        r_u0 = MonteCarloEngine(cfg, seed=11).run(_db([0]))
-        r_u3 = MonteCarloEngine(cfg, seed=11).run(_db([3]))
-        r_u5 = MonteCarloEngine(cfg, seed=11).run(_db([5]))
+        r_u0_off = MonteCarloEngine(cfg.copy_with(peak_year_jitter=False), seed=11).run(_driver_set([0]))
+        r_u0 = MonteCarloEngine(cfg, seed=11).run(_driver_set([0]))
+        r_u3 = MonteCarloEngine(cfg, seed=11).run(_driver_set([3]))
+        r_u5 = MonteCarloEngine(cfg, seed=11).run(_driver_set([5]))
         # Score 0 means no timing jitter for that driver: with the global switch
         # on it gives exactly the result of the switch off (same prior, same
         # copula stream; a grid with the single offset 0 draws no randomness).
@@ -146,8 +146,8 @@ class TestEngine:
         cfg = mock_model_config.copy_with(iterations=2000, peak_year_jitter=False)
         # With the switch off a score-5 driver draws no offset at all; switching
         # it on makes the +/-4 offsets live and widens the timing bands.
-        r_u5_off = MonteCarloEngine(cfg, seed=2).run(_db([5]))
-        r_u5_on = MonteCarloEngine(cfg.copy_with(peak_year_jitter=True), seed=2).run(_db([5]))
+        r_u5_off = MonteCarloEngine(cfg, seed=2).run(_driver_set([5]))
+        r_u5_on = MonteCarloEngine(cfg.copy_with(peak_year_jitter=True), seed=2).run(_driver_set([5]))
         assert r_u5_off["shift_matrix"] != r_u5_on["shift_matrix"]
         assert _velocity_width(r_u5_on) > _velocity_width(r_u5_off)
 
@@ -155,28 +155,28 @@ class TestEngine:
         cfg = mock_model_config.copy_with(iterations=4000, peak_year_jitter=False)
         bands = {}
         for u in (0, 3, 5):
-            r = MonteCarloEngine(cfg, seed=5).run(_db([u]))
+            r = MonteCarloEngine(cfg, seed=5).run(_driver_set([u]))
             bands[u] = _terminal_band(r)
         assert bands[0] < bands[3] < bands[5]
 
     def test_mixed_scores_reproducible_under_seed(self, mock_model_config):
         cfg = mock_model_config.copy_with(iterations=2000, peak_year_jitter=True)
-        db = _db([1, 0, 2, 5])
-        a = MonteCarloEngine(cfg, seed=3).run(db)
-        b = MonteCarloEngine(cfg, seed=3).run(db)
+        driver_set = _driver_set([1, 0, 2, 5])
+        a = MonteCarloEngine(cfg, seed=3).run(driver_set)
+        b = MonteCarloEngine(cfg, seed=3).run(driver_set)
         assert a["shift_matrix"] == b["shift_matrix"]
-        c = MonteCarloEngine(cfg, seed=4).run(db)
+        c = MonteCarloEngine(cfg, seed=4).run(driver_set)
         assert a["shift_matrix"] != c["shift_matrix"]
 
     def test_mixed_scores_keep_each_drivers_own_offset_range(self, mock_model_config):
         """A score-0 driver never moves its peak, a score-2 driver stays inside
         +/-1, and a score-5 driver uses offsets up to +/-4."""
         cfg = mock_model_config.copy_with(iterations=5000, peak_year_jitter=True)
-        db = _db([2, 0, 5])
+        driver_set = _driver_set([2, 0, 5])
         eng = MonteCarloEngine(cfg, seed=8)
         # Re-create the offset draw the engine performs (same RNG consumption
         # order as _compute_all_paths_vectorized): copula draws first.
-        drivers = db.drivers
+        drivers = driver_set.drivers
         R = eng.build_correlation_matrix(drivers)
         eng.generate_copula_samples(drivers, R, 5000)
         from prism.config import peak_jitter_for as pj
@@ -264,7 +264,7 @@ class TestOnsetClamp:
         score 5 uses offsets up to +/-4."""
         cfg = mock_model_config.copy_with(peak_year_jitter=True)
         eng = MonteCarloEngine(cfg, seed=8)
-        drivers = _db([2, 0, 5]).drivers
+        drivers = _driver_set([2, 0, 5]).drivers
         _sched, offsets, probs = eng.peak_schedule_table(drivers)
         idx = eng.draw_peak_offsets(probs, 6000)
         off = np.array(offsets)[idx]
@@ -282,9 +282,9 @@ class TestOnsetClamp:
         are fully in by 2026 and none is pushed to the horizon, so the 2026
         median is at least the no-jitter level in magnitude."""
         cfg = mock_model_config.copy_with(iterations=4000, path_years=[2026, 2027, 2028, 2029, 2030])
-        db = DriverSet(drivers=[self._driver(3)])
-        r_on = MonteCarloEngine(cfg.copy_with(peak_year_jitter=True), seed=3).run(db)
-        r_off = MonteCarloEngine(cfg.copy_with(peak_year_jitter=False), seed=3).run(db)
+        driver_set = DriverSet(drivers=[self._driver(3)])
+        r_on = MonteCarloEngine(cfg.copy_with(peak_year_jitter=True), seed=3).run(driver_set)
+        r_off = MonteCarloEngine(cfg.copy_with(peak_year_jitter=False), seed=3).run(driver_set)
         m_on = r_on["shift_matrix"]["Hair: Care"]["path"][2026]["median"]
         m_off = r_off["shift_matrix"]["Hair: Care"]["path"][2026]["median"]
         assert m_on < 0 and m_off < 0
@@ -292,7 +292,7 @@ class TestOnsetClamp:
 
 
 class TestMultichainEvents:
-    def test_zero_row_event_listed_once_in_multichain(self, mock_model_config, mock_drivers_database):
+    def test_zero_row_event_listed_once_in_multichain(self, mock_model_config, mock_driver_set):
         from prism.config import CATEGORIES as CATS, REGIONS
         W = {c: {r: 1.0 / (len(CATS) * len(REGIONS)) for r in REGIONS} for c in CATS}
         gone = CATS[0]
@@ -300,6 +300,6 @@ class TestMultichainEvents:
         W[gone] = {r: 0.0 for r in REGIONS}
         W[CATS[1]] = {r: v + freed / len(REGIONS) for r, v in W[CATS[1]].items()}
         cfg = mock_model_config.copy_with(cell_weights=W, iterations=200)
-        r = MonteCarloEngine(cfg, seed=1).run_multichain(mock_drivers_database, n_chains=2, iterations=200)
+        r = MonteCarloEngine(cfg, seed=1).run_multichain(mock_driver_set, n_chains=2, iterations=200)
         zero = [e for e in r["integrity_events"] if e.get("type") == "cell_weight_zero_row"]
         assert len(zero) == 1

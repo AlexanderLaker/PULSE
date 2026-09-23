@@ -38,7 +38,7 @@ def mock_driver() -> Driver:
 
 
 @pytest.fixture
-def mock_drivers_database() -> DriverSet:
+def mock_driver_set() -> DriverSet:
     """Five drivers, one per force except Customer, built so the golden pins can
     tell categories, regions, schedules and value-chain stages apart.
 

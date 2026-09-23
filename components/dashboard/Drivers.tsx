@@ -45,7 +45,7 @@ function sortValue(d: Driver, key: SortKey): string | number {
     case 'direction':   return d.direction;
     case 'probability': return d.probability;
     case 'gp1':         return d.gp1_pct_affected;
-    case 'shift':       return d.normalized_score;
+    case 'shift':       return d.expected_effect;
   }
 }
 

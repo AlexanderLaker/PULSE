@@ -49,7 +49,7 @@ export function rankContributors(
       const gap = Math.abs(b.contribution) - Math.abs(a.contribution);
       return Math.abs(gap) > 1e-9
         ? gap
-        : Math.abs(b.driver.normalized_score) - Math.abs(a.driver.normalized_score);
+        : Math.abs(b.driver.expected_effect) - Math.abs(a.driver.expected_effect);
     });
 }
 

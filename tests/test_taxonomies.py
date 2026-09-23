@@ -9,7 +9,7 @@ prism/drivers.py, in the same order.
 import re
 from pathlib import Path
 
-from prism.config import CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS, VC_STEPS
+from prism.config import CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS, VC_STAGES
 from prism.drivers import SOURCE_TIERS
 
 LIB = Path(__file__).resolve().parents[1] / "lib"
@@ -39,8 +39,8 @@ def test_regions():
 
 
 def test_value_chain_stages():
-    assert quoted(VALUE_CHAIN, "export const VC_STEPS =") == VC_STEPS
-    assert len(quoted(VALUE_CHAIN, "export const VC_SHORT_LABELS =")) == len(VC_STEPS)
+    assert quoted(VALUE_CHAIN, "export const VC_STAGES =") == VC_STAGES
+    assert len(quoted(VALUE_CHAIN, "export const VC_SHORT_LABELS =")) == len(VC_STAGES)
 
 
 def test_horizon():

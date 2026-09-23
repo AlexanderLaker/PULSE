@@ -22,9 +22,8 @@ naively, such a mechanism counts twice.
 - The overlaps are structured judgment computed from the drivers' category
   exposure vectors (weighted Jaccard similarity, excess over the random-pair
   baseline, a force-size factor, per-force and per-pair mechanism adjustments
-  with written reasons, clamps) by `scripts/compute_attenuation.py`, and called
-  an overlap
-  correction, never a calibration against outcomes.
+  with written reasons, clamps) by `scripts/compute_overlap_correction.py`,
+  and called an overlap correction, never a calibration against outcomes.
 
 ## Consequences
 

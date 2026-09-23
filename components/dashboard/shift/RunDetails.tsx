@@ -74,7 +74,7 @@ export const RunDetails: FC<{ simulation: SimulationResult }> = ({ simulation })
       .map(([r, w]) => `${r} ${fmtPct(w, 0)}`).join(' · ')],
     ['Category shares', 'row sums of the cell weights'],
     ['Driver base', `${m.driver_count} drivers`],
-    ['Calibration', m.attenuation_source],
+    ['Overlap correction', m.attenuation_source],
     ['Engine', m.engine_name],
     ['Model', m.model_version],
   ];

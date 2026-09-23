@@ -59,9 +59,10 @@ or the write lock (SQLite), so nothing can write in between.
    one it drops, the migration stops and changes nothing. Tables it does not
    know, such as user_roles, are never touched.
 4. The keys of the stored runs follow the new names: meta.trend_count ->
-   meta.driver_count, meta.trend_fingerprint -> meta.driver_fingerprint, and
-   trend_ids / unscored_trend_ids -> driver_ids / unscored_driver_ids in the
-   integrity events. Each driver fingerprint gains the onset years, which
+   meta.driver_count, meta.trend_fingerprint -> meta.driver_fingerprint,
+   decompositions.dimensions.vc_steps -> vc_stages, and trend_ids /
+   unscored_trend_ids -> driver_ids / unscored_driver_ids in the integrity
+   events. Each driver fingerprint gains the onset years, which
    the previous one did not record, and its exposure maps move onto the
    taxonomy's names as the drivers' do, so the next production run compares
    like with like. No number changes.
@@ -111,7 +112,7 @@ sys.path.insert(0, str(REPO))
 
 import prism.env_loader  # noqa: E402,F401  (loads .env; shell variables win)
 from prism.config import (CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS,  # noqa: E402
-                          VALID_DIFFUSION_CURVES, VC_STEPS, display_code)
+                          VALID_DIFFUSION_CURVES, VC_STAGES, display_code)
 from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, SCORE_FIELDS, SOURCE_TIERS  # noqa: E402
 
 MIGRATION = "0001_driver_schema"
@@ -143,6 +144,7 @@ LOCKED_TABLES = ("simulation_runs", "journey_content")
 LOCK_TIMEOUT = "10s"
 RUN_META_RENAMES = {"trend_count": "driver_count", "trend_fingerprint": "driver_fingerprint"}
 EVENT_DETAIL_RENAMES = {"trend_ids": "driver_ids", "unscored_trend_ids": "unscored_driver_ids"}
+DIMENSION_RENAMES = {"vc_steps": "vc_stages"}
 SOURCE_KINDS = ("primary source", "analyst report", "trade press", "primary_source", "analyst_report", "trade_press")
 
 
@@ -167,7 +169,7 @@ def _ddl(postgres: bool) -> list:
             diffusion_curve TEXT NOT NULL CHECK (diffusion_curve IN ({one_of(VALID_DIFFUSION_CURVES)})),
             gp1_pct_affected REAL NOT NULL CHECK (gp1_pct_affected > 0 AND gp1_pct_affected <= 1),
             uncertainty INTEGER NOT NULL CHECK (uncertainty BETWEEN 0 AND 5),
-            vc_epicentre TEXT NOT NULL CHECK (vc_epicentre IN ({one_of(VC_STEPS)})),
+            vc_epicentre TEXT NOT NULL CHECK (vc_epicentre IN ({one_of(VC_STAGES)})),
             confidence TEXT NOT NULL CHECK (confidence IN ({one_of(CONFIDENCE_LEVELS)})),
             analysis TEXT NOT NULL,
             baseline TEXT NOT NULL,
@@ -208,7 +210,7 @@ def _ddl(postgres: bool) -> list:
             uncertainty INTEGER CHECK (uncertainty BETWEEN 0 AND 5),
             category_exposure TEXT,
             regional_exposure TEXT,
-            vc_epicentre TEXT CHECK (vc_epicentre IN ({one_of(VC_STEPS)})),
+            vc_epicentre TEXT CHECK (vc_epicentre IN ({one_of(VC_STAGES)})),
             comment TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE (driver_id, user_id)
@@ -268,14 +270,14 @@ def epicentre_of(profile):
     The stage is the highest score; a tie goes to the stage nearest the
     score-weighted centre of the profile, and an exact tie in distance to the
     earlier stage. A profile that scores nothing (none stored, all zero, or
-    only names outside VC_STEPS) has no stage.
+    only names outside VC_STAGES) has no stage.
     """
     if not isinstance(profile, dict):
         return None
     scores = []
-    for step in VC_STEPS:
+    for stage in VC_STAGES:
         try:
-            scores.append(float(profile.get(step) or 0))
+            scores.append(float(profile.get(stage) or 0))
         except (TypeError, ValueError):
             scores.append(0.0)
     total = sum(scores)
@@ -287,7 +289,7 @@ def epicentre_of(profile):
     for i, v in enumerate(scores):
         if v == top and (best is None or abs(i + 1 - centre) < abs(best - centre)):
             best = i + 1
-    return VC_STEPS[best - 1]
+    return VC_STAGES[best - 1]
 
 
 def editor_sources(data_source):
@@ -318,13 +320,20 @@ def editor_sources(data_source):
 
 
 def rename_run_keys(results: dict) -> bool:
-    """Rename the trend-named keys of one stored results bundle in place; True if any changed."""
+    """Give the keys of one stored results bundle their current names, in place; True if any changed."""
     changed = False
     meta = results.get("meta")
     if isinstance(meta, dict):
         for old, new in RUN_META_RENAMES.items():
             if old in meta and new not in meta:
                 meta[new] = meta.pop(old)
+                changed = True
+    decompositions = results.get("decompositions")
+    dimensions = decompositions.get("dimensions") if isinstance(decompositions, dict) else None
+    if isinstance(dimensions, dict):
+        for old, new in DIMENSION_RENAMES.items():
+            if old in dimensions and new not in dimensions:
+                dimensions[new] = dimensions.pop(old)
                 changed = True
     for event in results.get("integrity_events") or []:
         detail = event.get("detail") if isinstance(event, dict) else None

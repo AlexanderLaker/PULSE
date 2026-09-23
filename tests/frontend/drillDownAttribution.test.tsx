@@ -41,7 +41,7 @@ import ShiftAnalysis from '@/components/dashboard/ShiftAnalysis';
 import { rankContributors } from '@/components/dashboard/shift/contributors';
 
 type FixtureDriver = Pick<Driver,
-  'id' | 'normalized_score' | 'category_exposure' | 'regional_exposure'
+  'id' | 'expected_effect' | 'category_exposure' | 'regional_exposure'
   | 'uncertainty' | 'peak_year' | 'diffusion_curve' | 'start_year'> & { force: string };
 
 const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'driverAttribution.fixture.json'), 'utf8')) as {
@@ -64,7 +64,7 @@ function fixtureDrivers(): Driver[] {
     ...d,
     force: d.force as ForceName,
     name: d.id,
-    direction: d.normalized_score < 0 ? 'Contraction' : 'Expansion',
+    direction: d.expected_effect < 0 ? 'Contraction' : 'Expansion',
   }));
 }
 

@@ -46,7 +46,7 @@ CATEGORIES = [
 # The value chain in order. A driver names one stage, its epicentre: the stage
 # where its impact centres. The value-chain lens assigns the driver's whole
 # contribution to it; propagation along the chain is not modelled.
-VC_STEPS = [
+VC_STAGES = [
     "Raw Materials", "Formulation", "Manufacturing", "Packaging",
     "Supply Chain", "Marketing", "Commercial", "Consumer",
 ]
@@ -191,8 +191,8 @@ DEFAULT_FORCE_WEIGHTS = {f: 1.0 / len(FORCES) for f in FORCES}
 # matter). It is derived from the drivers' category exposure vectors: weighted
 # Jaccard similarity, excess over the random-pair baseline, a force-size
 # asymmetry across forces, and per-pair mechanism adjustments with written
-# reasons. scripts/compute_attenuation.py computes it from the driver base and
-# writes the record, data/calibration/attenuation.json, and
+# reasons. scripts/compute_overlap_correction.py computes it from the driver
+# base and writes the record, data/parameters/overlap_correction.json, and
 # prism/overlap_correction.py, which these defaults read.
 #
 # Per force, the engine multiplies the force's summed contribution in a cell
@@ -202,7 +202,7 @@ DEFAULT_FORCE_WEIGHTS = {f: 1.0 / len(FORCES) for f in FORCES}
 # 1 - overlap x (n_eff - 1) / n_eff, with n_eff the magnitude-weighted
 # effective number of contributing drivers in the cell.
 
-DEFAULT_ATTENUATION_SOURCE = overlap_correction.CALIBRATION_VERSION
+DEFAULT_ATTENUATION_SOURCE = overlap_correction.VERSION
 DEFAULT_PER_FORCE_ATTENUATION = overlap_correction.PER_FORCE_ATTENUATION
 DEFAULT_WITHIN_FORCE_OVERLAP = overlap_correction.WITHIN_FORCE_OVERLAP
 # O[i][j]: the share of force i's signal already carried by force j (not
@@ -275,7 +275,7 @@ def build_driver_correlation_matrix(driver_forces, within_force_rho, force_corre
 # time (run_production.py --cell-weights FILE); absolute figures in that file
 # are normalised to shares before the engine sees them and are never stored.
 # scripts/build_cell_weights.py builds it from its graded inputs and writes
-# the record, data/calibration/cell_weights_estimate.json, and
+# the record, data/parameters/cell_weight_estimate.json, and
 # prism/cell_weight_estimate.py, which these defaults read.
 DEFAULT_CELL_WEIGHTS = cell_weight_estimate.CELL_WEIGHTS
 DEFAULT_CELL_WEIGHTS_SOURCE = cell_weight_estimate.SOURCE

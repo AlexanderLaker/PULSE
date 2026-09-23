@@ -1,9 +1,9 @@
 """The overlap correction: prism/config.py reads the generated record, and the record is reproducible.
 
 All three layers (per-force attenuation, within-force overlap, cross-force
-matrix) come from one derivation: scripts/compute_attenuation.py writes the
-record, data/calibration/attenuation.json, and prism/overlap_correction.py,
-which prism/config.py reads. The correction depends on the category exposure
+matrix) come from one derivation: scripts/compute_overlap_correction.py
+writes the record, data/parameters/overlap_correction.json, and
+prism/overlap_correction.py, which prism/config.py reads. The correction depends on the category exposure
 space, so a taxonomy or exposure change must be followed by a re-run; these
 tests fail until it is.
 """
@@ -18,7 +18,7 @@ from prism.config_validation import validate_model_config
 from support import load_module
 
 REPO = Path(__file__).resolve().parent.parent
-RECORD = REPO / "data" / "calibration" / "attenuation.json"
+RECORD = REPO / "data" / "parameters" / "overlap_correction.json"
 
 
 @pytest.fixture(scope="module")
@@ -27,12 +27,12 @@ def record():
 
 
 def _script():
-    return load_module("scripts/compute_attenuation.py")
+    return load_module("scripts/compute_overlap_correction.py")
 
 
 class TestConfigEqualsTheRecord:
     def test_source_label(self, record):
-        assert C.DEFAULT_ATTENUATION_SOURCE == record["calibration_version"]
+        assert C.DEFAULT_ATTENUATION_SOURCE == record["version"]
 
     def test_per_force_attenuation(self, record):
         assert C.DEFAULT_PER_FORCE_ATTENUATION == record["per_force_effective_attenuation"]
@@ -70,7 +70,7 @@ class TestConfigEqualsTheRecord:
 
 class TestReproducible:
     def test_the_script_regenerates_the_record(self, record, tmp_path):
-        out = tmp_path / "attenuation.json"
+        out = tmp_path / "overlap_correction.json"
         _script().compute(out_json=out, verbose=False)
         assert json.loads(out.read_text(encoding="utf-8")) == record
 
@@ -80,14 +80,14 @@ class TestReproducible:
     def test_the_check_passes_and_catches_stale_outputs(self, monkeypatch, tmp_path, capsys):
         script = _script()
         assert script.main(["--check"]) == 0
-        (tmp_path / "attenuation.json").write_text("{}", encoding="utf-8")
+        (tmp_path / "overlap_correction.json").write_text("{}", encoding="utf-8")
         (tmp_path / "overlap_correction.py").write_text("# stale", encoding="utf-8")
-        monkeypatch.setattr(script, "OUT_JSON", tmp_path / "attenuation.json")
+        monkeypatch.setattr(script, "OUT_JSON", tmp_path / "overlap_correction.json")
         monkeypatch.setattr(script, "OUT_PY", tmp_path / "overlap_correction.py")
         monkeypatch.setattr(script, "REPO", tmp_path)
         assert script.main(["--check"]) == 1
         out = capsys.readouterr().out
-        assert "attenuation.json differs from the derivation" in out
+        assert "overlap_correction.json differs from the derivation" in out
         assert "overlap_correction.py differs from the derivation" in out
 
 

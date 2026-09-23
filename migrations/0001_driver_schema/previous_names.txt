@@ -24,3 +24,7 @@ vc_exposure
 vc_weights
 vc_decomposition
 vc_epicentre_(?:step_)?of
+# the value chain's eight stages were called steps
+\bVC_STEPS\b
+\bvc_steps\b
+\bVcStep\b

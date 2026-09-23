@@ -74,7 +74,7 @@ its own; docs/OPERATIONS.md (Roles) shows how to work as an admin locally.
 | `components/dashboard/` | The views and their shared pieces |
 | `hooks/`, `types/` | The data store and the types that mirror the API's JSON |
 | `lib/` | Shared logic: the API client, formatting, the Shift Matrix arithmetic, cell weights, the per-driver attribution, tokens, auth helpers |
-| `data/` | Dashboard content (the Consumer Journey, the generated driver code map), the driver base and the PRISM Analysis templates (`drivers/`), and the generated records of the overlap correction, the cell-weight estimate and the attribution (`calibration/`, `drivers/driver_attribution.json`) |
+| `data/` | Dashboard content (the Consumer Journey, the generated driver code map), the driver base and the PRISM Analysis templates (`drivers/`), and the generated records of the overlap correction, the cell-weight estimate and the attribution (`parameters/`, `drivers/driver_attribution.json`) |
 | `prism/` | The Python package: the engine (`engine.py`), the model configuration, the driver base, persistence, the QA workbook and the API (`api/`) |
 | `api/index.py` | The Vercel entry point of the API |
 | `scripts/` | The production run, the generators and maintenance tools |
@@ -96,7 +96,7 @@ its own; docs/OPERATIONS.md (Roles) shows how to work as an admin locally.
 Four generators keep committed files in step with their inputs; each takes
 `--check` to verify them, and CI runs all four (docs/OPERATIONS.md):
 `scripts/generate_seed.py`, `scripts/build_cell_weights.py`,
-`scripts/compute_attenuation.py` and `scripts/build_driver_analysis.py`.
+`scripts/compute_overlap_correction.py` and `scripts/build_driver_analysis.py`.
 
 ## Configuration
 

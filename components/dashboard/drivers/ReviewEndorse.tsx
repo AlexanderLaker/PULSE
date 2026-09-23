@@ -11,7 +11,7 @@ import {
 import { ApiError } from '@/lib/apiClient';
 import { CATEGORIES, HORIZON, NO_VALUE, REGIONS, firstPeakYear, fmtPct, shortCat } from '@/lib/format';
 import { S, EXPANSION_RGB, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
-import { VC_STEPS, VC_SHORT_LABELS, shortStage } from '@/lib/valueChain';
+import { VC_STAGES, VC_SHORT_LABELS, shortStage } from '@/lib/valueChain';
 import type { Driver, DriverUpdate, ExposureMap, MeanAggregate } from '@/types';
 import SectionCard from '@/components/dashboard/SectionCard';
 import { curveLabel, DIFFUSION_LABELS, EXPERT_COLOR, REVIEWED_COLOR, uncLabel, vcPos } from './shared';
@@ -156,12 +156,12 @@ const EpicentreVotePanel: FC<{
     <div>
       <div style={{ position: 'relative', height: 78 }}>
         <div style={{ position: 'absolute', left: 0, right: 0, top: 54, height: 6, borderRadius: 6, backgroundColor: S.surfaceHigh }} />
-        {VC_STEPS.map((step) => (
+        {VC_STAGES.map((name) => (
           <button
-            key={step} type="button" onClick={() => onEndorse(step)}
-            title={`Endorse ${step}`} aria-label={`Endorse ${step}`}
+            key={name} type="button" onClick={() => onEndorse(name)}
+            title={`Endorse ${name}`} aria-label={`Endorse ${name}`}
             style={{
-              position: 'absolute', top: 52, left: vcPos(step), width: 10, height: 10,
+              position: 'absolute', top: 52, left: vcPos(name), width: 10, height: 10,
               borderRadius: 999, backgroundColor: S.surfaceHighest, border: 'none',
               padding: 0, cursor: 'pointer', transform: 'translateX(-50%)',
             }}
@@ -195,16 +195,16 @@ const EpicentreVotePanel: FC<{
         <span title={`Endorsed · ${endorsed}`} style={{ position: 'absolute', top: 47, left: vcPos(endorsed), width: 20, height: 20, borderRadius: 999, backgroundColor: REVIEWED_COLOR, border: `3px solid ${S.surface}`, outline: `1px solid rgba(${EXPANSION_RGB}, 0.45)`, transform: 'translateX(-50%)', pointerEvents: 'none' }} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', marginTop: 2 }}>
-        {VC_STEPS.map((step, i) => (
+        {VC_STAGES.map((name, i) => (
           <button
-            key={step} type="button" onClick={() => onEndorse(step)}
-            aria-pressed={step === endorsed}
-            title={`Endorse ${step}`}
+            key={name} type="button" onClick={() => onEndorse(name)}
+            aria-pressed={name === endorsed}
+            title={`Endorse ${name}`}
             style={{
               border: 'none', background: 'transparent', padding: '4px 0', cursor: 'pointer',
               fontFamily: BODY_FONT, fontSize: 11, textAlign: 'center', lineHeight: 1.25,
-              color: step === endorsed ? REVIEWED_COLOR : S.mutedText,
-              fontWeight: step === endorsed ? 800 : 400,
+              color: name === endorsed ? REVIEWED_COLOR : S.mutedText,
+              fontWeight: name === endorsed ? 800 : 400,
             }}
           >
             {VC_SHORT_LABELS[i]}

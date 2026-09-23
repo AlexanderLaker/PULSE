@@ -25,7 +25,7 @@ from urllib.parse import quote
 
 import pytest
 
-from prism.config import CATEGORIES, VC_STEPS
+from prism.config import CATEGORIES, VC_STAGES
 from prism.input_drift import driver_fingerprint
 from prism.seed_drivers import DRIVERS
 from support import load_module
@@ -54,8 +54,8 @@ def sha(text: str) -> str:
 def previous_profile(stage: str) -> dict:
     """The eight value-chain scores the previous editor stored for a chosen stage:
     5 there, 3 one stage away, 1 two away, 0 elsewhere."""
-    at = VC_STEPS.index(stage)
-    return {step: {0: 5, 1: 3, 2: 1}.get(abs(i - at), 0) for i, step in enumerate(VC_STEPS)}
+    at = VC_STAGES.index(stage)
+    return {name: {0: 5, 1: 3, 2: 1}.get(abs(i - at), 0) for i, name in enumerate(VC_STAGES)}
 
 
 def previous_scores(d) -> dict:
@@ -187,6 +187,7 @@ FIRST_RUN = {
         {"type": "vc_epicentre_coverage", "detail": {"unscored_trend_ids": ["technology_r01"]}},
         {"type": "other", "detail": None},
     ],
+    "decompositions": {"force": {}, "dimensions": {"vc_steps": ["Raw Materials", "Consumer"], "regions": ["Europe"]}},
     "totals": {"portfolio": {"2035": {"median": -0.0558}}},
 }
 
@@ -208,7 +209,7 @@ def previous_release_run() -> dict:
     return {**{k: {} for k in parts}, "cell_weights_source": "ESTIMATE, not Henkel P&L", "integrity_events": [],
             "meta": {"engine_fidelity": "scipy", "numerics_backend": "scipy 1.14.1, numpy 2.1.3", "seed": 42,
                      "chain_seeds": [42, 1000045, 2000048], "chains": 3, "model_version": "2.12.0",
-                     "engine_name": "beta_copula", "vc_attribution_basis": "epicentre",
+                     "engine_name": "bayesian_copula", "vc_attribution_basis": "epicentre",
                      "region_weights_used": {}, "cell_weights_used": {}, "category_weights_used": {},
                      "cell_weights_source": "ESTIMATE, not Henkel P&L", "trend_count": 51,
                      "attenuation_source": "calibrated_v3.12_september2026",
@@ -230,7 +231,7 @@ def fill_previous_database(conn, p: str, serial: str, json_type: str = "TEXT", o
             "user_override, probability_posterior, gp1_pct_affected, peak_year, diffusion_curve, ai_suggestion, "
             f"uncertainty) VALUES ({', '.join([p] * 21)})",
             (d.id, d.force, "", d.name, STORED_DESCRIPTION.get(d.id, d.description), d.direction,
-             4 if admin_edit else d.probability, d.start_year, d.normalized_score, f"Earlier analysis of {d.id}.",
+             4 if admin_edit else d.probability, d.start_year, d.expected_effect, f"Earlier analysis of {d.id}.",
              json.dumps(EDITOR_SOURCES) if admin_edit else "Circana (Apr 2026); YouGov (Jul 2026)", "",
              d.confidence, False, admin_edit, None, d.gp1_pct_affected, d.peak_year,
              d.diffusion_curve, None if d.id == "technology_r01" else json.dumps(previous_scores(d)), d.uncertainty))
@@ -253,7 +254,7 @@ def fill_previous_database(conn, p: str, serial: str, json_type: str = "TEXT", o
     attribution = "causal_decomposition" if older else "force_attribution"   # renamed in the previous release
     cur.execute(f"INSERT INTO simulation_runs (iterations, model_type, results, {attribution}, "
                 f"allocation_recommendation) VALUES ({p}, {p}, {p}, {p}, {p})",
-                (150000, "bayesian", json.dumps(FIRST_RUN), '{"Consumer": 0.5}', '{"a": 1}'))
+                (50000, "bayesian", json.dumps(FIRST_RUN), '{"Consumer": 0.5}', '{"a": 1}'))
     if json_type == "TEXT":   # a JSONB column cannot hold a malformed bundle
         cur.execute(f"INSERT INTO simulation_runs (iterations, results) VALUES ({p}, {p})", (10, "{not json"))
     cur.execute(f"INSERT INTO simulation_runs (iterations, results) VALUES ({p}, {p})",
@@ -274,7 +275,7 @@ def fill_previous_database(conn, p: str, serial: str, json_type: str = "TEXT", o
         cur.execute("INSERT INTO delphi_rounds (round_number, trend_id, scorer_id, session_id) "
                     "VALUES (1, 'consumer_r01', 'x', 's1')")
         cur.execute("INSERT INTO delphi_calibration (session_id, scorer_id) VALUES ('s1', 'x')")
-        cur.execute("UPDATE simulation_runs SET scenario = 'base', config_snapshot_id = 1 WHERE iterations = 150000")
+        cur.execute("UPDATE simulation_runs SET scenario = 'base', config_snapshot_id = 1 WHERE iterations = 50000")
     conn.commit()
 
 
@@ -533,6 +534,8 @@ class TestMigration:
             "retired_r99": {"p": 2, "ce": {"Hair: Care": 1}}}}
         assert [e["detail"] for e in first["integrity_events"]] == [
             {"driver_ids": ["consumer_r01"]}, {"unscored_driver_ids": ["technology_r01"]}, None]
+        assert first["decompositions"] == {
+            "force": {}, "dimensions": {"vc_stages": ["Raw Materials", "Consumer"], "regions": ["Europe"]}}
         assert first["totals"] == FIRST_RUN["totals"]
         assert rows[1]["results"] == "{not json"
         assert json.loads(rows[2]["results"]) == {"meta": {"driver_count": 51}}
@@ -542,7 +545,7 @@ class TestMigration:
         drivers unchanged since that run."""
         conn = sqlite3.connect(previous)
         conn.execute("INSERT INTO simulation_runs (iterations, results) VALUES (?, ?)",
-                     (150000, json.dumps(previous_release_run())))
+                     (50000, json.dumps(previous_release_run())))
         conn.commit()
         conn.close()
         assert migration.main(["--sqlite", str(previous)]) == 0
@@ -677,7 +680,7 @@ class TestMigration:
             "scenario", "model_type", "config_snapshot_id", "causal_decomposition", "allocation_recommendation",
             "convergence_diagnostics"}
         rows = query(older, "SELECT * FROM simulation_runs ORDER BY id")
-        assert [r["iterations"] for r in rows] == [150000, 10, 20] and [r["id"] for r in rows] == [1, 2, 3]
+        assert [r["iterations"] for r in rows] == [50000, 10, 20] and [r["id"] for r in rows] == [1, 2, 3]
         # the autoincrement counter carried over: a new run continues after the last id
         conn = sqlite3.connect(older)
         conn.execute("INSERT INTO simulation_runs (iterations, results) VALUES (5, '{}')")
@@ -751,6 +754,8 @@ class TestHelpers:
         assert migration.rename_run_keys(results) is False
         assert migration.rename_run_keys({"meta": {"driver_count": 5, "trend_count": 4}}) is False
         assert migration.rename_run_keys({"integrity_events": ["not a dict"]}) is False
+        assert migration.rename_run_keys({"decompositions": {"dimensions": {"vc_steps": [], "vc_stages": []}}}) is False
+        assert migration.rename_run_keys({"decompositions": ["not a dict"]}) is False
 
     def test_editor_sources(self, migration):
         saved = [{"title": "A", "url": "https://a", "data": "analyst report (Aug 2026)", "tier": "A"},
@@ -766,7 +771,7 @@ class TestHelpers:
     def test_a_stored_profile_reads_as_the_stage_it_centres_on(self, migration):
         """The rule the previous engine and dashboard read a profile with, so each
         driver keeps the stage it was shown with."""
-        for stage in VC_STEPS:
+        for stage in VC_STAGES:
             assert migration.epicentre_of(previous_profile(stage)) == stage, stage
         # the highest score of any profile
         assert migration.epicentre_of({"Manufacturing": 1, "Packaging": 1, "Supply Chain": 2, "Marketing": 4,
@@ -774,7 +779,7 @@ class TestHelpers:
         # a tie goes to the stage nearest the score-weighted centre (here pulled downstream)
         assert migration.epicentre_of({"Raw Materials": 3, "Commercial": 2, "Consumer": 3}) == "Consumer"
         # a flat profile centres at 4.5; of the two equally near stages the earlier wins
-        assert migration.epicentre_of({step: 2 for step in VC_STEPS}) == "Packaging"
+        assert migration.epicentre_of({stage: 2 for stage in VC_STAGES}) == "Packaging"
         # names outside the chain, and values that are not numbers, count as 0
         assert migration.epicentre_of({"supply_chain": 5, "Manufacturing": 2}) == "Manufacturing"
         assert migration.epicentre_of({"Marketing": "high", "Consumer": 1}) == "Consumer"
@@ -913,6 +918,17 @@ def postgres_schema(conn, schema: str) -> dict:
     return out
 
 
+def fill_previous_postgres(schema: str, json_type: str = "TEXT", older: bool = False) -> None:
+    """fill_previous_database on a PostgreSQL schema. The connection is closed
+    even when filling fails, so the caller's DROP SCHEMA never waits on its locks."""
+    import psycopg2
+    conn = psycopg2.connect(schema_url(schema))
+    try:
+        fill_previous_database(conn, "%s", "SERIAL PRIMARY KEY", json_type, older)
+    finally:
+        conn.close()
+
+
 @pytest.fixture
 def pg_previous(request):
     """A fresh PostgreSQL schema holding a previous-schema database: (admin connection, schema name).
@@ -925,10 +941,7 @@ def pg_previous(request):
     admin.autocommit = True
     admin.cursor().execute(f"CREATE SCHEMA {name}")
     try:
-        conn = psycopg2.connect(schema_url(name))
-        fill_previous_database(conn, "%s", "SERIAL PRIMARY KEY", options.get("json_type", "TEXT"),
-                               options.get("older", False))
-        conn.close()
+        fill_previous_postgres(name, options.get("json_type", "TEXT"), options.get("older", False))
         yield admin, name
     finally:
         admin.cursor().execute(f"DROP SCHEMA IF EXISTS {name} CASCADE")
@@ -998,9 +1011,7 @@ def test_postgres(migration, monkeypatch, capsys, json_type):
     try:
         for name in (previous_schema_name, fresh_schema_name):
             admin.cursor().execute(f"CREATE SCHEMA {name}")
-        conn = psycopg2.connect(schema_url(previous_schema_name))
-        fill_previous_database(conn, "%s", "SERIAL PRIMARY KEY", json_type)
-        conn.close()
+        fill_previous_postgres(previous_schema_name, json_type)
 
         monkeypatch.setenv("POSTGRES_URL", schema_url(previous_schema_name))
         assert migration.main([]) == 1                        # a PostgreSQL database needs --postgres

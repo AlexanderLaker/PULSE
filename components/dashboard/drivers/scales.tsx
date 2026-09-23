@@ -8,7 +8,7 @@ import type { FC } from 'react';
 import { CATEGORIES, REGIONS, shortCat } from '@/lib/format';
 import { UNCERTAINTY_LABELS } from '@/lib/uncertainty';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
-import { VC_STEPS, VC_SHORT_LABELS, stageIndex, type VcStep } from '@/lib/valueChain';
+import { VC_STAGES, VC_SHORT_LABELS, stageIndex, type VcStage } from '@/lib/valueChain';
 import type { ExposureMap } from '@/types';
 import { DELTA_COLOR, DIFFUSION_LABELS, EXPERT_COLOR, uncLabel, vcPos, vcStageLabel } from './shared';
 
@@ -107,9 +107,9 @@ export const EpicentreRail: FC<{ stage: string; baseline: string }> = ({ stage, 
     <div title={title} aria-label={title} style={{ cursor: 'help' }}>
       <div style={{ position: 'relative', height: 40 }}>
         <div style={{ position: 'absolute', left: 0, right: 0, top: 17, height: 6, borderRadius: 6, backgroundColor: S.surfaceHigh }} />
-        {VC_STEPS.map((step) => (
-          <span key={step} style={{
-            position: 'absolute', top: 16, left: vcPos(step),
+        {VC_STAGES.map((name) => (
+          <span key={name} style={{
+            position: 'absolute', top: 16, left: vcPos(name),
             width: 8, height: 8, borderRadius: 999,
             backgroundColor: S.surfaceHighest, transform: 'translateX(-50%)',
           }} />
@@ -129,11 +129,11 @@ export const EpicentreRail: FC<{ stage: string; baseline: string }> = ({ stage, 
         }} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', marginTop: 2 }}>
-        {VC_STEPS.map((step, i) => (
-          <span key={step} style={{
+        {VC_STAGES.map((name, i) => (
+          <span key={name} style={{
             fontSize: 11, textAlign: 'center', lineHeight: 1.25,
-            color: step === stage ? S.primary : S.mutedText,
-            fontWeight: step === stage ? 800 : 400,
+            color: name === stage ? S.primary : S.mutedText,
+            fontWeight: name === stage ? 800 : 400,
           }}>
             {VC_SHORT_LABELS[i]}
           </span>
@@ -149,14 +149,14 @@ export const EpicentreRail: FC<{ stage: string; baseline: string }> = ({ stage, 
 export const EpicentreSlider: FC<{
   value: string | null;
   baseline: string;
-  onChange: (stage: VcStep) => void;
+  onChange: (stage: VcStage) => void;
 }> = ({ value, baseline, onChange }) => (
   <div>
     <div style={{ position: 'relative', height: 44 }}>
       <div style={{ position: 'absolute', left: 0, right: 0, top: 19, height: 6, borderRadius: 6, backgroundColor: S.surfaceHigh }} />
-      {VC_STEPS.map((step) => (
-        <span key={step} style={{
-          position: 'absolute', top: 17, left: vcPos(step), width: 10, height: 10,
+      {VC_STAGES.map((name) => (
+        <span key={name} style={{
+          position: 'absolute', top: 17, left: vcPos(name), width: 10, height: 10,
           borderRadius: 999, backgroundColor: S.surfaceHighest, transform: 'translateX(-50%)',
         }} />
       ))}
@@ -176,25 +176,25 @@ export const EpicentreSlider: FC<{
         }} />
       )}
       <input
-        type="range" min={0} max={VC_STEPS.length - 1} step={1}
+        type="range" min={0} max={VC_STAGES.length - 1} step={1}
         value={stageIndex(value ?? baseline)}
-        onChange={(e) => onChange(VC_STEPS[parseInt(e.target.value, 10)])}
+        onChange={(e) => onChange(VC_STAGES[parseInt(e.target.value, 10)])}
         aria-label="Value chain epicentre"
         aria-valuetext={vcStageLabel(value)}
         style={{ position: 'absolute', left: 0, right: 0, top: 8, width: '100%', height: 28, opacity: 0, cursor: 'grab', margin: 0 }}
       />
     </div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', marginTop: 2 }}>
-      {VC_STEPS.map((step, i) => (
+      {VC_STAGES.map((name, i) => (
         <button
-          key={step} type="button" onClick={() => onChange(step)}
-          aria-pressed={step === value}
-          title={baseline === step ? `${step} (baseline)` : step}
+          key={name} type="button" onClick={() => onChange(name)}
+          aria-pressed={name === value}
+          title={baseline === name ? `${name} (baseline)` : name}
           style={{
             border: 'none', background: 'transparent', padding: '4px 0', cursor: 'pointer',
             fontFamily: BODY_FONT, fontSize: 11, textAlign: 'center', lineHeight: 1.25,
-            color: step === value ? S.primary : S.mutedText,
-            fontWeight: step === value ? 800 : 400,
+            color: name === value ? S.primary : S.mutedText,
+            fontWeight: name === value ? 800 : 400,
           }}
         >
           {VC_SHORT_LABELS[i]}

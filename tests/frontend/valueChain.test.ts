@@ -3,12 +3,12 @@
  * the rail by its position in the chain.
  */
 import { describe, it, expect } from 'vitest';
-import { VC_STEPS, shortStage, stageIndex } from '@/lib/valueChain';
+import { VC_STAGES, shortStage, stageIndex } from '@/lib/valueChain';
 import { vcPos, vcStageLabel } from '@/components/dashboard/drivers/shared';
 
 describe('the value chain', () => {
   it('places each stage by its position, and nothing else', () => {
-    expect(VC_STEPS.map(stageIndex)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(VC_STAGES.map(stageIndex)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     for (const other of [null, undefined, '', 'Retail', 'marketing']) expect(stageIndex(other)).toBe(-1);
   });
 

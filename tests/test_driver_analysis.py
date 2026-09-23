@@ -85,7 +85,7 @@ class TestDecomposition:
     def test_cell_shifts_equal_the_engine_at_the_means_with_jitter_off(self, build, drivers):
         config = ModelConfig().copy_with(peak_year_jitter=False)
         dec = build.decompose(config, drivers)
-        means = np.array([d.normalized_score for d in drivers])
+        means = np.array([d.expected_effect for d in drivers])
         # the engine's vectorised core, fed the Beta means as its "draws"
         eng = MonteCarloEngine(config, seed=1)
         n_cats, n_reg, n_years = len(CATEGORIES), 4, len(config.path_years)
@@ -120,8 +120,8 @@ class TestDecomposition:
         config = ModelConfig()
         dec = build.decompose(config, drivers)
         det = float(dec["port"][:, -1].sum())
-        db = DriverSet(drivers=list(drivers))
-        res = MonteCarloEngine(config, seed=42).run(db, iterations=4000)
+        driver_set = DriverSet(drivers=list(drivers))
+        res = MonteCarloEngine(config, seed=42).run(driver_set, iterations=4000)
         median = res["totals"]["portfolio"][2035]["median"]
         # the sum at the means sits within a few per cent of the MC median
         assert abs(median / det - 1) < 0.03

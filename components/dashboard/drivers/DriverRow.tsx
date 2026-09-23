@@ -127,7 +127,7 @@ const RowEndCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverPro
   }
 
   // Driver List and Review: the driver's own shift, with the arithmetic on hover.
-  const shift = driver.normalized_score;
+  const shift = driver.expected_effect;
   return (
     <div className="text-right" style={{ position: 'relative' }}
       onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}>

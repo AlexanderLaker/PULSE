@@ -145,7 +145,7 @@ describe('British spelling', () => {
       ['odor', 'toward', 'programs', 'Optimized']);
     expect(americanForms('colour-safe care for grey hair, sized for travel')).toEqual([]);
     expect(americanForms('Keratin Color and Color Wow at https://example.org/color-center')).toEqual([]);
-    expect(americanForms('normalized_score')).toEqual([]);
+    expect(americanForms('row_normalized_cell_weights')).toEqual([]);
     expect(americanForms('flex items-center justify-center')).toEqual([]);
     expect(americanForms('color 150ms ease')).toEqual([]);
     expect(americanForms('border-color 0.15s, background-color 0.15s')).toEqual([]);
