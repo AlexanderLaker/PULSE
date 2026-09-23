@@ -186,6 +186,17 @@ with the driver base, the first time a request needs the database.
   `DATABASE_URL` at the backup branch). The archive file of step 5 holds the
   dropped rows as well.
 
+## When a shipped text changes
+
+Until this migration has run on every database, it is what carries a
+changed driver description, Consumer Journey tile text or stage label to
+them. The new text becomes the `text` of the entry in `descriptions.json`
+(an entry is added where the driver has none) or in `journey_edits.json`,
+and the SHA-256 of the text it replaces joins the entry's `previous_sha256`.
+`tests/test_migration.py` checks that every entry ends on the text the code
+ships: a description on the driver base's, a journey text on
+`data/consumerJourney.ts`.
+
 ## Exit codes
 
 | Code | Meaning |

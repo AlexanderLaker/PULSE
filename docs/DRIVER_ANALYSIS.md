@@ -187,14 +187,14 @@ A reading runs 200 to 600 words whatever the driver's weight, because "why is
 it small" needs as much explanation as "why is it large".
 
 `tests/test_driver_analysis.py` enforces what a machine can check: the four
-labels in order and the basis line, the length, the forbidden content (a
-list of patterns for restated scores in numerals and in words, history,
-management response, dashes, filler and the word trend), no unfilled
-placeholder, the direction wording, an observable in the band paragraph, and
-three template checks against hand-typed model figures (the shapes a model
-figure takes in the prose, any rendered value typed into its own template,
-and the peak year anywhere but `{peak_year}`). The rule on facts outside the description and sources is held by
-the author and by the review of every regeneration.
+labels in order and the basis line, the length, the forbidden content (a list
+of patterns for restated scores in numerals and in words, history, management
+response, dashes, filler and the word trend), no unfilled placeholder, the
+direction wording, an observable in the band paragraph, and three template
+checks against hand-typed model figures (the shapes a model figure takes in
+the prose, any rendered value typed into its own template, and the peak year
+anywhere but `{peak_year}`). The rule on facts outside the description and
+sources is held by the author and by the review of every regeneration.
 
 ## Regeneration
 

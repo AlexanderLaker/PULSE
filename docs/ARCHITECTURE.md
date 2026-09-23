@@ -209,10 +209,10 @@ Tailwind reads too); the server side has `db.ts`, `roles.ts`, `audit.ts` (the
 role-change entries of the audit log), `prismJwt.ts` and `backend.ts`. The
 types in `types/` mirror the API's JSON.
 
-The Consumer Journey content ships with the dashboard (`data/consumerJourney.ts`);
-once an admin saves an edit, the newest stored version replaces the bundled
-tiles. The Profit Pool Explorer's data is `lib/profitPoolData.ts`
-(docs/EXPLORER.md). Neither feeds the simulation.
+The Consumer Journey content ships with the dashboard
+(`data/consumerJourney.ts`); once an admin saves an edit, the newest stored
+version replaces the bundled tiles. The Profit Pool Explorer's data is
+`lib/profitPoolData.ts` (docs/EXPLORER.md). Neither feeds the simulation.
 
 ## The database
 
@@ -246,9 +246,9 @@ drivers (`insert_drivers`, `save_driver_edit`) run the engine's own check,
 `simulation_problems`, before anything is written, which adds what the
 constraints leave out: the onset and peak years, the peak after the onset
 (a rule that depends on the model's base year) and a score for every
-category and every region. An edit updates the driver row in place instead
-of deleting and inserting it again, because the expert proposals reference
-it with `ON DELETE CASCADE`.
+category and every region. An edit updates the driver row in place; the
+expert proposals reference it with `ON DELETE CASCADE`, so they go only with
+a deleted driver.
 
 ## Deployment
 

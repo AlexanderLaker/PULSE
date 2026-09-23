@@ -48,8 +48,8 @@ Every figure links to a page that shows it, and every figure has a grade:
 GP1 (net sales less direct cost of goods) is not disclosed by any company at
 tier level, so the tier margins are PRISM estimates calibrated against the
 companies' reported gross margins (the latest filings, mostly FY2025; GAAP
-gross margin rather than adjusted figures). They are graded derived or estimate, never reported,
-unless the company-level figure itself is shown.
+gross margin rather than adjusted figures). They are graded derived or
+estimate, never reported, unless the company-level figure itself is shown.
 
 Sizes come from the highest source on this ladder that has the figure:
 

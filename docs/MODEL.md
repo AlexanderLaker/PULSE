@@ -208,10 +208,11 @@ an integrity event.
   share of the category's gross profit, and the value-chain lens gives it
   wholly to the driver's epicentre stage (propagation along the chain is not
   modelled). Each lens's shares add up to 1, so every lens adds up to the same
-  median; a category no driver reaches has a median of zero and no shares. The lenses are attributions of one simulated number, not separate
-  simulations, and they use magnitudes: a lens shows how much of a median each
-  force, stage or region accounts for, not the direction of its own push. The
-  per-driver attribution behind the drill-down and the PRISM Analysis
+  median; a category no driver reaches has a median of zero and no shares. The
+  lenses are attributions of one simulated number, not separate simulations,
+  and they use magnitudes: a lens shows how much of a median each force, stage
+  or region accounts for, not the direction of its own push. The per-driver
+  attribution behind the drill-down and the PRISM Analysis
   (docs/DRIVER_ANALYSIS.md) evaluates the engine's arithmetic itself, with
   signs, timing and the overlap correction, so its totals by force or region
   can differ from these lenses.

@@ -206,13 +206,10 @@ texts. After an edit to `driver_base.json`, in this order:
    `python3 scripts/build_driver_analysis.py` before it (without
    `--reference`: the attribution record carries each driver's name, the
    reference run does not depend on it);
-4. until migration 0001 has run on every database, it is what carries a
-   changed description to them: the new text becomes the `text` of the
-   driver's entry in `migrations/0001_driver_schema/descriptions.json` (an
-   entry is added where the driver has none) and the SHA-256 of the text it
-   replaces joins `previous_sha256`. A changed Consumer Journey tile text or
-   stage label goes into `journey_edits.json` the same way. The migration's
-   tests check that every entry ends on the shipped text;
+4. while migration 0001 has not run on every database, a changed
+   description also goes into the migration's `descriptions.json`, which
+   carries it to them (its README, "When a shipped text changes"; a changed
+   Consumer Journey text goes into `journey_edits.json` the same way);
 5. commit the regenerated files; CI checks all of them.
 
 A new database picks up the base when it is seeded. An existing database
