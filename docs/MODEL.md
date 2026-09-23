@@ -267,11 +267,12 @@ cross-force overlap matrix `O`, where `O[i][j]` is the share of force `i`'s
 signal already carried by force `j` (not symmetric by design). The
 attenuation of a force is `0.5 x (1 - m)`, where `m` is the mean of its row
 in `O` over the five other forces. The record is
-`data/calibration/attenuation.json`. The correction is computed from the
-driver base, not from the live database: it is recomputed whenever the
-categories or the base's exposure scores change (`--check` fails until it
-is), and an exposure edit made on the Drivers page moves it only once the
-base carries the edit.
+`data/calibration/attenuation.json`; the script also writes the three layers
+to `prism/overlap_correction.py`, which the model's defaults read. The
+correction is computed from the driver base, not from the live database: it
+is recomputed whenever the categories or the base's exposure scores change
+(`--check` fails until it is), and an exposure edit made on the Drivers page
+moves it only once the base carries the edit.
 
 ## The cell weights
 
@@ -294,7 +295,8 @@ percent). Each category has its own regional mix, so the matrix is not a
 region vector times a category vector and regional concentration moves the
 category numbers. Every input carries a grade: **B** public reporting
 supports it, **E** defensible but unverified, **G** low-confidence guess. The
-record is `data/calibration/cell_weights_estimate.json`; Settings shows the
+record is `data/calibration/cell_weights_estimate.json`, the matrix the
+model's defaults read `prism/cell_weight_estimate.py`; Settings shows the
 whole derivation whenever the served run used this estimate.
 
 The estimate's marginals are: categories Colour 17.1, Care 13.0, Styling 7.1,

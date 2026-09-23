@@ -1,10 +1,11 @@
-"""The overlap correction: prism/config.py equals the generated record, and the record is reproducible.
+"""The overlap correction: prism/config.py reads the generated record, and the record is reproducible.
 
 All three layers (per-force attenuation, within-force overlap, cross-force
-matrix) come from one record, data/calibration/attenuation.json, written by
-scripts/compute_attenuation.py from the driver base. The correction depends
-on the category exposure space, so a taxonomy or exposure change must be
-followed by a re-run; these tests fail until it is.
+matrix) come from one derivation: scripts/compute_attenuation.py writes the
+record, data/calibration/attenuation.json, and prism/overlap_correction.py,
+which prism/config.py reads. The correction depends on the category exposure
+space, so a taxonomy or exposure change must be followed by a re-run; these
+tests fail until it is.
 """
 import json
 from pathlib import Path
@@ -45,12 +46,6 @@ class TestConfigEqualsTheRecord:
                 expected = 0.0 if i == j else record["cross_force_final"][i][j]
                 assert C.DEFAULT_FORCE_OVERLAP_MATRIX[i][j] == pytest.approx(expected, abs=1e-12), (i, j)
 
-    def test_config_holds_the_printed_blocks_verbatim(self, record):
-        """The script prints the three constants as they appear in prism/config.py."""
-        source = (REPO / "prism" / "config.py").read_text(encoding="utf-8")
-        for block in _script().config_literals(record).split("\n\n"):
-            assert block.strip() in source, block.splitlines()[0]
-
     def test_attenuation_follows_from_the_matrix(self):
         for i in C.FORCES:
             row = [C.DEFAULT_FORCE_OVERLAP_MATRIX[i][j] for j in C.FORCES if j != i]
@@ -79,18 +74,21 @@ class TestReproducible:
         _script().compute(out_json=out, verbose=False)
         assert json.loads(out.read_text(encoding="utf-8")) == record
 
-    def test_the_check_passes_and_catches_a_stale_config(self, monkeypatch, tmp_path, capsys):
+    def test_the_module_config_reads_is_generated_from_the_record(self, record):
+        assert (REPO / "prism" / "overlap_correction.py").read_text(encoding="utf-8") == _script().module_text(record)
+
+    def test_the_check_passes_and_catches_stale_outputs(self, monkeypatch, tmp_path, capsys):
         script = _script()
         assert script.main(["--check"]) == 0
-        stale = tmp_path / "attenuation.json"
-        stale.write_text("{}", encoding="utf-8")
-        monkeypatch.setattr(script, "OUT_JSON", stale)
+        (tmp_path / "attenuation.json").write_text("{}", encoding="utf-8")
+        (tmp_path / "overlap_correction.py").write_text("# stale", encoding="utf-8")
+        monkeypatch.setattr(script, "OUT_JSON", tmp_path / "attenuation.json")
+        monkeypatch.setattr(script, "OUT_PY", tmp_path / "overlap_correction.py")
         monkeypatch.setattr(script, "REPO", tmp_path)
-        (tmp_path / "prism").mkdir()
-        (tmp_path / "prism" / "config.py").write_text("# no blocks", encoding="utf-8")
         assert script.main(["--check"]) == 1
         out = capsys.readouterr().out
-        assert "differs from the derivation" in out and "does not hold the three blocks" in out
+        assert "attenuation.json differs from the derivation" in out
+        assert "overlap_correction.py differs from the derivation" in out
 
 
 class TestCopula:

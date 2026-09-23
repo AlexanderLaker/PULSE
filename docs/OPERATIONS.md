@@ -91,8 +91,8 @@ compares:
 
 ```bash
 python3 scripts/generate_seed.py --check          # prism/seed_drivers.py, data/driverCodeMap.ts
-python3 scripts/build_cell_weights.py --check     # the cell-weight record, lib/cellWeightProvenance.ts
-python3 scripts/compute_attenuation.py --check    # the overlap-correction record and prism/config.py
+python3 scripts/build_cell_weights.py --check     # the cell-weight record, lib/cellWeightProvenance.ts, prism/cell_weight_estimate.py
+python3 scripts/compute_attenuation.py --check    # the overlap-correction record, prism/overlap_correction.py
 python3 scripts/build_driver_analysis.py --check  # the attribution record, the PRISM Analysis texts, the parity fixture
 ```
 
@@ -238,11 +238,9 @@ back as that migration's runbook says.
   records it as done, and the API and the production run refuse a database
   that has not recorded it (503 and exit code 1, naming the migration).
 - **The cell-weight estimate** is changed in `scripts/build_cell_weights.py`
-  (its inputs and grades). Run it to write the record and
-  `lib/cellWeightProvenance.ts`, paste the output of `--emit-python` over
-  `DEFAULT_CELL_WEIGHTS` in `prism/config.py` (the generator's `--check` does
-  not look at `prism/config.py`; `tests/test_cell_weights.py` does), and give
-  the record a new `VERSION`. The new weights move the category and portfolio
+  (its inputs and grades) with a new `VERSION`. Run it: it writes the record,
+  `lib/cellWeightProvenance.ts` and `prism/cell_weight_estimate.py`, which
+  `prism/config.py` reads. The new weights move the category and portfolio
   numbers: the change carries a new `MODEL_VERSION` and golden pins, then the
   PRISM Analysis is regenerated after the next production run
   (docs/DRIVER_ANALYSIS.md).

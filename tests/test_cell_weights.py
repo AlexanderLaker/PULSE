@@ -162,9 +162,9 @@ class TestModelConfig:
 
 
 class TestEstimatedMix:
-    """The literal in prism/config.py, the record and the generator are three copies of one thing."""
+    """The defaults in prism/config.py, the record and the generator are one thing."""
 
-    def test_the_literal_matches_the_record(self):
+    def test_the_defaults_match_the_record(self):
         assert set(DEFAULT_CELL_WEIGHTS) == set(CATEGORIES)
         for c in CATEGORIES:
             for r in REGIONS:
@@ -176,15 +176,10 @@ class TestEstimatedMix:
         assert ESTIMATE_SOURCE_PREFIX == "ESTIMATE, not Henkel P&L"
         assert DEFAULT_CELL_WEIGHTS_SOURCE.startswith(ESTIMATE_SOURCE_PREFIX)
 
-    def test_the_generator_reproduces_both_outputs(self):
+    def test_the_generator_reproduces_its_three_outputs(self):
         out = subprocess.run([sys.executable, str(REPO / "scripts" / "build_cell_weights.py"), "--check"],
                              capture_output=True, text=True, cwd=str(REPO))
         assert out.returncode == 0, out.stdout + out.stderr
-
-    def test_config_holds_the_generated_literal(self):
-        out = subprocess.run([sys.executable, str(REPO / "scripts" / "build_cell_weights.py"), "--emit-python"],
-                             capture_output=True, text=True, cwd=str(REPO), check=True)
-        assert out.stdout.strip() in (REPO / "prism" / "config.py").read_text(encoding="utf-8")
 
     def test_shares_add_up_to_one(self):
         values = [v for row in DEFAULT_CELL_WEIGHTS.values() for v in row.values()]

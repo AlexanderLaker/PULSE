@@ -19,8 +19,9 @@ them drifts silently from its source.
   `about` field), and none is edited by hand.
 - Each generator has `--check`, which regenerates in memory and fails on any
   difference; CI runs all four.
-- Constants in `prism/config.py` that come from a generator are held to the
-  generator's record by tests.
+- A model parameter that comes from a generator reaches `prism/config.py`
+  through a Python module the generator writes (`prism/overlap_correction.py`,
+  `prism/cell_weight_estimate.py`), never through a number copied by hand.
 
 ## Consequences
 

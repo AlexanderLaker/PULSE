@@ -181,11 +181,12 @@ texts. After an edit to `driver_base.json`:
 
 1. run `scripts/generate_seed.py`;
 2. if category exposures changed, or drivers were added or removed (the
-   correction depends on how many drivers each force has), run
-   `scripts/compute_attenuation.py`, copy the blocks it prints into
-   `prism/config.py` and give the record a new `CALIBRATION_VERSION`. The
-   new correction moves the model's numbers, so the same commit carries a new
-   `MODEL_VERSION` and the regenerated golden pins (docs/adr/0014);
+   correction depends on how many drivers each force has), give
+   `scripts/compute_attenuation.py` a new `CALIBRATION_VERSION` and run it;
+   it writes the record and `prism/overlap_correction.py`, which
+   `prism/config.py` reads. The new correction moves the model's numbers, so
+   the same commit carries a new `MODEL_VERSION` and the regenerated golden
+   pins (docs/adr/0014);
 3. regenerate the PRISM Analysis as docs/DRIVER_ANALYSIS.md describes;
 4. until migration 0001 has run on every database, it is what carries a
    changed description to them: the new text becomes the `text` of the

@@ -34,6 +34,7 @@ documents in `docs/` explain everything below in full.
   fixture drivers the pins are computed on also regenerates them, without a
   new version. Never regenerate pins to make a test pass.
 - **Generated files are never edited by hand**: `prism/seed_drivers.py`,
+  `prism/overlap_correction.py`, `prism/cell_weight_estimate.py`,
   `data/driverCodeMap.ts`, `data/calibration/*.json`,
   `lib/cellWeightProvenance.ts`, `data/drivers/driver_attribution.json`, the
   rendered texts in `data/drivers/driver_analysis.json` and
