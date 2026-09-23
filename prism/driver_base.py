@@ -31,7 +31,7 @@ ENTRY_FIELDS = ("id", "code", "force", "name", "description", "direction", "prob
                 "category_exposure", "regional_exposure", "vc_epicentre", "sources")
 
 
-def validate(entries: list) -> None:
+def validate(entries: list, highest_numbers: dict) -> None:
     """Raise InvalidBaseError listing every problem of the base's entries.
 
     The model inputs are held to the engine's own rules
@@ -39,8 +39,16 @@ def validate(entries: list) -> None:
     the id and code pattern, lie inside the horizon, carry a known confidence
     and have sources the API would accept back from the editor, each with a
     title and an http(s) link, at least one of them of tier S, A or B.
+
+    ``highest_numbers`` is the highest driver number each force has used.
+    Stored runs, proposals, the audit log and the journey content refer to
+    drivers by id or code, so a number is never given to a second driver: a
+    new driver takes the next number and raises the record with it, and an
+    entry above its force's record is refused.
     """
     problems = [f"duplicate code {c}" for c, n in collections.Counter(d.get("code") for d in entries).items() if n > 1]
+    problems += [f"highest_numbers has no whole number for {f}" for f in FORCES
+                 if isinstance(highest_numbers.get(f), bool) or not isinstance(highest_numbers.get(f), int)]
     complete = []
     for d in entries:
         tag = d.get("code") or d.get("id")
@@ -53,6 +61,9 @@ def validate(entries: list) -> None:
         if d["force"] in FORCES and (not m or m.group(1) != d["force"].lower()
                                      or d["code"] != display_code(d["id"], d["force"])):
             problems.append(f"{tag}: id {d['id']!r} and code {d['code']!r} do not follow force + number")
+        elif m and isinstance(highest := highest_numbers.get(d["force"]), int) and int(m.group(2)) > highest:
+            problems.append(f"{tag}: number {int(m.group(2))} is above the highest {d['force']} number the base "
+                            f"records ({highest}); raise highest_numbers with the new driver")
         if isinstance(d["start_year"], int) and d["start_year"] < DEFAULT_BASE_YEAR:
             problems.append(f"{tag}: onset {d['start_year']} before the base year {DEFAULT_BASE_YEAR}")
         if isinstance(d["peak_year"], int) and d["peak_year"] > DEFAULT_PATH_YEARS[-1]:
@@ -95,9 +106,9 @@ def _entry_driver(d: dict) -> Driver:
 
 def load_base(path: Path = BASE_PATH) -> list:
     """The base's entries as stored, after validate()."""
-    entries = json.loads(path.read_text(encoding="utf-8"))["drivers"]
-    validate(entries)
-    return entries
+    base = json.loads(path.read_text(encoding="utf-8"))
+    validate(base["drivers"], base["highest_numbers"])
+    return base["drivers"]
 
 
 def driver_from_base(d: dict, analysis: str = "") -> Driver:

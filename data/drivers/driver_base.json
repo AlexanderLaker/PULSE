@@ -1,5 +1,13 @@
 {
- "about": "The Profit Pool Drivers PRISM simulates: for each driver its scores, exposures and sources. scripts/generate_seed.py turns this file into prism/seed_drivers.py and data/driverCodeMap.ts; edit this file and re-run the generator, never the generated files. Field meanings: docs/DRIVERS.md.",
+ "about": "The Profit Pool Drivers PRISM simulates: for each driver its scores, exposures and sources. scripts/generate_seed.py turns this file into prism/seed_drivers.py and data/driverCodeMap.ts; edit this file and re-run the generator, never the generated files. highest_numbers is the highest driver number each force has used: a new driver takes the next one and raises it, so no number is given to a second driver. Field meanings: docs/DRIVERS.md.",
+ "highest_numbers": {
+  "Consumer": 37,
+  "Customer": 13,
+  "Technology": 19,
+  "Government": 17,
+  "Environmental": 12,
+  "Competitive": 18
+ },
  "drivers": [
   {
    "id": "consumer_r01",

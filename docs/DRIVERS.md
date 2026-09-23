@@ -27,10 +27,11 @@ Journey cites drivers by code.
 
 An id is never given to another driver. Stored runs (their fingerprints),
 expert proposals, the audit log and the journey content refer to drivers by
-id or code, so a driver that leaves the base takes its id with it. A new
-driver takes a number above the highest its force has ever used: C-37, K-13,
-T-19, G-17, E-12 and X-18 so far. The gaps in the numbering belong to drivers
-that left and are never filled.
+id or code, so a driver that leaves the base takes its id with it. The base
+records the highest number each force has used (`highest_numbers`); a new
+driver takes the next number and raises the record in the same change, and
+`prism/driver_base.py` refuses a driver numbered above it. The gaps in the
+numbering belong to drivers that left and are never filled.
 
 ## Fields
 
@@ -143,11 +144,12 @@ dashboard do not use it.
 `prism/driver_base.py` reads and validates the base for everything built
 from it (the seed, the overlap correction and the PRISM Analysis): every
 model input by the engine's own rules, as the database and the API apply
-them, and on top of those the id and code pattern, an onset and a peak inside
-the horizon, a known confidence, and sources the editor can save again (a
-title, an http(s) link, a tier on the scale or none, within the API's
-lengths), at least one of them of tier S, A or B. `scripts/generate_seed.py`
-writes two files from it that are never edited by hand:
+them, and on top of those the id and code pattern, a number within its
+force's record, an onset and a peak inside the horizon, a known confidence,
+and sources the editor can save again (a title, an http(s) link, a tier on
+the scale or none, within the API's lengths), at least one of them of tier
+S, A or B. `scripts/generate_seed.py` writes two files from it that are
+never edited by hand:
 
 - `prism/seed_drivers.py`: the drivers a new database is seeded with,
   including each driver's PRISM Analysis text (docs/DRIVER_ANALYSIS.md) and
