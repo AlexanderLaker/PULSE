@@ -55,14 +55,14 @@ a_jcry = w_f x a_f x D_fcr x E[p_j] x g_j x d_j x E[m_j(y)] x (category exposure
 ```
 
 Each term is linear in the driver's own probability draw, so the mean of the
-Monte Carlo term is the term at the mean: `E[p_j] = probability / 6`, with the
-materialisation averaged over the driver's peak-jitter grid.
+Monte Carlo term is the term at the mean: `E[p_j] = probability / 6`, with
+the materialisation averaged over the driver's peak-jitter grid.
 `prism/attribution.py` evaluates these terms driver by driver and cell by
 cell with the engine's own exposure, dampening and schedule functions,
-compounds them per cell as the engine does, spreads the
-cross-terms of the compounding over the drivers of the cell in proportion to
-their terms (so the drivers of a cell add up to the cell's shift), and rolls
-the cells up with the run's gross-profit shares.
+compounds them per cell as the engine does, spreads the cross-terms of the
+compounding over the drivers of the cell in proportion to their terms (so
+the drivers of a cell add up to the cell's shift), and rolls the cells up
+with the run's gross-profit shares.
 
 The 51 contributions then add up to the reference run's terminal-year mean to
 a few hundredths of a percent; what remains is the covariance between the
@@ -178,16 +178,17 @@ portfolio totals keep the headline's one decimal. Shares are whole
 percentages, except a force's pass-through and a cell's share of the pool,
 which carry one decimal; ranks are ordinals. Cells and categories are named
 with the labels the page shows, in lower case, the hair categories in full
-("fabric clean Europe", "hair colour", "body care"). A headwind is
-stated against the net exposure the dashboard shows and its force's gross
-headwind; a tailwind against the gross headwind it offsets and the gross
-tailwind. Relative to its contribution, the width of a driver's own range
-follows from its probability and uncertainty scores (and, for a driver whose
-jittered peak can fall after 2035, from its timing), so the "because" in the
-band paragraph is the rationale behind those scores, not something the model
+("fabric clean Europe", "hair colour", "body care"). A headwind is stated
+against the net exposure the dashboard shows and its force's gross headwind;
+a tailwind against the gross headwind it offsets and the gross tailwind.
+Relative to its contribution, the width of a driver's own range follows from
+its probability and uncertainty scores (and, for a driver whose jittered
+peak can fall after 2035, from its timing), so the "because" in the band
+paragraph is the rationale behind those scores, not something the model
 computed.
-A reading runs 200 to 600 words whatever the driver's weight, because "why is
-it small" needs as much explanation as "why is it large".
+
+A reading runs 200 to 600 words whatever the driver's weight, because "why
+is it small" needs as much explanation as "why is it large".
 
 `tests/test_driver_analysis.py` enforces what a machine can check: the four
 labels in order and the basis line, the length, the forbidden content (a list
@@ -246,12 +247,12 @@ rendering the same templates on other shares would put the estimate's
 comparisons next to the finance figures. The renderer therefore refuses a
 record built on any other cell weights, and the build has no option for them.
 
-When the production run uses the finance file, the dashboard's headline moves
-away from the median the basis line names, and a card says so under its basis
-line whenever the two differ at one decimal. Readings on the finance shares
-are a decision for the owner:
-they need templates rewritten so that no comparison depends on the mix, and
-a build that keeps the finance shares out of the repository.
+When the production run uses the finance file, the dashboard's headline
+moves away from the median the basis line names, and a card says so under
+its basis line whenever the two differ at one decimal. Readings on the
+finance shares are a decision for the owner: they need templates rewritten
+so that no comparison depends on the mix, and a build that keeps the finance
+shares out of the repository.
 
 ## Limits
 

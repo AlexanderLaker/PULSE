@@ -304,7 +304,7 @@ sign-up.
 |---|---|
 | Every data request answers 401 | The dashboard and the API see different `PRISM_JWT_SECRET` values, or the value is shorter than 32 characters. Set the same value everywhere and redeploy |
 | The dashboard says the service is unavailable, or a notice under the navigation says the data cannot be loaded | Check `/api/v1/health` and `/api/v1/diagnostics`. `simulation_reason` names the cause: `migration_pending` (the database needs a migration; the `error` field names it), `no_database` (neither `DATABASE_URL` nor `POSTGRES_URL` is set in this Vercel deployment) or `db_error` (the API cannot reach the database or a query failed; the `error` field says why) |
-| The Shift Analysis is empty | `simulation_reason` in `/api/v1/diagnostics` is `no_rows` (write a run) or `malformed` (the newest run lacks a key the dashboard needs; write a new run) |
+| The Shift Analysis is empty | `simulation_reason` in `/api/v1/diagnostics` is `no_rows` (write a run) or `malformed` (the newest run lacks a part the dashboard needs, such as a key, a category, region or year, a gross-profit share, its run metadata or a complete driver fingerprint; the `error` field lists them; write a new run) |
 | Nobody is admin | The webhook did not reach the dashboard: check its deliveries in the Clerk dashboard, then set the role as described under Roles |
 | The production run exits with 4 | The correlation settings are not positive definite on the current driver mix; lower the cross-force correlations in `prism/config.py` |
 
@@ -312,11 +312,11 @@ sign-up.
 
 `bash scripts/package_handover.sh` builds `PRISM_HANDOVER_<date>.zip`: a git
 repository with a single commit of the tracked tree at `HEAD`. It refuses a
-dirty working tree and fails if the exported tree holds `.env`, Clerk's local
-folder or a local working folder (a leading underscore) at the root, a
-`runs/` or `archive/` folder, a database file or a workbook anywhere, or a
-string that looks like a secret.
-Three things travel separately:
+dirty working tree and fails if the exported tree holds a `.env` file other
+than `.env.example`, a `runs/` or `archive/` folder, a database file or a
+workbook anywhere, Clerk's local folder or a local working folder (a leading
+underscore) at the root, or a string that looks like a secret. Three things
+travel separately:
 
 - the database, as a `pg_dump` of the Neon production branch;
 - the finance cell-weights file, if one exists;

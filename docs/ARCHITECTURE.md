@@ -56,8 +56,12 @@ docs/OPERATIONS.md has the command, the file format and the exit codes.
 
 ### The results bundle
 
-Every run stores one JSON document. The API refuses to serve a run that lacks
-any of these keys (`prism/api/runs.py`).
+Every run stores one JSON document. The API serves a run only when it
+carries every key below, covers every category, region and year the
+dashboard lays out, holds a gross-profit share for every cell and category,
+and has its run metadata and a complete driver fingerprint
+(`prism/api/runs.py`); it refuses any other run, so a run made before a
+change to the taxonomy or the horizon is reported rather than shown.
 
 | Key | Content |
 |---|---|
@@ -118,7 +122,7 @@ database moved on (the driver routes, the run and `/health` read the
 drivers; the run and `/diagnostics` read the run): the drivers are reloaded
 when their stamp changes (the row count and the sum of the row revisions,
 raised by every saved driver row), the run when the newest run's id is no
-longer the one held. A production run, a script or an edit made through
+longer the one held. A production run, a migration or an edit made through
 another instance is therefore visible on the next such request.
 
 On an empty database the API creates the tables and seeds the driver base
@@ -229,21 +233,20 @@ PostgreSQL in production. On a development machine with no database URL set,
 the API and the migration fall back to a SQLite file (`PRISM_DB_PATH`,
 default `data/prism.db`); the production run does so only with
 `--allow-sqlite`, `scripts/promote_admin.py` needs PostgreSQL, and on Vercel
-the API refuses to. All SQL is written once for both
-(`prism/database.py`). The database holds scores, shares and percentage
-shifts, never an HCB financial figure; texts (driver descriptions and
-sources, the Consumer Journey content) may quote public market figures as
-evidence.
+the API refuses to. All SQL is written once for both (`prism/database.py`).
+The database holds scores, shares and percentage shifts, never an HCB
+financial figure; texts (driver descriptions and sources, the Consumer
+Journey content) may quote public market figures as evidence.
 
 | Table | Written by | Content |
 |---|---|---|
 | `drivers` | seed, admin edits, migrations | One row per driver: scores (the value-chain epicentre among them), name, description, the baseline it was seeded with, whether an admin changed a model field, a revision counter |
 | `driver_category_exposure`, `driver_regional_exposure` | as above | An exposure score 0 to 5 for every category and every region of every driver |
 | `driver_sources` | as above | The evidence behind each driver: title, link, credibility tier and publication date |
-| `driver_score_proposals` | experts | One partial proposal per driver and expert |
-| `simulation_runs` | production run | One results bundle per run |
-| `journey_content` | admins | Versions of the Consumer Journey tile map; the newest wins |
-| `audit_log` | API, dashboard, scripts | Driver edits (one row per changed field, the field named in `reason`, old and new value as JSON), journey saves, role changes where the entry can be written and migrations, each with the acting identity |
+| `driver_score_proposals` | experts, migrations | One partial proposal per driver and expert |
+| `simulation_runs` | production run, migrations | One results bundle per run |
+| `journey_content` | admins, migrations | Versions of the Consumer Journey tile map; the newest wins |
+| `audit_log` | API, dashboard, migrations, `scripts/promote_admin.py` | Driver edits (one row per changed field, the field named in `reason`, old and new value as JSON), journey saves, role changes where the entry can be written and migrations, each with the acting identity |
 | `schema_migrations` | API, migrations | The migrations the schema already contains |
 | `user_roles` | dashboard, `scripts/promote_admin.py` | Clerk user id, email and role |
 

@@ -34,5 +34,5 @@ or a weight changes.
 
 A re-scored base, a new overlap correction or new cell weights require
 regenerating the readings and reviewing their comparative claims
-(docs/DRIVER_ANALYSIS.md).
-The card is labelled attribution and is read-only.
+(docs/DRIVER_ANALYSIS.md). The card is labelled attribution and is
+read-only.

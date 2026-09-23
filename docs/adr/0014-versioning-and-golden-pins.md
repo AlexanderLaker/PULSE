@@ -19,9 +19,11 @@ the API and the dashboard also need to agree on which model they describe.
   That run is made before the commit and the deploy. The pins also move when
   the fixture drivers they are computed on change; such a commit says so and
   keeps the version.
-- A result key the dashboard needs is listed in `prism/api/runs.py`; the API
-  refuses to serve a run without it, so an incompatible run is reported
-  instead of rendered wrongly.
+- What the dashboard needs of a run is checked in `prism/api/runs.py`: every
+  key it reads, every category, region and year, a gross-profit share for
+  every cell and category, the run metadata and a complete driver
+  fingerprint. The API refuses to serve a run that lacks any of them, so an
+  incompatible run is reported instead of rendered wrongly.
 
 ## Consequences
 

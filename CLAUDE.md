@@ -89,8 +89,10 @@ README.md; the documents in `docs/` explain everything below in full.
   PostgreSQL, an archive of everything dropped, a runbook, tests on SQLite
   and PostgreSQL, and an entry in `SCHEMA_MIGRATIONS` (`prism/database.py`).
 - **Never run anything against the production database** without the owner
-  asking for it. The scripts read `DATABASE_URL` from `.env`, which may be
-  production. Never print or copy `.env`.
+  asking for it. The scripts and the migration read `POSTGRES_URL`, else
+  `DATABASE_URL`, from the shell or from `.env`, which may be production; to
+  point one at another database, set both in the shell. Never print or copy
+  `.env`.
 
 ## Words
 
