@@ -11,6 +11,7 @@
  * the production run replaces it.
  */
 import { ESTIMATED_CELL_WEIGHTS } from '@/lib/cellWeightProvenance';
+import { CATEGORY_NAMES, REGIONS } from '@/lib/format';
 
 /** category -> region -> share. */
 export type CellWeights = Record<string, Record<string, number>>;
@@ -32,61 +33,44 @@ export function cellWeightsBasis(source: string | null | undefined): CellWeights
 }
 
 export interface CellMarginals {
-  categories: string[];
-  regions: string[];
   /** category -> its share (row sum). */
   rowSums: Record<string, number>;
   /** region -> its share (column sum). */
   colSums: Record<string, number>;
   total: number;
-  cellCount: number;
-  /** Every cell equals the estimated HCB mix, over exactly its keys. */
+  /** Every cell within 1e-6 of the estimated HCB mix. */
   matchesEstimate: boolean;
 }
 
-const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
-
-/** The estimate's keys and every cell within 1e-6 of it. */
-function isEstimate(cells: CellWeights, categories: string[], regions: string[]): boolean {
-  if (categories.length !== Object.keys(ESTIMATED_CELL_WEIGHTS).length) return false;
-  return categories.every((c) => {
-    const row = ESTIMATED_CELL_WEIGHTS[c];
-    return !!row && regions.length === Object.keys(row).length
-      && regions.every((r) => row[r] !== undefined && Math.abs(num(cells[c]?.[r]) - row[r]) < 1e-6);
-  });
-}
-
-/** Row and column sums of a matrix, keys in the given order first, then any others. */
-export function cellMarginals(cells: CellWeights, categoryOrder: string[] = [], regionOrder: string[] = []): CellMarginals {
-  const ordered = (keys: string[], order: string[]) =>
-    [...order.filter((k) => keys.includes(k)), ...keys.filter((k) => !order.includes(k))];
-  const categories = ordered(Object.keys(cells), categoryOrder);
-  const regions = ordered(Array.from(new Set(categories.flatMap((c) => Object.keys(cells[c] ?? {})))), regionOrder);
+/**
+ * Row and column sums of a run's cell weights, over the taxonomy
+ * (CATEGORY_NAMES x REGIONS). The API serves a run only with a share for
+ * every cell (prism/api/runs.py).
+ */
+export function cellMarginals(cells: CellWeights): CellMarginals {
   const rowSums: Record<string, number> = {};
-  const colSums: Record<string, number> = {};
+  const colSums: Record<string, number> = Object.fromEntries(REGIONS.map((r) => [r, 0]));
   let total = 0;
-  for (const c of categories) {
+  let matchesEstimate = true;
+  for (const c of CATEGORY_NAMES) {
     rowSums[c] = 0;
-    for (const r of regions) {
-      const w = num(cells[c]?.[r]);
+    for (const r of REGIONS) {
+      const w = cells[c]![r]!;
       rowSums[c] += w;
-      colSums[r] = (colSums[r] ?? 0) + w;
+      colSums[r]! += w;
       total += w;
+      if (Math.abs(w - ESTIMATED_CELL_WEIGHTS[c]![r]!) >= 1e-6) matchesEstimate = false;
     }
   }
-  const cellCount = categories.length * regions.length;
-  return {
-    categories, regions, rowSums, colSums, total, cellCount,
-    matchesEstimate: cellCount > 0 && isEstimate(cells, categories, regions),
-  };
+  return { rowSums, colSums, total, matchesEstimate };
 }
 
 /** A category's row divided by its own sum: the weights that rolled that
- *  category's regional shifts up. Undefined when the row is missing or zero. */
+ *  category's regional shifts up. Undefined for a row of zeros, which the run
+ *  reports as an integrity event. */
 export function rowShares(cells: CellWeights, category: string): Record<string, number> | undefined {
-  const row = cells[category];
-  if (!row) return undefined;
-  const sum = Object.values(row).reduce((a, b) => a + num(b), 0);
+  const row = cells[category]!;
+  const sum = REGIONS.reduce((acc, r) => acc + row[r]!, 0);
   if (sum <= 0) return undefined;
-  return Object.fromEntries(Object.entries(row).map(([r, w]) => [r, num(w) / sum]));
+  return Object.fromEntries(REGIONS.map((r) => [r, row[r]! / sum]));
 }

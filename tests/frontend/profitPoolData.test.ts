@@ -15,8 +15,8 @@ const DENOMINATIONS = ['RSP', 'MSP', 'scanner-POS', 'salon-mfr', 'model'];
 describe('the views', () => {
   it('are the six views, Hair and Laundry & Home Care, once each', () => {
     expect(PROFIT_POOL_VIEWS.map((s) => s.id).sort()).toEqual([
-      'hair_core_adjacent', 'hair_sub_segments', 'hair_value_chain',
-      'laundry_core_adjacent', 'laundry_sub_segments', 'laundry_value_chain',
+      'hair_categories', 'hair_core_adjacent', 'hair_value_chain',
+      'home_care_categories', 'laundry_core_adjacent', 'laundry_value_chain',
     ]);
   });
 

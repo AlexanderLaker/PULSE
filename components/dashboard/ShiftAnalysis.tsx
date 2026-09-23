@@ -74,7 +74,7 @@ const ShiftAnalysis: FC<{
 }> = ({ isAdmin = false, onNavigateToDriver }) => {
   const {
     simulation, simulationError, config, drivers, health,
-    loading, error, backendAvailable,
+    loading, error, apiAvailable,
     reload,
   } = usePrism();
 
@@ -92,11 +92,11 @@ const ShiftAnalysis: FC<{
   const healthStatus = health?.status;
   const healthReason = health?.simulation_reason;
   useEffect(() => {
-    if (loading || simulation || !backendAvailable) return;
+    if (loading || simulation || !apiAvailable) return;
     let cancelled = false;
     void getDiagnostics().then((d) => { if (!cancelled) setDiagnostics(d); });
     return () => { cancelled = true; };
-  }, [loading, simulation, backendAvailable, healthStatus, healthReason]);
+  }, [loading, simulation, apiAvailable, healthStatus, healthReason]);
 
   const categoryWeights = useMemo(
     () => (simulation ? categoryShares(simulation.category_weights_used, CATEGORY_NAMES) : []),
@@ -141,9 +141,9 @@ const ShiftAnalysis: FC<{
   }, [simulation]);
 
   const meta = LENS_META[lens];
-  const noRun = simulation ? undefined : noRunReason(backendAvailable, diagnostics);
+  const noRun = simulation ? undefined : noRunReason(apiAvailable, diagnostics);
   const onEstimate = simulation != null && cellWeightsBasis(simulation.cell_weights_source) === 'estimate';
-  const showOffline = !loading && !backendAvailable;
+  const showOffline = !loading && !apiAvailable;
 
   // The matrix card's toolbar speaks three distinct vocabularies, so its jobs
   // never blur into one strip of look-alike pills: the lens as a segmented
@@ -246,7 +246,7 @@ const ShiftAnalysis: FC<{
               </button>
             </motion.div>
           )}
-          {error && backendAvailable && (
+          {error && apiAvailable && (
             <motion.div
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}

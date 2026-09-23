@@ -14,9 +14,9 @@ import type { Driver, DriverProposal, DriverUpdate, ForceName } from '@/types';
 import { EXPERT_COLOR, REVIEWED_COLOR, type ScoringMode } from './shared';
 import { ColorDots, DeltaChip } from './scales';
 import { Dash, EditedChip } from './cards';
-import { ExpertInputPanel } from './ExpertRating';
+import { ExpertRatingPanel } from './ExpertRating';
 import { ReviewPanel } from './ReviewEndorse';
-import { ExpandedPanel } from './DriverPanel';
+import { DriverPanel } from './DriverPanel';
 
 // A force's icon and its tonal tile (editorial palette)
 const FORCE_TILE: Record<ForceName, { Icon: LucideIcon; bg: string; fg: string }> = {
@@ -154,7 +154,7 @@ const ExpectedEffectCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: D
   );
 };
 
-// ── Last column: the Edited chip (list), the expert's own review status
+// ── Last column: the Edited chip (list), the expert's own rating status
 //    (rating), the number of experts who scored the driver (review) ──
 const ReviewStatusCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverProposal }> = ({ driver, mode, myProposal }) => {
   const pill: React.CSSProperties = {
@@ -171,10 +171,10 @@ const ReviewStatusCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: Dri
       <div className="flex justify-end">
         <span className="inline-flex items-center gap-1.5"
           title={done
-            ? 'Reviewed: you rated probability, GP1% and at least one category exposure'
-            : 'To complete: rate probability, GP1% and at least one category exposure'}
+            ? 'Rated: you scored the probability, the GP1% and at least one category exposure'
+            : 'To complete: score the probability, the GP1% and at least one category exposure'}
           style={{ ...pill, backgroundColor: done ? EXPANSION_SOFT : S.surfaceLow, color: done ? REVIEWED_COLOR : S.onSurfaceVariant }}>
-          {done ? <><Check size={11} strokeWidth={2.6} /> Reviewed</> : 'Not reviewed'}
+          {done ? <><Check size={11} strokeWidth={2.6} /> Rated</> : 'Not rated'}
         </span>
       </div>
     );
@@ -299,11 +299,11 @@ export const DriverRow: FC<DriverRowProps> = ({
             style={{ overflow: 'hidden', backgroundColor: S.surfaceLow }}
           >
             {mode === 'rating' ? (
-              <ExpertInputPanel driver={driver} onMyChange={onMyChange} />
+              <ExpertRatingPanel driver={driver} onMyChange={onMyChange} />
             ) : mode === 'review' ? (
               <ReviewPanel driver={driver} updateDriver={updateDriver} />
             ) : (
-              <ExpandedPanel driver={driver} isAdmin={isAdmin} updateDriver={updateDriver} />
+              <DriverPanel driver={driver} isAdmin={isAdmin} updateDriver={updateDriver} />
             )}
           </motion.div>
         )}

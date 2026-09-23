@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * The shared store (hooks/usePrism.ts): what it loads, how it reports an
+ * The shared store (hooks/usePrism.tsx): what it loads, how it reports an
  * unreachable service and a part that failed to load, how it recovers, and
  * what an admin edit does to the drivers and the run.
  */
@@ -27,7 +27,7 @@ function Probe() {
   lastStore = store;
   return (
     <div>
-      <span data-testid="available">{String(store.backendAvailable)}</span>
+      <span data-testid="available">{String(store.apiAvailable)}</span>
       <span data-testid="drivers">{store.drivers.length}</span>
       <span data-testid="run">{store.simulation ? 'yes' : 'no'}</span>
       <span data-testid="error">{store.error ?? ''}</span>

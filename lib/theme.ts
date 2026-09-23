@@ -69,8 +69,6 @@ export const S = {
   glass:            'rgba(255, 255, 255, 0.75)',
   /** The sticky header of a dialog, over the page background. */
   headerGlass:      'rgba(248, 249, 255, 0.92)',
-  /** A veil over content that is loading. */
-  veil:             'rgba(255, 255, 255, 0.6)',
 
   /* ─── The shift pair (lib/format.ts builds on it) ─── */
   expansion:            '#1f7a3d',

@@ -12,7 +12,7 @@
  *   two factors, the revenue CAGR and the GP1 margin drift (a graded
  *   estimate), with € pools today and in 2030 and every source linked and
  *   graded.
- *   Navigation: Laundry | Hair, then Value Chain | Sub-Segments | Core + Adjacent.
+ *   Navigation: Laundry & Home Care | Hair, then Value Chain | Categories | Core + Adjacent.
  *
  * Every indicator runs over the same horizon, FY2025 → 2030.
  */
@@ -26,6 +26,7 @@ import {
   PROFIT_POOL_VIEWS, POOL_CAGR_THRESHOLDS, POOL_HORIZON_LABEL, viewPoolSummary, toPoolRating,
   type PoolItem, type PoolViewKind, type PoolGroup,
 } from '@/lib/profitPoolData';
+import { groupDisplay } from '@/lib/format';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { arrowColorFor, ArrowLegend, ArrowsHTML, fmtEurBn } from './explorer/arrows';
 import { GradeChip } from './explorer/sources';
@@ -138,7 +139,7 @@ const ProfitPoolExplorer: FC = () => {
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: S.onSurfaceVariant, marginBottom: 4 }}>
-              {group === 'Hair' ? 'Hair' : 'Laundry'} · {KINDS.find(k => k.id === kind)?.label} · revenue pool {view.poolSize}
+              {groupDisplay(group)} · {KINDS.find(k => k.id === kind)?.label} · revenue pool {view.poolSize}
             </div>
             <div style={{ fontFamily: HEADLINE_FONT, fontSize: 22, fontWeight: 800, color: S.onBg, lineHeight: 1.2 }}>
               {view.title}

@@ -115,20 +115,21 @@ describe('taxonomy', () => {
 
   it('labels categories in plain English', () => {
     expect(categoryDisplay('LHC: FCN')).toBe('Fabric Clean');
-    expect(categoryDisplay('Unknown')).toBe('Unknown');
     expect(groupDisplay('LHC')).toBe('Laundry & Home Care');
+    expect(groupDisplay('Hair')).toBe('Hair');
     expect(shortCat('Hair: Color')).toBe('Colour');
     expect(shortCat('LHC: FCN')).toBe('FCN');
-    expect(shortCat('Other: Thing')).toBe('Thing');
+    // Every key comes from the API, which serves the taxonomy's only.
+    expect(() => categoryDisplay('LHC: HSC (old)')).toThrow(/not a category/);
+    expect(() => shortCat('Other: Thing')).toThrow(/not a category/);
   });
 });
 
 describe('firstPeakYear', () => {
   it('is the year after the onset, and never before the year after the base year', () => {
     expect(BASE_YEAR).toBe(2025);
-    expect(firstPeakYear(undefined)).toBe(2026);
-    expect(firstPeakYear(null)).toBe(2026);
     expect(firstPeakYear(2024)).toBe(2026);
+    expect(firstPeakYear(2025)).toBe(2026);
     expect(firstPeakYear(2029)).toBe(2030);
   });
 });

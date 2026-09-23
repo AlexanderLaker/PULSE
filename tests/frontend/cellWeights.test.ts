@@ -15,74 +15,47 @@ import { CATEGORIES, CATEGORY_NAMES as CATS, REGIONS, categoryDisplay } from '@/
 const copyOfEstimate = (): CellWeights =>
   Object.fromEntries(Object.entries(ESTIMATED_CELL_WEIGHTS).map(([c, row]) => [c, { ...row }]));
 
+/** Every cell of the taxonomy at `share`, with the given cells set. */
+const grid = (share: number, cells: Record<string, Record<string, number>> = {}): CellWeights =>
+  Object.fromEntries(CATS.map((c) => [c, Object.fromEntries(REGIONS.map((r) => [r, cells[c]?.[r] ?? share]))]));
+
 describe('cellMarginals', () => {
-  it('sums the rows (category shares) and the columns (region shares)', () => {
-    const W = {
-      'Hair: Color': { Europe: 0.2, 'North America': 0.1, Asia: 0.0, 'High Growth': 0.1 },
+  it('sums the rows (category shares) and the columns (region shares) over the taxonomy', () => {
+    const W = grid(0, {
+      'Hair: Color': { Europe: 0.2, 'North America': 0.1, 'High Growth': 0.1 },
       'Hair: Care': { Europe: 0.3, 'North America': 0.1, Asia: 0.1, 'High Growth': 0.1 },
-    };
-    const m = cellMarginals(W, CATS, REGIONS);
-    expect(m.categories).toEqual(['Hair: Color', 'Hair: Care']);
-    expect(m.regions).toEqual(REGIONS);
+    });
+    const m = cellMarginals(W);
+    expect(Object.keys(m.rowSums)).toEqual(CATS);
+    expect(Object.keys(m.colSums)).toEqual(REGIONS);
     expect(m.rowSums['Hair: Color']).toBeCloseTo(0.4, 12);
     expect(m.rowSums['Hair: Care']).toBeCloseTo(0.6, 12);
+    expect(m.rowSums['LHC: IC']).toBe(0);
     expect(m.colSums.Europe).toBeCloseTo(0.5, 12);
     expect(m.colSums.Asia).toBeCloseTo(0.1, 12);
     expect(m.total).toBeCloseTo(1, 12);
-    expect(m.cellCount).toBe(8);
     expect(m.matchesEstimate).toBe(false);
-  });
-
-  it('treats a missing cell as zero', () => {
-    const m = cellMarginals({ 'Hair: Color': { Europe: 0.5 }, 'Hair: Care': { Europe: 0.45, Asia: 0.05 } });
-    expect(m.regions).toEqual(['Europe', 'Asia']);
-    expect(m.rowSums['Hair: Color']).toBeCloseTo(0.5, 12);
-    expect(m.total).toBeCloseTo(1, 12);
-    expect(cellMarginals({}).cellCount).toBe(0);
-  });
-
-  it('puts the known keys in the given order and keeps unknown ones after them', () => {
-    const m = cellMarginals({ Zeta: { 'High Growth': 0.5, Europe: 0.5 } }, CATS, REGIONS);
-    expect(m.categories).toEqual(['Zeta']);
-    expect(m.regions).toEqual(['Europe', 'High Growth']);
   });
 });
 
 describe('matchesEstimate', () => {
-  it('recognises the estimated HCB mix over its 13 x 4 cells', () => {
-    const m = cellMarginals(copyOfEstimate(), CATS, REGIONS);
+  it('recognises the estimated HCB mix', () => {
+    const m = cellMarginals(copyOfEstimate());
     expect(m.matchesEstimate).toBe(true);
-    expect(m.cellCount).toBe(52);
     expect(m.total).toBeCloseTo(1, 9);
   });
 
   it('is false after a one-cell change and true inside the 1e-6 tolerance', () => {
     const changed = copyOfEstimate();
     changed['LHC: FCN'].Europe += 1e-5;
-    expect(cellMarginals(changed, CATS, REGIONS).matchesEstimate).toBe(false);
+    expect(cellMarginals(changed).matchesEstimate).toBe(false);
     const rounded = copyOfEstimate();
     rounded['LHC: FCN'].Europe += 1e-9;
-    expect(cellMarginals(rounded, CATS, REGIONS).matchesEstimate).toBe(true);
+    expect(cellMarginals(rounded).matchesEstimate).toBe(true);
   });
 
-  it('is false for finance figures, however close, over other keys', () => {
-    const equal = Object.fromEntries(CATS.map((c) => [c, Object.fromEntries(REGIONS.map((r) => [r, 1 / 52]))]));
-    expect(cellMarginals(equal, CATS, REGIONS).matchesEstimate).toBe(false);
-
-    const missingCategory = copyOfEstimate();
-    delete missingCategory['LHC: IC'];
-    expect(cellMarginals(missingCategory, CATS, REGIONS).matchesEstimate).toBe(false);
-
-    const extraCategory = { ...copyOfEstimate(), Zeta: { Europe: 0, 'North America': 0, Asia: 0, 'High Growth': 0 } };
-    expect(cellMarginals(extraCategory, CATS, REGIONS).matchesEstimate).toBe(false);
-
-    const renamedRegion = copyOfEstimate();
-    for (const row of Object.values(renamedRegion)) {
-      row.EMEA = row.Europe;
-      delete row.Europe;
-    }
-    expect(cellMarginals(renamedRegion, CATS, REGIONS).matchesEstimate).toBe(false);
-    expect(cellMarginals({}, CATS, REGIONS).matchesEstimate).toBe(false);
+  it('is false for other figures, however evenly spread', () => {
+    expect(cellMarginals(grid(1 / 52)).matchesEstimate).toBe(false);
   });
 });
 
@@ -97,17 +70,13 @@ describe('cellWeightsBasis', () => {
 });
 
 describe('rowShares', () => {
-  it("divides a category's row by its own sum", () => {
-    const W = {
-      'Hair: Color': { Europe: 0.3, 'North America': 0.1, Asia: 0, 'High Growth': 0 },
-      'LHC: FCN': { Europe: 0, 'North America': 0, Asia: 0, 'High Growth': 0 },
-    };
+  it("divides a category's row by its own sum, and has none for a row of zeros", () => {
+    const W = grid(0, { 'Hair: Color': { Europe: 0.3, 'North America': 0.1 } });
     const shares = rowShares(W, 'Hair: Color')!;
     expect(shares.Europe).toBeCloseTo(0.75, 12);
     expect(shares['North America']).toBeCloseTo(0.25, 12);
     expect(shares.Asia).toBe(0);
     expect(rowShares(W, 'LHC: FCN')).toBeUndefined();
-    expect(rowShares(W, 'missing')).toBeUndefined();
   });
 });
 
@@ -162,7 +131,7 @@ describe('the estimate record agrees with its own derivation', () => {
         total += base * w;
       }
     }
-    const m = cellMarginals(ESTIMATED_CELL_WEIGHTS, CATS, REGIONS);
+    const m = cellMarginals(ESTIMATED_CELL_WEIGHTS);
     for (const category of ESTIMATE_CATS) {
       for (const region of REGIONS) {
         expect(Math.abs(raw[category][region] / total - ESTIMATED_CELL_WEIGHTS[category][region])).toBeLessThan(1e-8);

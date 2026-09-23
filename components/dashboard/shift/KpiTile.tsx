@@ -5,7 +5,7 @@
 import React, { useState, type FC } from 'react';
 import { fmtShift } from '@/lib/format';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
-import ShiftValue from '@/components/dashboard/ShiftValue';
+import ShiftValue from './ShiftValue';
 import type { PercentileDistribution } from '@/types';
 
 /** A headline figure above the matrix. Its P10–P90 band opens on hover,

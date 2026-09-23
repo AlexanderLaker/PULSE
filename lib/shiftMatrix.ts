@@ -22,9 +22,10 @@ export function getYearPercentiles(
   return shifts?.[category]?.[String(year)] ?? null;
 }
 
-/** The run's category shares (category_weights_used) in the given order; 0 for a category the run lacks. */
+/** The run's category shares (category_weights_used) in the given order; the API serves a run
+ *  only with a share for every category. */
 export function categoryShares(weights: Record<string, number>, categories: string[]): number[] {
-  return categories.map((c) => weights[c] ?? 0);
+  return categories.map((c) => weights[c]!);
 }
 
 /**

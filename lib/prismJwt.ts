@@ -5,7 +5,7 @@
  * (prism/api/auth.py). The dashboard signs two kinds, always for the user of
  * the Clerk session: a viewer token that /api/prism-cookie puts in the httpOnly
  * cookie the reads use, and a five-minute admin token for each write it
- * forwards (lib/backend.ts).
+ * forwards (lib/adminWrite.ts).
  *
  * Server-side only. Returns null when the secret is missing or shorter than
  * 32 characters, which the API would refuse as well.

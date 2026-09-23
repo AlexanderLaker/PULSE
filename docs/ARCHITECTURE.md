@@ -154,7 +154,7 @@ signed-in user (`lib/prismJwt.ts`, verified in `prism/api/auth.py`):
   `user_roles`, then forwards the request to the API (on `PRISM_API_ORIGIN`
   when that is set, else on the origin the request came in on) with a
   five-minute admin token that carries the user's identity
-  (`lib/backend.ts`). The API writes that identity to the audit log.
+  (`lib/adminWrite.ts`). The API writes that identity to the audit log.
 
 Both tokens carry the user's Clerk id, email, role and, when Clerk has one,
 their full name, which the proposals list shows next to each expert's scores
@@ -183,7 +183,7 @@ The dashboard's server routes (`app/api`):
 ## The dashboard
 
 Next.js with the App Router, React and TypeScript. `app/dashboard/page.tsx`
-holds the top navigation and mounts `PrismProvider` (`hooks/usePrism.ts`),
+holds the top navigation and mounts `PrismProvider` (`hooks/usePrism.tsx`),
 which loads the drivers, the configuration and the latest run and shares them
 with every view. It asks `/api/v1/health` every minute (every 30 seconds while
 the service is unreachable or degraded) and reloads when the service recovers
@@ -202,8 +202,8 @@ its own:
 | Profit Pool Explorer (beta) | `ProfitPoolExplorer.tsx`, `explorer/` | Sourced profit pool views of the Hair and Laundry & Home Care industries |
 | Settings | `SettingsModal.tsx`, `settings/` | Profile, password and sessions (from Clerk); the model configuration, read-only: the code's parameters and the cell weights the served run used; the user list for admins |
 
-`Chip.tsx`, `SectionCard.tsx` and `ShiftValue.tsx` are the pieces several
-views share: one look for a label, for a boxed section and for a signed shift.
+`Chip.tsx` and `SectionCard.tsx` are the pieces several views share: one look
+for a label and one for a boxed section.
 
 Shared logic lives in `lib/`: `apiClient.ts` (every request the dashboard
 makes), `apiError.ts` (one readable line from an error answer, for the client
@@ -214,7 +214,7 @@ keeps them from being reimplemented in a component), `cellWeights.ts`,
 engine), `driverAttribution.ts` (the per-driver decomposition behind the
 drill-down and the impact filter) and `theme.ts` (the design tokens, which
 Tailwind reads too); the server side has `db.ts`, `roles.ts`, `audit.ts` (the
-role-change entries of the audit log), `prismJwt.ts` and `backend.ts`. The
+role-change entries of the audit log), `prismJwt.ts` and `adminWrite.ts`. The
 types in `types/` mirror the API's JSON.
 
 The Consumer Journey content ships with the dashboard

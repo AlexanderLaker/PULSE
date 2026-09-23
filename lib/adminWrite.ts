@@ -9,7 +9,7 @@
  * to PRISM_API_ORIGIN when that is set, else to the host the request came in
  * on. On Vercel the /api/v1 path is rewritten to the Python function
  * (vercel.json); in local development next.config.js rewrites it to the API
- * server at PRISM_BACKEND_URL.
+ * server at PRISM_LOCAL_API_URL.
  *
  * Server-side only: it signs with PRISM_JWT_SECRET.
  */

@@ -13,7 +13,7 @@ import {
   type PoolView, type PoolItem, type CagrRating, type EvidenceGrade,
 } from '@/lib/profitPoolData';
 import { S, SHADOW, INK_RGB, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
-import { NO_VALUE } from '@/lib/format';
+import { NO_VALUE, groupDisplay } from '@/lib/format';
 import { arrowColorFor, fmtEurBn, fmtShare } from './arrows';
 import { GradeChip, SourceChip, sourceParts, taggedSources } from './sources';
 
@@ -97,8 +97,8 @@ export const DetailPanel: FC<{
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.onSurfaceVariant, marginBottom: 4 }}>
-                {view.kind === 'ValueChain' ? 'Value chain tier' : view.kind === 'SubSegment' ? 'Sub-segment' : 'Core / adjacent pool'}
-                {' · '}{view.group === 'Hair' ? 'Hair' : 'Laundry'}
+                {view.kind === 'ValueChain' ? 'Value chain tier' : view.kind === 'Categories' ? 'Category' : 'Core / adjacent pool'}
+                {' · '}{groupDisplay(view.group)}
               </div>
               <h2 style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 20, color: S.onBg, margin: 0, lineHeight: 1.2 }}>
                 {name}

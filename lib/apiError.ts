@@ -1,7 +1,7 @@
 /**
  * One readable line from an error body: `detail` from the API, `error` from
  * the dashboard's own routes. The browser client (lib/apiClient.ts) and the
- * server routes that forward admin writes (lib/backend.ts) both read errors
+ * server routes that forward admin writes (lib/adminWrite.ts) both read errors
  * through it, so a refusal reads the same wherever it surfaces. FastAPI's
  * validation errors arrive as a list of {loc, msg}, which would otherwise
  * render as "[object Object]".

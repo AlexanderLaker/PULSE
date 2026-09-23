@@ -19,7 +19,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, Activity, Zap, Layers, LineChart, Globe } from 'lucide-react';
 import {
-  BASE_YEAR, CATEGORIES, FIRST_YEAR, FLAT_EPS, HORIZON, fmtShift, fmtPct, categoryDisplay, groupDisplay, heatText,
+  BASE_YEAR, FIRST_YEAR, FLAT_EPS, HORIZON, fmtShift, fmtPct, categoryDisplay, categoryOf, groupDisplay, heatText,
 } from '@/lib/format';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
 import { rowShares } from '@/lib/cellWeights';
@@ -53,7 +53,7 @@ const pt = (v: number): string => `${v >= FLAT_EPS ? '+' : ''}${(Math.abs(v) < F
 const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
   category, year, simulation, drivers, attribution, onClose, onOpenDriver,
 }) => {
-  const group = CATEGORIES.find((c) => c.name === category)?.group;
+  const group = categoryOf(category).group;
   const path = simulation.shifts[category];
 
   // Anchor of the momentum explainer (the tile's bottom centre); it is
@@ -76,7 +76,10 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
 
   const shiftEnd = path[String(HORIZON)].median;
   const shiftStart = path[String(FIRST_YEAR)].median;
-  const velocity = shiftEnd - shiftStart;
+  // How the median path moves across the horizon: a difference of two
+  // medians, which the Momentum tile names as such. The run's velocity, the
+  // per-iteration year-on-year change, is lastYearChange.
+  const movement = shiftEnd - shiftStart;
   // The change in the final year, per iteration (the run's velocity band).
   const lastYearChange = simulation.velocity[category]?.[String(HORIZON)];
 
@@ -107,17 +110,17 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
   // easing in calm navy, accelerating in expansion ink, slowing in amber. The
   // value is in percentage points: a difference of two percentages.
   const momentum = useMemo(() => {
-    const pts = pt(velocity);
-    if (shiftEnd < -FLAT_EPS && velocity > FLAT_EPS)
+    const pts = pt(movement);
+    if (shiftEnd < -FLAT_EPS && movement > FLAT_EPS)
       return { msg: 'Contraction easing', pts, color: S.onSurface };
-    if (shiftEnd < -FLAT_EPS && velocity < -FLAT_EPS)
+    if (shiftEnd < -FLAT_EPS && movement < -FLAT_EPS)
       return { msg: 'Contraction deepening', pts, color: S.contractionInk };
-    if (shiftEnd > FLAT_EPS && velocity > FLAT_EPS)
+    if (shiftEnd > FLAT_EPS && movement > FLAT_EPS)
       return { msg: 'Expansion accelerating', pts, color: S.expansionInk };
-    if (shiftEnd > FLAT_EPS && velocity < -FLAT_EPS)
+    if (shiftEnd > FLAT_EPS && movement < -FLAT_EPS)
       return { msg: 'Expansion slowing', pts, color: S.amber };
     return { msg: 'Broadly flat', pts, color: S.onSurface };
-  }, [shiftEnd, velocity]);
+  }, [shiftEnd, movement]);
 
   const showMomentumHelp = (e: React.SyntheticEvent<HTMLElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -601,11 +604,9 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             Momentum · What this means
           </div>
           <div style={{ lineHeight: 1.5, opacity: 0.92 }}>
-            Velocity of the profit-pool shift across the horizon:
-            <span style={{ fontFamily: MONO_FONT, fontWeight: 600, opacity: 0.95 }}>
-              {' '}horizon-end − horizon-start{' '}
-            </span>
-            of the MC median path.
+            How the median shift moves across the horizon: the {HORIZON} median minus the{' '}
+            {FIRST_YEAR} median, in percentage points. It is a difference of two medians, not a
+            change any iteration makes.
           </div>
           {lastYearChange && (
             <div style={{ marginTop: 6, lineHeight: 1.5, opacity: 0.92 }}>

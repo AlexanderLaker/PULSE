@@ -8,7 +8,7 @@ import { SlidersHorizontal } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import SectionCard from '@/components/dashboard/SectionCard';
 import { S, MONO_FONT } from '@/lib/theme';
-import { CATEGORY_NAMES, FORCES, NO_VALUE } from '@/lib/format';
+import { CATEGORY_NAMES, FORCES, NO_VALUE, REGIONS } from '@/lib/format';
 import { cellMarginals, cellWeightsBasis } from '@/lib/cellWeights';
 import type { ForceName, ModelConfig, SimulationResult } from '@/types';
 import {
@@ -183,7 +183,7 @@ const BasisBadge: FC<{ estimate: boolean }> = ({ estimate }) => (
 
 /** The served run's cell weights with their marginals and where they come from. */
 const RunCellWeights: FC<{ run: SimulationResult }> = ({ run }) => {
-  const m = cellMarginals(run.cell_weights_used, CATEGORY_NAMES, run.decompositions.dimensions.regions);
+  const m = cellMarginals(run.cell_weights_used);
   // The run's own label says what the weights are; the graded derivation
   // below documents the current estimate, so it shows only when the run's
   // shares are that estimate.
@@ -206,16 +206,16 @@ const RunCellWeights: FC<{ run: SimulationResult }> = ({ run }) => {
         <thead>
           <tr>
             <th style={CELL_LABEL}>Category</th>
-            {m.regions.map((r) => <th key={r} style={CELL_TH}>{r}</th>)}
+            {REGIONS.map((r) => <th key={r} style={CELL_TH}>{r}</th>)}
             <th style={CELL_TH} title="Row sum: the category's share of the pool">Σ category</th>
           </tr>
         </thead>
         <tbody>
-          {m.categories.map((c) => (
+          {CATEGORY_NAMES.map((c) => (
             <tr key={c}>
               <th scope="row" style={{ ...CELL_LABEL, borderTop: `1px solid ${S.cardBorder}` }}>{c}</th>
-              {m.regions.map((r) => <td key={r} style={CELL_NUM}>{pct2(run.cell_weights_used[c]?.[r] ?? 0)}</td>)}
-              <td style={CELL_SUM}>{pct2(m.rowSums[c])}%</td>
+              {REGIONS.map((r) => <td key={r} style={CELL_NUM}>{pct2(run.cell_weights_used[c]![r]!)}</td>)}
+              <td style={CELL_SUM}>{pct2(m.rowSums[c]!)}%</td>
             </tr>
           ))}
         </tbody>
@@ -224,7 +224,7 @@ const RunCellWeights: FC<{ run: SimulationResult }> = ({ run }) => {
             <th scope="row" style={{ ...CELL_LABEL, borderTop: `1px solid ${S.cardBorder}` }} title="Column sum: the region's share of the pool">
               Σ region
             </th>
-            {m.regions.map((r) => <td key={r} style={CELL_SUM}>{pct2(m.colSums[r])}%</td>)}
+            {REGIONS.map((r) => <td key={r} style={CELL_SUM}>{pct2(m.colSums[r]!)}%</td>)}
             <td style={{ ...CELL_SUM, fontWeight: 800 }}>{pct2(m.total)}%</td>
           </tr>
         </tfoot>

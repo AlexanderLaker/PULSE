@@ -28,9 +28,8 @@ entry gate's doors (`HomeGate.tsx`) and the Explorer's bar fills
 (`components/dashboard/explorer/PoolChart.tsx`).
 
 The pieces several views share are components of their own: `Chip.tsx` (a
-label with its meaning in text), `SectionCard.tsx` (a boxed section with an
-icon, a title and optional help) and `ShiftValue.tsx` (a signed shift with
-its arrow).
+label with its meaning in text) and `SectionCard.tsx` (a boxed section with
+an icon, a title and optional help).
 
 ## Colour
 
@@ -66,7 +65,7 @@ of a segmented control, `lift`, `primaryButton`, `authCard`, and `door` and
 One colour pair means direction everywhere: green `#1f7a3d` for expansion,
 red `#9f403d` for contraction, slate for flat. Colour is never the only
 signal: a shift always carries its sign, and headline figures an arrow as
-well (`components/dashboard/ShiftValue.tsx`), so the direction survives
+well (`components/dashboard/shift/ShiftValue.tsx`), so the direction survives
 colour-vision deficiency, a projector and greyscale print. The Shift Matrix
 tints its cells in the shift's own hue, stronger with the magnitude up to the
 95th percentile of the values in view; the tint stops where the cell text

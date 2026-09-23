@@ -28,7 +28,7 @@ import {
 import { ANALYSIS_FOOTNOTE, PrismAnalysisReading } from './PrismAnalysis';
 
 
-interface ExpandedPanelProps {
+interface DriverPanelProps {
   driver: Driver;
   isAdmin: boolean;
   updateDriver: (driverId: string, update: DriverUpdate) => Promise<void>;
@@ -102,7 +102,7 @@ function updateFrom(draft: Draft, d: Driver): DriverUpdate {
   return update;
 }
 
-export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateDriver }) => {
+export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDriver }) => {
   const base = driver.baseline;
 
   const [isEditing, setIsEditing] = useState(false);

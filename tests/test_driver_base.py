@@ -184,7 +184,7 @@ class TestCodeMap:
             assert letter == LETTER[d.force] and d.id.endswith(f"_r{number}"), code
             assert (info["name"], info["force"], info["direction"]) == (d.name, d.force, d.direction)
             # a whole first sentence, not a fragment cut at an initialism
-            assert len(info["fallbackDescription"]) >= 40, (code, info["fallbackDescription"])
+            assert len(info["firstSentence"]) >= 40, (code, info["firstSentence"])
 
     def test_an_initialism_does_not_end_the_first_sentence(self):
         gen = _generator()

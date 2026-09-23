@@ -170,41 +170,30 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
           </ul>
           <p className="text-[12px]" style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}>
             <span style={{ fontWeight: 600, color: S.onSurfaceVariant }}>Methodology:</span>{' '}
-            All cell values in this matrix are produced by the Monte Carlo engine
+            Every cell comes from the Monte Carlo engine
             {run ? (
               <>
                 {' '}(<code style={{ fontFamily: MONO_FONT }}>{run.engine_name}</code>,{' '}
                 {run.iterations.toLocaleString('en-US')} iterations &times; {run.chains} chains, Gaussian-copula
                 dependencies, {run.driver_count} drivers)
               </>
-            ) : ' (Gaussian-copula dependencies)'}. The driver
-            probability priors are <strong>structured expert judgment</strong> (Beta shapes set
-            from analyst 1&ndash;5 scores); the model expresses uncertainty in those judgments and
-            does not learn or update from data. Each cell is a{' '}
-            <strong>cumulative shift level vs {BASE_YEAR}</strong> at that measurement year, i.e. the
-            compounded impact from {YEARS[0]} up to that year, not a year-on-year change.
-            The Force, Value Chain and Region lenses are per-year decompositions written by
-            the engine. <strong>Region is a dimension of the simulation, not only a lens</strong>: the engine solves
-            a category &times; region &times; year tensor (each driver weighted by category
-            exposure &times; regional exposure) and rolls a category&rsquo;s regional shifts up
-            with its own row of the cell weights, so a regionally concentrated driver only
-            moves its regions&rsquo; slice of the pool; each category&rsquo;s drill-down shows
-            its regional shifts. The Force and Region shares use the drivers&rsquo; 0&ndash;5
-            exposure scores with the force weights and the run&rsquo;s cell weights; the{' '}
-            <strong>Value Chain lens is a categorical epicentre partition</strong>: each
-            driver&rsquo;s contribution is assigned wholly to the single stage where experts
-            located its impact epicentre, with no split across stages and no modelled
-            propagation up or down the chain (holding responses constant, propagation would
-            be a management or market story, not a driver property). Every row total equals
-            the MC median shift for that (category, year) and is therefore identical across
-            all four lenses. <strong>Column and grand totals are category-weighted
-            averages</strong> of the per-category values, using the run&rsquo;s category
-            shares (the row sums of its cell weights), so totals reflect the portfolio mix
-            rather than simple sums of 13 categories. Because the decomposition shares sum
-            to 1 per category, the grand total for any given year is identical across Time
-            Path, Force, Value Chain and Region views. The dashboard neither calibrates nor
-            anchors any cell; it computes only the portfolio-weighted totals, from the
-            run&rsquo;s own weights.
+            ) : ' (Gaussian-copula dependencies)'}. The probability priors are{' '}
+            <strong>structured expert judgment</strong>: Beta shapes set from the analysts&rsquo;
+            1&ndash;5 scores, never updated from data. Each cell is the{' '}
+            <strong>cumulative shift against {BASE_YEAR}</strong> in its year, the impact compounded
+            from {YEARS[0]} to that year. The engine solves every category and region year by year,
+            each driver weighted by its category exposure times its regional exposure, and rolls a
+            category&rsquo;s regional shifts up with that category&rsquo;s row of the cell weights, so
+            a regionally concentrated driver moves only its regions&rsquo; slice of the pool; each
+            category&rsquo;s drill-down shows its regional shifts. The Force, Value Chain and Region
+            lenses split each category&rsquo;s median of each year: by force with the force weights,
+            by region with the cell weights, and by value-chain stage wholly to the stage where
+            experts placed each driver&rsquo;s epicentre (with responses held constant, the model
+            carries no propagation along the chain). A lens&rsquo;s row total is the
+            category&rsquo;s median, the same in all four lenses. <strong>Column and grand totals
+            are category-weighted averages</strong> with the run&rsquo;s category shares (the row
+            sums of its cell weights), so a year&rsquo;s grand total is the same in every lens and
+            reads as one portfolio shift.
           </p>
         </div>
       )}

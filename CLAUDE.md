@@ -19,7 +19,7 @@ README.md; the documents in `docs/` explain everything below in full.
 - The dashboard (`app/`, `components/dashboard/`) authenticates with Clerk.
   Roles live in `user_roles`. Reads use a viewer cookie scoped to `/api/v1`;
   admin writes go through the dashboard's server routes, which forward them
-  with a five-minute admin token (`lib/backend.ts`).
+  with a five-minute admin token (`lib/adminWrite.ts`).
 - The numbers are relative shifts, ceteris paribus (no management response),
   presented as structured judgment, never as a validated forecast.
 

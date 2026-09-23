@@ -3,12 +3,12 @@
  *
  * Reads and the user's own expert proposals go straight to the PRISM API
  * under /api/v1 and are authenticated by the httpOnly viewer cookie that
- * /api/prism-cookie sets (see hooks/usePrism.ts). The cookie lasts thirty
+ * /api/prism-cookie sets (see hooks/usePrism.tsx). The cookie lasts thirty
  * minutes; a /api/v1 request answered 401 asks for a new one and is sent once
  * more, so a dashboard left open keeps working while the session lasts, and
  * signing out expires the cookie first (clearViewerCookie). Admin writes go to the
  * dashboard's own routes under /api, which check the signed-in user's role
- * and forward the write with a short-lived admin token (lib/backend.ts): the
+ * and forward the write with a short-lived admin token (lib/adminWrite.ts): the
  * viewer cookie can never authorise an admin write. User management and the
  * role lookup are dashboard routes too (lib/roles.ts).
  */

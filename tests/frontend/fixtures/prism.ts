@@ -187,7 +187,7 @@ export function makeStore(overrides: Partial<PrismStore> = {}): PrismStore {
     databaseFailure: null,
     loading: false,
     error: null,
-    backendAvailable: true,
+    apiAvailable: true,
     updateDriver: vi.fn(async () => {}),
     reload: vi.fn(async () => {}),
     ...overrides,

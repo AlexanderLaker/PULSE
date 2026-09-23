@@ -14,9 +14,9 @@ type NoRunReason = 'unreachable' | 'migrating' | 'not_configured' | 'db_unreacha
 
 /** The reason from the service's diagnosis; undefined while the diagnosis is still loading. */
 export function noRunReason(
-  backendAvailable: boolean, diagnostics: DiagnosticsResult | null | undefined,
+  apiAvailable: boolean, diagnostics: DiagnosticsResult | null | undefined,
 ): NoRunReason | undefined {
-  if (!backendAvailable || diagnostics === null) return 'unreachable';
+  if (!apiAvailable || diagnostics === null) return 'unreachable';
   if (diagnostics === undefined) return undefined;
   if (diagnostics.simulation_reason === 'migration_pending') return 'migrating';
   if (diagnostics.simulation_reason === 'no_database') return 'not_configured';
@@ -32,9 +32,9 @@ const NO_RUN_TITLE: Record<NoRunReason, { viewer: string; admin: string }> = {
   unreachable:    { viewer: 'Results unavailable right now', admin: 'The run cannot be loaded' },
   migrating:      { viewer: 'PRISM is being updated', admin: 'The database awaits a migration' },
   not_configured: { viewer: 'Data connection issue', admin: 'No database configured' },
-  db_unreachable: { viewer: 'Data connection issue', admin: 'Backend cannot reach the database' },
+  db_unreachable: { viewer: 'Data connection issue', admin: 'The API cannot reach the database' },
   unservable:     { viewer: 'Latest run needs a refresh', admin: 'Latest run cannot be served' },
-  no_run:         { viewer: 'No simulation available yet', admin: 'No simulation persisted yet' },
+  no_run:         { viewer: 'No simulation available yet', admin: 'No run stored yet' },
 };
 
 const CODE: React.CSSProperties = { fontFamily: MONO_FONT, fontSize: '0.92em' };
@@ -80,7 +80,7 @@ export const NoRunState: FC<{
               ? 'No simulation run has been published yet. Results appear here automatically as soon as the PRISM team publishes the first run.'
               : reason === 'migrating'
                 ? 'PRISM’s database is moving to the current schema. The results return here as soon as the update has finished.'
-                : 'The simulation engine isn’t serving results right now. Please check back shortly; if this persists, contact the PRISM team.'}
+                : 'The results cannot be loaded right now. Please check back shortly; if this persists, contact the PRISM team.'}
           </p>
         ) : reason === 'migrating' ? (
           <>
@@ -116,12 +116,9 @@ export const NoRunState: FC<{
         ) : reason === 'db_unreachable' ? (
           <>
             <p>
-              The FastAPI backend is running but cannot query the Neon
-              database. This is almost always a Vercel environment
-              issue: check that <code style={CODE}>POSTGRES_URL</code> (or
-              {' '}<code style={CODE}>DATABASE_URL</code>)
-              in the Vercel dashboard points to the same Neon branch
-              you persist to from the CLI.
+              The PRISM API answers but cannot query its database. Check that{' '}
+              <code style={CODE}>POSTGRES_URL</code> (or <code style={CODE}>DATABASE_URL</code>) in the
+              Vercel project settings points to the Neon database the production runs write to.
             </p>
             {diagnostics?.error && (
               <p style={{ fontFamily: MONO_FONT, fontSize: '12px', color: S.error }}>
@@ -148,20 +145,16 @@ export const NoRunState: FC<{
               </p>
             )}
             <p>
-              Re-run <code style={CODE}>python3 scripts/run_production.py</code>{' '}
-              to persist a complete run.
+              Run <code style={CODE}>python3 scripts/run_production.py</code> again to store a
+              complete run.
             </p>
           </>
         ) : (
-          <>
-            <p>
-              Simulations are triggered from the CLI
-              (<code style={CODE}>scripts/run_production.py</code>).
-              Once a run has been persisted to the database, all four lenses
-              (Time Path, Force, Value Chain and Region) populate here
-              automatically.
-            </p>
-          </>
+          <p>
+            Runs are made offline by <code style={CODE}>python3 scripts/run_production.py</code>,
+            which stores them in the database. Once one is stored, all four lenses (Time Path,
+            Force, Value Chain and Region) fill in here.
+          </p>
         )}
       </div>
       {problem && (

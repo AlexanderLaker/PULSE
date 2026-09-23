@@ -7,7 +7,7 @@
  *   - The token in the cookie always says viewer, admins included, so the
  *     role is not looked up. The cookie authorises reads and the user's own
  *     expert proposals, never an admin write: admin writes go through the
- *     dashboard routes with a separate admin token (lib/backend.ts).
+ *     dashboard routes with a separate admin token (lib/adminWrite.ts).
  *   - httpOnly, Secure in production, SameSite=Lax and Path=/api/v1: script
  *     cannot read it and it is sent to the API only.
  *   - It lasts 30 minutes, so a session ended on another device loses its

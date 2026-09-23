@@ -27,8 +27,8 @@ describe('weightedAvg', () => {
 });
 
 describe('categoryShares', () => {
-  it("reads the run's shares in the given order, 0 for a category the run lacks", () => {
-    expect(categoryShares({ 'Hair: Color': 0.2, 'LHC: FCN': 0.3 }, ['LHC: FCN', 'Hair: Care', 'Hair: Color']))
+  it("reads the run's shares in the given order", () => {
+    expect(categoryShares({ 'Hair: Color': 0.2, 'Hair: Care': 0, 'LHC: FCN': 0.3 }, ['LHC: FCN', 'Hair: Care', 'Hair: Color']))
       .toEqual([0.3, 0, 0.2]);
   });
 });

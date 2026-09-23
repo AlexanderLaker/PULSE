@@ -53,7 +53,7 @@ const ProposalYearInput: FC<{
 
 // ── Expert Rating panel: the expert's own proposal, scored from a blank
 //    slate and saved automatically, with the baseline on hover ──
-export const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: string, my: DriverProposal) => void }> = ({ driver, onMyChange }) => {
+export const ExpertRatingPanel: FC<{ driver: Driver; onMyChange: (driverId: string, my: DriverProposal) => void }> = ({ driver, onMyChange }) => {
   const { data, loaded, failed, retry } = useDriverProposals(driver.id);
   const [draft, setDraft] = useState<DriverProposal>({});
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');

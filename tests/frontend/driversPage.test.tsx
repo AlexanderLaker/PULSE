@@ -31,7 +31,7 @@ vi.mock('@/lib/apiClient', async (importOriginal) => ({
 }));
 
 import Drivers from '@/components/dashboard/Drivers';
-import { ExpertInputPanel } from '@/components/dashboard/drivers/ExpertRating';
+import { ExpertRatingPanel } from '@/components/dashboard/drivers/ExpertRating';
 import { SourceItem, sourceHost } from '@/components/dashboard/drivers/cards';
 
 // framer-motion restores the scroll position after measuring an expanded panel.
@@ -313,7 +313,7 @@ describe('the Expert Rating panel', () => {
     let finishSave!: () => void;
     API.saveMyProposal.mockImplementationOnce(
       () => new Promise((r) => { finishSave = () => r(response({ probability: 4 })); }));
-    const first = render(<ExpertInputPanel driver={PRIVATE_LABEL} onMyChange={() => {}} />);
+    const first = render(<ExpertRatingPanel driver={PRIVATE_LABEL} onMyChange={() => {}} />);
     await screen.findByRole('radiogroup', { name: /^Probability/ });
     fireEvent.click(probabilityDot(4));
     first.unmount();   // closed inside the autosave delay: the pending edit is sent, not dropped
@@ -321,7 +321,7 @@ describe('the Expert Rating panel', () => {
     expect(API.saveMyProposal.mock.calls[0]![1]).toMatchObject({ probability: 4 });
 
     API.getDriverProposals.mockClear().mockResolvedValue(response({ probability: 4 }));
-    render(<ExpertInputPanel driver={PRIVATE_LABEL} onMyChange={() => {}} />);   // opened again at once
+    render(<ExpertRatingPanel driver={PRIVATE_LABEL} onMyChange={() => {}} />);   // opened again at once
     expect(screen.getByText('Loading your proposal…')).toBeTruthy();
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
     expect(API.getDriverProposals).not.toHaveBeenCalled();

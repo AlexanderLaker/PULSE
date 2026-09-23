@@ -4,9 +4,9 @@
  */
 import type { FC } from 'react';
 import { Info, Database } from 'lucide-react';
-import { fmtPct, fmtDateTimeUtc } from '@/lib/format';
+import { CATEGORY_NAMES, REGIONS, fmtPct, fmtDateTimeUtc } from '@/lib/format';
 import { S, HEADLINE_FONT, MONO_FONT } from '@/lib/theme';
-import { cellMarginals, cellWeightsBasis } from '@/lib/cellWeights';
+import { cellWeightsBasis } from '@/lib/cellWeights';
 import { codeForDriverId } from '@/data/driverCodeMap';
 import type { SimulationResult } from '@/types';
 
@@ -63,12 +63,14 @@ export const RunNotices: FC<{ simulation: SimulationResult; serviceVersion: stri
 
 // ─── The run's provenance ────────────────────────────────────────────
 
+/** The composite cells a run's gross-profit shares cover: 13 categories x 4 regions. */
+const CELL_COUNT = CATEGORY_NAMES.length * REGIONS.length;
+
 /** The served run's provenance and audit metadata, and the integrity events recorded with it. */
 export const RunDetails: FC<{ simulation: SimulationResult }> = ({ simulation }) => {
   const m = simulation.run_meta;
   const ss = simulation.seed_stability;
   const events = simulation.integrity_events;
-  const cells = cellMarginals(simulation.cell_weights_used);
   // The largest bootstrap standard error of a terminal-year category median.
   const maxSe = Math.max(0, ...Object.values(simulation.mc_standard_error).map((e) => e.median_se_pp));
   const rows: Array<[string, string]> = [
@@ -83,8 +85,8 @@ export const RunDetails: FC<{ simulation: SimulationResult }> = ({ simulation })
     // The run's own label says whether it stands on the estimated HCB mix or
     // on a file given to the production run.
     ['Cell weights', cellWeightsBasis(simulation.cell_weights_source) === 'estimate'
-      ? `estimated HCB mix, not Henkel P&L (${cells.cellCount} cells)`
-      : `from the file given to the run (${cells.cellCount} cells)`],
+      ? `estimated HCB mix, not Henkel P&L (${CELL_COUNT} cells)`
+      : `from the file given to the run (${CELL_COUNT} cells)`],
     ['Weights source', simulation.cell_weights_source],
     ['Region shares', Object.entries(simulation.region_weights_used)
       .map(([r, w]) => `${r} ${fmtPct(w, 0)}`).join(' · ')],

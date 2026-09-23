@@ -180,7 +180,7 @@ export const DriverForceCard: FC<{
   const c = forceColor(info.force);
   const name = live?.name ?? info.name;
   const isExp = (live?.direction ?? info.direction) === 'Expansion';
-  const description = live?.description ?? (driversLoaded ? '' : info.fallbackDescription);
+  const description = live?.description ?? (driversLoaded ? '' : info.firstSentence);
   const sourceCount = live?.sources.length ?? 0;
 
   return (
@@ -219,7 +219,7 @@ export const DriverForceCard: FC<{
         <p style={{ fontSize: 11.5, color: S.onSurfaceVariant, lineHeight: 1.5, margin: '9px 0 0' }}>
           {description}
           {!live && !driversLoaded && (
-            <span style={{ color: S.mutedText, fontStyle: 'italic' }}> (offline fallback)</span>
+            <span style={{ color: S.mutedText, fontStyle: 'italic' }}> (the drivers have not loaded yet)</span>
           )}
         </p>
       )}

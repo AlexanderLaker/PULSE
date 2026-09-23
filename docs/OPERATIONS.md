@@ -33,7 +33,7 @@ npm run dev
 ```
 
 and open http://localhost:3000. The Next.js dev server sends `/api/v1` to the
-API (`PRISM_BACKEND_URL` changes the target). On first use the API creates
+API (`PRISM_LOCAL_API_URL` changes the target). On first use the API creates
 its tables and seeds the drivers. For a Shift Analysis to look at, write a
 short run:
 

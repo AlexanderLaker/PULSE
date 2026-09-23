@@ -108,7 +108,7 @@ describe('ConsumerJourney: rail and tile dialog', () => {
     render(<ConsumerJourney />);
     const dialog = await openTile();
     expect(dialog.getByText(DRIVER_CODE_MAP['T-01'].name)).toBeTruthy();
-    expect(dialog.getByText(/\(offline fallback\)/)).toBeTruthy();
+    expect(dialog.getByText(/\(the drivers have not loaded yet\)/)).toBeTruthy();
   });
 
   it('closes on Escape', async () => {

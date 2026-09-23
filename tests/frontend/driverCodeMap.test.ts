@@ -42,8 +42,8 @@ describe('DRIVER_CODE_MAP', () => {
       expect(info.name).toBe(d.name);
       expect(info.force).toBe(d.force);
       expect(info.direction).toBe(d.direction);
-      expect(info.fallbackDescription.length).toBeGreaterThan(0);
-      expect(d.description.startsWith(info.fallbackDescription.replace(/…$/, ''))).toBe(true);
+      expect(info.firstSentence.length).toBeGreaterThan(0);
+      expect(d.description.startsWith(info.firstSentence.replace(/…$/, ''))).toBe(true);
     }
   });
 

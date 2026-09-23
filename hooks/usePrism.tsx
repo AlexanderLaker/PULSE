@@ -18,13 +18,11 @@
  * a migration or an outage) and when a newer run appears. While the database
  * cannot be used, the views keep what they last loaded and the service notice
  * says why.
- *
- * A .ts module without JSX: the provider is built with createElement.
  */
 'use client';
 
 import {
-  createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, useState,
+  createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
   type FC, type ReactNode,
 } from 'react';
 import * as api from '@/lib/apiClient';
@@ -49,7 +47,7 @@ export interface PrismStore {
   /** Set when the service itself could not be reached. */
   error: string | null;
   /** False while the service cannot be reached. */
-  backendAvailable: boolean;
+  apiAvailable: boolean;
   /**
    * Admin edit of a driver. Rejects when the write fails (with status 409 when
    * the driver changed after `update.revision`); either way the drivers are
@@ -233,7 +231,7 @@ function usePrismStore(): PrismStore {
   return useMemo(() => ({
     health, drivers, simulation, config, driversError, configError, simulationError, databaseFailure,
     loading, error,
-    backendAvailable: connectionState !== 'offline',
+    apiAvailable: connectionState !== 'offline',
     updateDriver, reload,
   }), [health, drivers, simulation, config, driversError, configError, simulationError, databaseFailure,
     loading, error, connectionState, updateDriver, reload]);
@@ -244,7 +242,7 @@ const PrismContext = createContext<PrismStore | null>(null);
 /** Mount once (app/dashboard/page.tsx); every view shares this store. */
 export const PrismProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const store = usePrismStore();
-  return createElement(PrismContext.Provider, { value: store }, children);
+  return <PrismContext.Provider value={store}>{children}</PrismContext.Provider>;
 };
 
 /** The shared store. Must be used inside <PrismProvider>. */

@@ -1,18 +1,19 @@
 /**
- * The Explorer's navigation: Laundry or Hair, and the view within it.
+ * The Explorer's navigation: Laundry & Home Care or Hair, and the view within it.
  */
 import type { FC } from 'react';
+import { groupDisplay } from '@/lib/format';
 import type { PoolViewKind, PoolGroup } from '@/lib/profitPoolData';
 import { S, HEADLINE_FONT } from '@/lib/theme';
 
 const GROUPS: { id: PoolGroup; label: string }[] = [
-  { id: 'LHC', label: 'Laundry' },
+  { id: 'LHC', label: groupDisplay('LHC') },
   { id: 'Hair', label: 'Hair' },
 ];
 
 export const KINDS: { id: PoolViewKind; label: string }[] = [
   { id: 'ValueChain', label: 'Value Chain' },
-  { id: 'SubSegment', label: 'Sub-Segments' },
+  { id: 'Categories', label: 'Categories' },
   { id: 'CoreAdjacent', label: 'Core + Adjacent' },
 ];
 

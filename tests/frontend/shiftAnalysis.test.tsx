@@ -58,9 +58,9 @@ describe('Shift Analysis without a run', () => {
   it('tells an admin which of the reasons applies', async () => {
     const cases: Array<[DiagnosticsResult | null, string]> = [
       [null, 'The run cannot be loaded'],
-      [diagnosis({ simulation_reason: 'no_rows' }), 'No simulation persisted yet'],
+      [diagnosis({ simulation_reason: 'no_rows' }), 'No run stored yet'],
       [diagnosis({ simulation_reason: 'malformed', latest_run_id: 99 }), 'Latest run cannot be served'],
-      [diagnosis({ simulation_reason: 'db_error', db_reachable: false }), 'Backend cannot reach the database'],
+      [diagnosis({ simulation_reason: 'db_error', db_reachable: false }), 'The API cannot reach the database'],
       [diagnosis({ simulation_reason: 'migration_pending' }), 'The database awaits a migration'],
       [diagnosis({ simulation_reason: 'no_database', db_reachable: false }), 'No database configured'],
     ];
@@ -95,7 +95,7 @@ describe('Shift Analysis without a run', () => {
   });
 
   it('treats a store that lost the service as unreachable without asking it', () => {
-    STORE.store = makeStore({ simulation: null, backendAvailable: false });
+    STORE.store = makeStore({ simulation: null, apiAvailable: false });
     DIAGNOSIS.result = diagnosis({ simulation_reason: 'no_rows' });
     render(<ShiftAnalysis />);
     expect(screen.getByText('Results unavailable right now')).toBeTruthy();

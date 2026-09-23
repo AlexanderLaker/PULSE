@@ -186,13 +186,13 @@ def render_codemap(drivers: list) -> str:
     a("  force: ForceName;")
     a("  direction: Direction;")
     a("  /** First sentence of the description, shown until the drivers API has answered. */")
-    a("  fallbackDescription: string;")
+    a("  firstSentence: string;")
     a("}")
     a("")
     a("export const DRIVER_CODE_MAP: Record<string, DriverCodeInfo> = {")
     for d in sorted(drivers, key=lambda x: x["code"]):
         info = {"driverId": d["id"], "name": d["name"], "force": d["force"],
-                "direction": d["direction"], "fallbackDescription": first_sentence(d["description"])}
+                "direction": d["direction"], "firstSentence": first_sentence(d["description"])}
         a(f"  '{d['code']}': {json.dumps(info, ensure_ascii=False)},")
     a("};")
     a("")

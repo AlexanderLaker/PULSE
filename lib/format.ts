@@ -22,7 +22,7 @@ export const EXPANSION = S.expansion;
 export const CONTRACTION = S.contraction;
 const NEUTRAL = S.mutedText;
 
-/** A light expansion tint for badges (the Reviewed pill). */
+/** A light expansion tint for badges (the Rated pill). */
 export const EXPANSION_SOFT = `rgba(${EXPANSION_RGB}, 0.10)`;
 
 /** Below this absolute shift a value is flat. */
@@ -48,6 +48,9 @@ export const FORCE_COLORS: Record<ForceName, string> = {
   Competitive: '#b0504a',
 };
 
+/** A category's group: Hair, or Laundry & Home Care. */
+export type CategoryGroup = 'Hair' | 'LHC';
+
 export interface CategoryDefinition {
   /** The key the API uses, e.g. "LHC: FCN". */
   name: string;
@@ -57,7 +60,7 @@ export interface CategoryDefinition {
   short: string;
   /** Acronym chip next to a Laundry & Home Care label; Hair labels need none. */
   code?: string;
-  group: 'Hair' | 'LHC';
+  group: CategoryGroup;
   color: string;
 }
 
@@ -81,28 +84,29 @@ export const CATEGORIES: CategoryDefinition[] = [
 /** The category keys in the engine's order: the keys of every category-keyed block in a run. */
 export const CATEGORY_NAMES: string[] = CATEGORIES.map((c) => c.name);
 
-const CATEGORY_BY_NAME: Record<string, CategoryDefinition> = Object.fromEntries(CATEGORIES.map((c) => [c.name, c]));
+const CATEGORY_BY_NAME = new Map(CATEGORIES.map((c) => [c.name, c]));
 
-/** The plain-English label of a category key; the key itself if unknown. */
-export function categoryDisplay(name: string | null | undefined): string {
-  if (!name) return '';
-  return CATEGORY_BY_NAME[name]?.label ?? name;
+/** A category by its key. Every key the dashboard shows is the taxonomy's (the
+ *  API serves no other), so an unknown one is an error, not a label. */
+export function categoryOf(name: string): CategoryDefinition {
+  const category = CATEGORY_BY_NAME.get(name);
+  if (!category) throw new Error(`${name} is not a category of the taxonomy`);
+  return category;
+}
+
+/** The plain-English label of a category key ("LHC: FCN" -> "Fabric Clean"). */
+export function categoryDisplay(name: string): string {
+  return categoryOf(name).label;
 }
 
 /** A group's heading: "LHC" reads "Laundry & Home Care". */
-export function groupDisplay(group: string | null | undefined): string {
-  if (!group) return '';
-  return group === 'LHC' ? 'Laundry & Home Care' : group;
+export function groupDisplay(group: CategoryGroup): string {
+  return group === 'LHC' ? 'Laundry & Home Care' : 'Hair';
 }
 
-/** The short label of a category key ("Hair: Color" -> "Colour", "LHC: FCN" -> "FCN"); an
- *  unknown key loses its group prefix. */
-export function shortCat(cat: string | null | undefined): string {
-  if (!cat) return '';
-  const known = CATEGORY_BY_NAME[cat]?.short;
-  if (known) return known;
-  const parts = cat.split(':');
-  return parts.length > 1 ? (parts[1]?.trim() ?? cat) : cat;
+/** The short label of a category key ("Hair: Color" -> "Colour", "LHC: FCN" -> "FCN"). */
+export function shortCat(name: string): string {
+  return categoryOf(name).short;
 }
 
 /** prism/config.py DEFAULT_BASE_YEAR: the year every shift is measured against. */
@@ -116,8 +120,8 @@ export const HORIZON = YEARS[YEARS.length - 1]!;
 
 /** The earliest peak year a driver may take: the year after its onset (the
  *  later of the base year and its start year), as the API requires. */
-export function firstPeakYear(startYear: number | null | undefined): number {
-  return Math.max(BASE_YEAR, startYear ?? BASE_YEAR) + 1;
+export function firstPeakYear(startYear: number): number {
+  return Math.max(BASE_YEAR, startYear) + 1;
 }
 
 // ── Numbers ─────────────────────────────────────────────────────────────────

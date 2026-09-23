@@ -116,7 +116,7 @@ interface DriversProps {
 }
 
 const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
-  const { drivers, driversError, loading, backendAvailable, updateDriver, reload } = usePrism();
+  const { drivers, driversError, loading, apiAvailable, updateDriver, reload } = usePrism();
   // The category a driver must be exposed to, by its API name; null shows all.
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [search, setSearch] = useState(opened?.query ?? '');
@@ -329,7 +329,7 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
             </span>
             <SortHeader label="Expected effect" sortKey="effect"     currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
             <span className="inline-flex items-center justify-end w-full text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: S.onSurfaceVariant }}>
-              {mode === 'rating' ? 'Your review' : mode === 'review' ? 'Proposals' : 'Edited'}
+              {mode === 'rating' ? 'Your rating' : mode === 'review' ? 'Proposals' : 'Edited'}
             </span>
           </div>
 
@@ -338,10 +338,10 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
             {loading && drivers.length === 0 && (
               <EmptyRow text="Loading drivers…" icon={<Layers size={20} />} />
             )}
-            {!loading && !backendAvailable && drivers.length === 0 && (
+            {!loading && !apiAvailable && drivers.length === 0 && (
               <EmptyRow text="The PRISM service cannot be reached; the drivers show once it answers." icon={<AlertTriangle size={20} />} />
             )}
-            {!loading && backendAvailable && driversError && drivers.length === 0 && (
+            {!loading && apiAvailable && driversError && drivers.length === 0 && (
               <EmptyRow text={`The drivers could not be loaded: ${driversError}`} icon={<AlertTriangle size={20} />}
                 action={{ label: 'Try again', onClick: () => { void reload(); } }} />
             )}

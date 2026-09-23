@@ -59,7 +59,7 @@
  * Analysis stays relative (percent only).
  */
 
-import { NO_VALUE } from '@/lib/format';
+import { NO_VALUE, type CategoryGroup } from '@/lib/format';
 
 // ═══════════════════════════════════════════════════════════════════
 // Types
@@ -68,13 +68,14 @@ import { NO_VALUE } from '@/lib/format';
 export type PoolViewId =
   | 'hair_value_chain'
   | 'laundry_value_chain'
-  | 'hair_sub_segments'
+  | 'hair_categories'
   | 'hair_core_adjacent'
-  | 'laundry_sub_segments'
+  | 'home_care_categories'
   | 'laundry_core_adjacent';
 
-export type PoolGroup = 'Hair' | 'LHC';
-export type PoolViewKind = 'ValueChain' | 'SubSegment' | 'CoreAdjacent';
+/** The industry a view covers: Hair, or Laundry & Home Care. */
+export type PoolGroup = CategoryGroup;
+export type PoolViewKind = 'ValueChain' | 'Categories' | 'CoreAdjacent';
 
 /** Evidence grade of a figure: reported, derived or estimate (see the header). */
 export type EvidenceGrade = 'reported' | 'derived' | 'estimate';
@@ -779,13 +780,13 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
 
   // ═════════ Hair: Passport categories (Euromonitor taxonomy) ═════════
   {
-    id: 'hair_sub_segments',
+    id: 'hair_categories',
     title: 'Hair Care: Passport Category Profit Pools',
     subtitle: 'Brand-owner GP1 proxy by Euromonitor Passport category | Total ~$94bn (2025, RSP; triangulated, Passport-unconfirmed) | € at 1.15',
     poolSize: '~€82bn',
     poolSizeEurBn: 81.7,
     group: 'Hair',
-    kind: 'SubSegment',
+    kind: 'Categories',
     construction:
       'Rows = Euromonitor Passport’s 8 hair care categories (2-in-1, Colourants, Conditioners & Treatments, Hair Loss Treatments, Perms & Relaxants, Salon Professional, Shampoos, Styling Agents) so an internal Passport extract drops in 1:1. Passport values are not shareable (licence), so every size is a PUBLIC TRIANGULATION at 2025 RSP (recipes in each source hover), normalised over their $93.1bn sum vs. the ~$94bn triangulated total. A format patchwork of 8 tier-2 firms would reconcile in total while every slice deviates from Passport: shampoo ~30% high, C&T fragments ~35% low, colour ~65% high (professional double-count), salon professional missing. HCB mapping: Shampoos/C&T/2-in-1/Hair Loss → Hair: Care; Colourants → Hair: Colour; Styling Agents (+ Perms, folded conceptually) → Hair: Styling; Salon Professional = in-total adjacency (Schwarzkopf Professional; no PRISM category). Hair: Body (Fa) lives in Passport Bath & Shower + Deodorants, outside this view. BASIS NOTE: bar widths are category revenue at RSP (retail value); GP1 % is a brand-owner proxy, so € GP1 pools on this view read as pool-at-retail-value; brand-owner-level GP1 € is ≈ half (RSP ≈ 2× MSP; the value-chain view carries the per-tier € honestly).',
     items: [
@@ -981,15 +982,15 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
 
   // ═════════ Home Care: Passport categories (Euromonitor taxonomy) ═════════
   {
-    id: 'laundry_sub_segments',
+    id: 'home_care_categories',
     title: 'Home Care: Passport Category Profit Pools',
     subtitle: 'Brand-owner GP1 proxy by Euromonitor Passport category | Home Care ~$213bn (2025, RSP; triangulated, Passport-unconfirmed) | € at 1.15',
     poolSize: '~€186bn',
     poolSizeEurBn: 185.7,
     group: 'LHC',
-    kind: 'SubSegment',
+    kind: 'Categories',
     construction:
-      'Rows = Euromonitor Passport’s Home Care tree (Laundry Care split into Detergents / Fabric Softeners / Laundry Aids; Dishwashing split Hand / Automatic; Surface, Toilet, Bleach, Polishes, Home Insecticides, Air Care) so an internal Passport extract drops in 1:1, and EVERY PRISM LHC category has a pool row (Toilet Care for Bref, Home Insecticides for IC). Passport values are not shareable (licence), so every size is a PUBLIC TRIANGULATION at 2025 RSP (recipes in each source hover); the 11 rows sum to $213.5bn ≈ the triangulated Home Care total. The bars stay on one hierarchy level (categories, not detergent formats next to categories), and stain removers are sized on the Passport scope rather than a surface-stain-inflated one that would overweight them ~3×; the detergent format mix (liquid ≈ half, powder ≈ ⅓, unit-dose ≈ 10–14%) lives inside the Laundry Detergents row note, matching Passport’s drill-down level. HCB mapping: Detergents → FCN+FCA (internal split: Passport has no fine-fabric category); Softeners → FFI; Aids (+ Carpet Cleaners, folded) → LAD; Hand/Auto Dishwashing → HDW/ADW; Surface+Bleach+Polishes → HSC cluster and Toilet → TOI (Toilet Care is its own PRISM category, separate from Hard-Surface Cleaner); Home Insecticides → IC; Air Care → no HCB category (white-space adjacency). BASIS NOTE: bar widths are category revenue at RSP (retail value); GP1 % is a brand-owner proxy, so € GP1 pools on this view read as pool-at-retail-value; brand-owner-level GP1 € is ≈ half (RSP ≈ 2× MSP; the value-chain view carries the per-tier € honestly).',
+      'Rows = Euromonitor Passport’s Home Care tree (Laundry Care split into Detergents / Fabric Softeners / Laundry Aids; Dishwashing split Hand / Automatic; Surface, Toilet, Bleach, Polishes, Home Insecticides, Air Care) so an internal Passport extract drops in 1:1, and every PRISM Laundry & Home Care category has a row (Toilet Care for Bref, Home Insecticides for IC). Passport values are not shareable (licence), so every size is a PUBLIC TRIANGULATION at 2025 RSP (recipes in each source hover); the 11 rows sum to $213.5bn ≈ the triangulated Home Care total. The bars stay on one hierarchy level (categories, not detergent formats next to categories), and stain removers are sized on the Passport scope rather than a surface-stain-inflated one that would overweight them ~3×; the detergent format mix (liquid ≈ half, powder ≈ ⅓, unit-dose ≈ 10–14%) lives inside the Laundry Detergents row note, matching Passport’s drill-down level. HCB mapping: Detergents → FCN+FCA (internal split: Passport has no fine-fabric category); Softeners → FFI; Aids (+ Carpet Cleaners, folded) → LAD; Hand/Auto Dishwashing → HDW/ADW; Surface+Bleach+Polishes → HSC cluster and Toilet → TOI (Toilet Care is its own PRISM category, separate from Hard-Surface Cleaner); Home Insecticides → IC; Air Care → no HCB category (white-space adjacency). BASIS NOTE: bar widths are category revenue at RSP (retail value); GP1 % is a brand-owner proxy, so € GP1 pools on this view read as pool-at-retail-value; brand-owner-level GP1 € is ≈ half (RSP ≈ 2× MSP; the value-chain view carries the per-tier € honestly).',
     items: [
       {
         id: 'l_sub_1', label: 'Laundry', sublabel: 'Detergents',
