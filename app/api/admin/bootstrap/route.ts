@@ -6,6 +6,8 @@
  * must equal ADMIN_BOOTSTRAP_SECRET instead.
  *
  *   - secret unset: the route answers 404, as if it did not exist
+ *   - secret shorter than 32 characters: 503, and nothing is compared (the
+ *     route has no rate limit; the length is what keeps guessing hopeless)
  *   - wrong or missing header: 403
  *   - no user_roles row for the email (the Clerk webhook adds one when a
  *     user signs up; it has not added this user): 404
@@ -28,6 +30,9 @@ import type { Role } from '@/types';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+/** The shortest secret the route works with, as for PRISM_JWT_SECRET. */
+const MIN_SECRET_LENGTH = 32;
+
 interface BootstrapBody {
   email?: unknown;
 }
@@ -43,6 +48,13 @@ export async function POST(req: Request) {
   if (!expected) {
     // Disabled here: do not reveal that the route exists.
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  if (expected.length < MIN_SECRET_LENGTH) {
+    return NextResponse.json(
+      { error: `ADMIN_BOOTSTRAP_SECRET is shorter than ${MIN_SECRET_LENGTH} characters; set a longer one` },
+      { status: 503 },
+    );
   }
 
   const provided = req.headers.get('x-bootstrap-secret');

@@ -271,8 +271,8 @@ role without an admin session:
 - `POST /api/admin/bootstrap` with the header `x-bootstrap-secret` equal to
   `ADMIN_BOOTSTRAP_SECRET` and the body `{"email": "..."}` makes the user
   admin; it never takes a role away. The route exists only while the
-  variable is set: set it, redeploy, call the route, then remove it and
-  redeploy again.
+  variable is set, and works only with a secret of at least 32 characters:
+  set it, redeploy, call the route, then remove it and redeploy again.
 
 Both need the user's row in `user_roles`, which the Clerk webhook adds at
 sign-up.
