@@ -201,6 +201,20 @@ class TestCommittedArtefacts:
         assert build.records_match(json.loads(FIXTURE.read_text(encoding="utf-8")), json.loads(json.dumps(fixture)),
                                    build.FIXTURE_ATOL, build.FIXTURE_RTOL)
 
+    def test_a_median_far_from_the_sum_at_the_means_is_refused(self, build, drivers, record):
+        """Scaled by such a factor every contribution would be inflated or turned around."""
+        for factor in (-1.0, 0.4, 2.5):
+            reference = copy.deepcopy(record["reference_run"])
+            reference["portfolio_terminal"]["median"] *= factor / record["reconciliation"]["factor"]
+            with pytest.raises(ValueError, match="cannot be reconciled"):
+                build.build_record(ModelConfig(), drivers, reference, record.get("persisted_run"))
+
+    def test_the_drill_down_rescales_in_the_same_range(self, build):
+        """lib/driverAttribution.ts reconciliationFactor holds RECONCILIATION_RANGE too."""
+        low, high = build.RECONCILIATION_RANGE
+        ts = (REPO / "lib" / "driverAttribution.ts").read_text(encoding="utf-8")
+        assert f"k >= {low:g} && k <= {high:g}" in ts
+
     def test_records_match_admits_rounding_flips_and_nothing_a_reader_could_notice(self, build):
         base = {"a": [0.9129, {"b": 1, "c": "x", "d": True}], "e": 0.5}
         flipped = {"a": [0.913, {"b": 1, "c": "x", "d": True}], "e": 0.5}
@@ -323,6 +337,20 @@ class TestCommittedArtefacts:
         # a build without --reference refuses instead of reconciling to the old median
         assert script.main([]) == 1
         assert "REFUSING" in capsys.readouterr().out
+
+    def test_a_build_refuses_a_production_run_the_reference_does_not_reproduce(
+            self, script, tmp_path, monkeypatch, capsys):
+        """A record whose reference run misses the recorded production run would
+        fail --check, so the build refuses and writes nothing."""
+        moved = json.loads(ATTRIBUTION.read_text(encoding="utf-8"))
+        moved["persisted_run"]["categories_terminal"]["LHC: FCN"]["median"] += 0.001
+        p = tmp_path / "moved.json"
+        p.write_text(json.dumps(moved), encoding="utf-8")
+        monkeypatch.setattr(script, "ATTRIBUTION_PATH", str(p))
+        before = p.read_text(encoding="utf-8")
+        assert script.main([]) == 1
+        assert "REFUSING: the reference run does not reproduce production run" in capsys.readouterr().out
+        assert p.read_text(encoding="utf-8") == before
 
     def test_readings_are_rendered_on_the_estimated_mix_only(self, render, record):
         """The templates compare shares of the estimated mix in words, so a

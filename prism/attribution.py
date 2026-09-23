@@ -73,6 +73,9 @@ TERMINAL_YEAR = DEFAULT_PATH_YEARS[-1]
 #: are reproducible (any fixed value would do; changing it moves the shares).
 BAND_DRAWS = 200_000
 BAND_SEED = 20260917
+#: The factors of the median over the sum at the means that the record
+#: accepts; the dashboard's drill-down applies the same range.
+RECONCILIATION_RANGE = (0.5, 2.0)
 #: How many of its largest cells, and same-force partners per cell, the
 #: record keeps for each driver.
 TOP_CELLS = 6
@@ -247,14 +250,15 @@ def reference_run(config: ModelConfig, drivers: list, chains: int, iterations: i
 def reference_reproduces(reference: dict, persisted: dict, tol: float = 1.5e-6) -> list:
     """Names of the categories and quantiles where the reference run does not
     reproduce the persisted run (empty when it does)."""
-    out = []
-    for cat, q in persisted.get("categories_terminal", {}).items():
-        ref = reference.get("categories_terminal", {}).get(cat)
-        if ref is None:
-            out.append(f"{cat}: not in the reference run"); continue
+    ref_cats, run_cats = reference["categories_terminal"], persisted["categories_terminal"]
+    out = [f"{cat}: not in the persisted run" for cat in ref_cats if cat not in run_cats]
+    for cat, q in run_cats.items():
+        if cat not in ref_cats:
+            out.append(f"{cat}: not in the reference run")
+            continue
         for k in ("p10", "median", "p90"):
-            if abs(float(ref[k]) - float(q[k])) > tol:
-                out.append(f"{cat} {k}: reference {ref[k]} vs persisted {q[k]}")
+            if abs(float(ref_cats[cat][k]) - float(q[k])) > tol:
+                out.append(f"{cat} {k}: reference {ref_cats[cat][k]} vs persisted {q[k]}")
     return out
 
 
@@ -271,7 +275,14 @@ def build_record(config: ModelConfig, drivers: list, reference: dict, persisted:
     port_raw = dec["port"]
     det_total = float(port_raw[:, y_last].sum())
     median = float(reference["portfolio_terminal"]["median"])
-    factor = median / det_total if abs(det_total) > 1e-12 else 1.0
+    factor = median / det_total if abs(det_total) > 1e-12 else float("nan")
+    if not RECONCILIATION_RANGE[0] <= factor <= RECONCILIATION_RANGE[1]:
+        # The skew of the distribution moves the median by a percent or so; a
+        # factor far from 1, or a negative one, would inflate or turn around
+        # every contribution (lib/driverAttribution.ts reconciliationFactor
+        # does not rescale outside the same range).
+        raise ValueError(f"the reference median ({median:.6f}) is {factor:.3f} times the sum at the means "
+                         f"({det_total:.6f}); readings cannot be reconciled outside {RECONCILIATION_RANGE}")
 
     port = port_raw * factor
     cat_pp = dec["cat_pp"] * factor

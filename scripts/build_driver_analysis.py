@@ -24,7 +24,8 @@ in docs/DRIVER_ANALYSIS.md) and the texts from prism/readings.py.
 `--check` fails when a committed file differs from what the code produces
 from the driver base and the configuration, when the reference run was made
 on other inputs (their digest), or when it does not reproduce the production
-run recorded with --workbook.
+run recorded with --workbook. A build refuses in the last two cases and
+writes nothing.
 
 After a re-scoring: run scripts/run_production.py, then this script with
 --reference --workbook FILE, review the re-rendered texts, run
@@ -118,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
                             "run (its inputs digest differs): re-run with --reference --workbook FILE")
         if persisted:
             for line in attribution.reference_reproduces(reference, persisted):
-                problems.append(f"the reference run does not reproduce production run {persisted.get('id')}: {line}")
+                problems.append(f"the reference run does not reproduce production run {persisted['id']}: {line}")
         for code, entry in analysis.get("drivers", {}).items():
             driver_id = next((i for i, d in record["drivers"].items() if d["code"] == code), None)
             if driver_id and entry.get("text") != texts.get(driver_id):
@@ -139,13 +140,13 @@ def main(argv: list[str] | None = None) -> int:
     if persisted:
         mismatch = attribution.reference_reproduces(reference, persisted)
         if mismatch:
-            print(f"WARNING: the reference run does not reproduce production run {persisted.get('id')} "
+            print(f"REFUSING: the reference run does not reproduce production run {persisted['id']} "
                   f"({len(mismatch)} quantile(s) differ, first: {mismatch[0]}). Either the drivers or the "
-                  f"configuration changed since that run, or the workbook is not this run's: record the "
-                  f"new production run with --workbook, or run run_production.py first.")
-        else:
-            print(f"reference run reproduces persisted run {persisted.get('id')} ({persisted.get('generated')}) "
-                  f"at every terminal-year category quantile")
+                  f"configuration changed since that run, or the workbook is not this run's: run "
+                  f"scripts/run_production.py and pass its workbook with --workbook.")
+            return 1
+        print(f"reference run reproduces persisted run {persisted['id']} ({persisted['generated']}) "
+              f"at every terminal-year category quantile")
     _dump_json(ATTRIBUTION_PATH, record)
     print(f"wrote {os.path.relpath(ATTRIBUTION_PATH, REPO)} "
           f"({len(record['drivers'])} drivers, factor {record['reconciliation']['factor']:.4f})")

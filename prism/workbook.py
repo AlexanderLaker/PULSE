@@ -38,6 +38,9 @@ ESTIMATE_RECORD = Path(__file__).resolve().parents[1] / "data" / "parameters" / 
 
 PERCENTILES = ("p10", "p25", "median", "p75", "p90")
 
+#: The Metadata rows read_workbook needs to name the run it reads back.
+RUN_IDENTITY = ("Run id", "Generated", "Model version", "Pooled iterations")
+
 # The dashboard's colours (lib/theme.ts) as solid fills, since a workbook has
 # no transparency: the navy ink, the surface tint, and the shift pair at 12
 # percent over white.
@@ -100,7 +103,7 @@ def write_workbook(output_path: str, result: dict, config: ModelConfig, *,
     wb = openpyxl.Workbook()
     _shift_matrix(wb.active, result, config)
     _regional_shift(wb.create_sheet("Regional Shift"), result, config)
-    _cell_weights(wb.create_sheet("Cell Weights"), result, config)
+    _cell_weights(wb.create_sheet("Cell Weights"), result)
     _velocity(wb.create_sheet("Velocity"), result, config)
     _metadata(wb.create_sheet("Metadata"), result, config, run_id, driver_count)
     wb.save(output_path)
@@ -147,12 +150,11 @@ def _shift_matrix(ws, result: dict, config: ModelConfig) -> None:
             col += 1
     for row, cat in enumerate(CATEGORIES, 3):
         ws.cell(row=row, column=1, value=cat).font = Font(name="Inter", bold=True, size=10)
-        path = (result["shift_matrix"].get(cat) or {}).get("path", {})
+        path = result["shift_matrix"][cat]["path"]
         col = 2
         for year in config.path_years:
-            q = path.get(year, {})
             for p in PERCENTILES:
-                _shift_cell(ws, row, col, q.get(p, 0.0))
+                _shift_cell(ws, row, col, path[year][p])
                 col += 1
     ws.column_dimensions["A"].width = 18
     for c in range(2, col):
@@ -169,12 +171,12 @@ def _regional_shift(ws, result: dict, config: ModelConfig) -> None:
     row = 2
     for cat in CATEGORIES:
         for region in REGIONS:
-            share = (weights.get(cat) or {}).get(region, 0.0)
+            share = weights[cat][region]
             ws.cell(row=row, column=1, value=cat).font = LABEL_FONT
             ws.cell(row=row, column=2, value=f"{region} ({share * 100:.1f}%)").font = LABEL_FONT
-            path = ((result["regional_shift_matrix"].get(cat) or {}).get(region) or {}).get("path", {})
+            path = result["regional_shift_matrix"][cat][region]["path"]
             for j, year in enumerate(config.path_years, 3):
-                _shift_cell(ws, row, j, path.get(year, {}).get("median", 0.0))
+                _shift_cell(ws, row, j, path[year]["median"])
             row += 1
     ws.column_dimensions["A"].width = 18
     ws.column_dimensions["B"].width = 24
@@ -182,7 +184,7 @@ def _regional_shift(ws, result: dict, config: ModelConfig) -> None:
         ws.column_dimensions[get_column_letter(c)].width = 11
 
 
-def _cell_weights(ws, result: dict, config: ModelConfig) -> None:
+def _cell_weights(ws, result: dict) -> None:
     """The share matrix the run applied, its marginals and its source."""
     weights = result["cell_weights_used"]
     _header(ws, 1, 1, "Category")
@@ -191,25 +193,25 @@ def _cell_weights(ws, result: dict, config: ModelConfig) -> None:
     _header(ws, 1, len(REGIONS) + 2, "Category share")
     row = 2
     for cat in CATEGORIES:
-        shares = weights.get(cat) or {}
+        shares = weights[cat]
         ws.cell(row=row, column=1, value=cat).font = LABEL_FONT
         for j, region in enumerate(REGIONS, 2):
-            ws.cell(row=row, column=j, value=round(float(shares.get(region, 0.0)), 6)).number_format = "0.00%"
+            ws.cell(row=row, column=j, value=round(float(shares[region]), 6)).number_format = "0.00%"
         ws.cell(row=row, column=len(REGIONS) + 2,
                 value=round(sum(float(v) for v in shares.values()), 6)).number_format = "0.00%"
         row += 1
     ws.cell(row=row, column=1, value="Region share").font = BOLD_FONT
     for j, region in enumerate(REGIONS, 2):
-        total = sum(float((weights.get(c) or {}).get(region, 0.0)) for c in CATEGORIES)
+        total = sum(float(weights[c][region]) for c in CATEGORIES)
         ws.cell(row=row, column=j, value=round(total, 6)).number_format = "0.00%"
-    ws.cell(row=row + 2, column=1, value="Source: " + str(result.get("cell_weights_source") or ""))
-    row = _estimate_derivation(ws, weights, config, row + 4)
+    ws.cell(row=row + 2, column=1, value="Source: " + str(result["cell_weights_source"]))
+    row = _estimate_derivation(ws, weights, row + 4)
     ws.column_dimensions["A"].width = 18
     for j in range(2, len(REGIONS) + 3):
         ws.column_dimensions[get_column_letter(j)].width = 14
 
 
-def _estimate_derivation(ws, weights: dict, config: ModelConfig, row: int) -> int:
+def _estimate_derivation(ws, weights: dict, row: int) -> int:
     """The graded derivation of the estimated mix, written only when the run used it.
 
     A reader holding the file offline must be able to see that these shares
@@ -218,9 +220,8 @@ def _estimate_derivation(ws, weights: dict, config: ModelConfig, row: int) -> in
     """
     record = _estimate_record()
     cells = record["cells"]
-    if set(weights) != set(cells) or any(
-            abs(float((weights.get(c) or {}).get(r, 0.0)) - float(cells[c][r])) >= 1e-9
-            for c in cells for r in cells[c]):
+    if set(weights) != set(cells) or any(set(weights[c]) != set(cells[c]) for c in cells) or any(
+            abs(float(weights[c][r]) - float(cells[c][r])) >= 1e-9 for c in cells for r in cells[c]):
         return row
     inputs = record["inputs"]
 
@@ -280,10 +281,9 @@ def _estimate_derivation(ws, weights: dict, config: ModelConfig, row: int) -> in
         ws.cell(row=row, column=len(REGIONS) + 2, value=str(entry["grade"])).font = LABEL_FONT
         ws.cell(row=row, column=len(REGIONS) + 3, value=str(entry["note"])).font = LABEL_FONT
         row += 1
-    for note in (inputs.get("margin_index_note"), inputs.get("region_mix_note")):
-        if note:
-            row += 1
-            ws.cell(row=row, column=1, value=str(note)).font = LABEL_FONT
+    for note in (inputs["margin_index_note"], inputs["region_mix_note"]):
+        row += 1
+        ws.cell(row=row, column=1, value=str(note)).font = LABEL_FONT
     row += 2
     ws.cell(row=row, column=1, value="Replace all of this with the finance figures: "
                                      "run_production.py --cell-weights FILE.").font = BOLD_FONT
@@ -296,8 +296,8 @@ def _velocity(ws, result: dict, config: ModelConfig) -> None:
     for j, head in enumerate(["Category", "Path shape", *(f"Velocity {y}" for y in years)], 1):
         _header(ws, 1, j, head)
     for row, cat in enumerate(CATEGORIES, 2):
-        velocity = (result["shift_matrix"].get(cat) or {}).get("velocity", {})
-        values = [float(velocity.get(y, {}).get("median", 0.0)) for y in years]
+        velocity = result["shift_matrix"][cat]["velocity"]
+        values = [float(velocity[y]["median"]) for y in years]
         if all(abs(v) < 0.001 for v in values):
             shape = "flat"
         elif abs(values[-1]) > abs(values[0]) * 1.5:
@@ -322,19 +322,19 @@ def _metadata(ws, result: dict, config: ModelConfig, run_id: Optional[int],
     rows = [
         ("Run id", run_id),
         ("Generated", datetime.now(timezone.utc).isoformat(timespec="seconds")),
-        ("Model version", result.get("model_version")),
-        ("Engine", f"{result.get('engine_name')} (Beta priors, Gaussian copula)"),
-        ("Numerics", result.get("numerics_backend")),
+        ("Model version", result["model_version"]),
+        ("Engine", f"{result['engine_name']} (Beta priors, Gaussian copula)"),
+        ("Numerics", result["numerics_backend"]),
         ("Iterations per chain", result["iterations"]),
         ("Chains", result["chains"]),
         ("Pooled iterations", result["iterations"] * result["chains"]),
-        ("Seed", result.get("seed")),
+        ("Seed", result["seed"]),
         ("Drivers", driver_count),
         ("Path years", ", ".join(str(y) for y in config.path_years)),
         ("Attenuation source", f"{config.attenuation_source} (structured-judgment overlap correction, "
                                "not fitted to outcomes)"),
         ("Per-force attenuation", attenuation),
-        ("Cell weights", str(result.get("cell_weights_source") or "")),
+        ("Cell weights", str(result["cell_weights_source"])),
         ("Region shares", regions),
         (None, None),
         *READING_NOTES,
@@ -360,6 +360,10 @@ def read_workbook(path: str, terminal_year: int) -> dict:
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     meta = {str(row[0]).strip(): row[1] for row in wb["Metadata"].iter_rows(values_only=True)
             if row and row[0] is not None and len(row) > 1}
+    missing = [label for label in RUN_IDENTITY if meta.get(label) is None]
+    if missing:
+        raise ValueError(f"{path}: the Metadata sheet has no {', '.join(missing)}; only the workbook "
+                         "scripts/run_production.py writes for a stored run can be read back")
     rows = list(wb["Shift Matrix"].iter_rows(values_only=True))
     header, sub = rows[0], rows[1]
     start = next((i for i, v in enumerate(header) if str(v) == str(terminal_year)), None)
@@ -370,11 +374,13 @@ def read_workbook(path: str, terminal_year: int) -> dict:
         if r and r[0] is not None and r[start] is not None:
             q = dict(zip(PERCENTILES, r[start:start + len(PERCENTILES)]))
             categories[str(r[0])] = {k: round(float(q[k]), 6) for k in ("p10", "median", "p90")}
+    if set(categories) != set(CATEGORIES):
+        raise ValueError(f"{path}: the Shift Matrix sheet does not hold the {len(CATEGORIES)} categories")
     return {
-        "id": int(meta["Run id"]) if meta.get("Run id") is not None else None,
-        "generated": str(meta.get("Generated") or ""),
-        "model_version": str(meta.get("Model version") or ""),
-        "pooled_iterations": int(meta["Pooled iterations"]) if meta.get("Pooled iterations") is not None else None,
+        "id": int(meta["Run id"]),
+        "generated": str(meta["Generated"]),
+        "model_version": str(meta["Model version"]),
+        "pooled_iterations": int(meta["Pooled iterations"]),
         "workbook": Path(path).name,
         "categories_terminal": categories,
     }

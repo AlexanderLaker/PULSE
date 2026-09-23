@@ -181,6 +181,15 @@ class TestWorkbook:
         with pytest.raises(ValueError, match="no 2035 percentiles"):
             read_workbook(str(path), 2035)
 
+    def test_only_a_stored_runs_workbook_is_read_back(self, tmp_path, mock_model_config, mock_driver_set):
+        """The attribution record names the run it reproduces, so a workbook
+        without a run id (the run was not stored) is refused, not read as run None."""
+        from prism.workbook import read_workbook, write_workbook
+        path = tmp_path / "unsaved.xlsx"
+        write_workbook(str(path), self._result(mock_model_config, mock_driver_set), mock_model_config)
+        with pytest.raises(ValueError, match="the Metadata sheet has no Run id"):
+            read_workbook(str(path), mock_model_config.path_years[-1])
+
     def test_the_estimate_carries_its_derivation(self, tmp_path, mock_model_config, mock_driver_set):
         import openpyxl
         from prism.workbook import write_workbook
