@@ -314,7 +314,20 @@ class TestDrivers:
             "baseline", "scores_edited", "revision", "proposal_summary"}
         assert first["baseline"]["probability"] == first["probability"] and first["scores_edited"] is False
         assert first["revision"] == 1
-        assert first["proposal_summary"]["count"] == 0 and first["analysis"].startswith("Weight in the answer:")
+        assert first["proposal_summary"]["count"] == 0
+        from prism.analysis_texts import TEXTS
+        assert first["analysis"] == TEXTS[first["id"]] and first["analysis"].startswith("Weight in the answer:")
+
+    def test_a_driver_the_base_does_not_know_has_no_analysis(self, api):
+        """The readings ship with the code, by driver id; nothing stores them."""
+        from prism.database import insert_drivers
+        from prism.seed_drivers import get_seed_drivers
+        api.get("/api/v1/drivers", headers=bearer())   # seeds the base
+        extra = get_seed_drivers()[0]
+        extra.id = "consumer_r99"
+        insert_drivers([extra])
+        listed = {d["id"]: d for d in api.get("/api/v1/drivers", headers=bearer()).json()}
+        assert listed["consumer_r99"]["analysis"] == "" and listed["consumer_r01"]["analysis"]
 
     def test_an_admin_edit(self, api):
         from prism.database import get_db_connection

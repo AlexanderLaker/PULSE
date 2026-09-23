@@ -35,11 +35,12 @@ What it changes is listed in its docstring; in short:
   compares as changed, for anything that cannot be known) and the exposure
   maps on the taxonomy's names, so the next production run compares like
   with like; no number changes;
-- each driver gets its current PRISM Analysis text, and descriptions,
-  Consumer Journey tile texts and stage labels that still hold a previously
-  shipped text get the current one. A text an admin has edited is left alone
-  and listed in the report. The journey tiles cite drivers under
-  `driverCodes`, and a code that is not a driver of the base is removed.
+- descriptions, Consumer Journey tile texts and stage labels that still hold
+  a previously shipped text get the current one. A text an admin has edited
+  is left alone and listed in the report. The journey tiles cite drivers
+  under `driverCodes`, and a code that is not a driver of the base is
+  removed. The previous PRISM Analysis column is not carried over: the
+  readings ship with the code.
 
 A new, empty database needs no migration: the API creates the schema on first
 use and seeds the driver base.
@@ -93,8 +94,8 @@ environment from `requirements-dev.txt` and a `.env` whose `DATABASE_URL` (or
    ```
 
    The report opens with the database host, production's this time. Expect
-   `copied` to show 51 drivers with their sources and proposals, the previous
-   tables in `dropped_tables`, and 51 in `analysis_updated`. Then read:
+   `copied` to show 51 drivers with their sources and proposals and the
+   previous tables in `dropped_tables`. Then read:
 
    - `exposures`: per driver, the names outside the taxonomy that were
      dropped and the missing names that were set to 0;

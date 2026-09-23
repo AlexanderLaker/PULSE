@@ -22,6 +22,9 @@ or a weight changes.
 - The record carries the reference run and a digest of its inputs; `--check`
   fails when the inputs change or the reference stops reproducing the recorded
   production run.
+- The readings ship with the code (`prism/analysis_texts.py`, generated): the
+  API serves each with its driver and no database stores them, so a deploy is
+  all it takes to bring new readings everywhere.
 - The Shift Analysis uses a TypeScript port of the same decomposition, held
   to the Python one by a parity fixture: the category drill-down ranks its
   drivers with it and the Time Path's impact filter splits the median with

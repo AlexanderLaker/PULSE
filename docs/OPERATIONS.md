@@ -222,7 +222,8 @@ expected run. `/api/v1/diagnostics` explains a problem (see Troubleshooting).
 
 A deploy never needs a restart for data to appear: each API instance checks
 the database on every request and reloads the drivers or the run when they
-changed.
+changed. A deploy also brings the PRISM Analysis texts, which ship with the
+code.
 
 **Rollback**: in the Vercel dashboard, promote the previous production
 deployment (Deployments, the deployment, Promote to Production), or revert
@@ -231,9 +232,9 @@ back as that migration's runbook says.
 
 ## The database
 
-- **Backups.** Before any change to production data (a migration, a sync),
-  create a Neon branch of the production branch. It is instant and it is the
-  rollback.
+- **Backups.** Before any change to production data (a migration, a script
+  that writes), create a Neon branch of the production branch. It is instant
+  and it is the rollback.
 - **Migrations.** A change to the schema or to existing data is a folder
   under `migrations/`, numbered, with the script and a runbook. The pattern
   of `0001_driver_schema`: everything in one transaction; a `--dry-run` that
@@ -252,19 +253,13 @@ back as that migration's runbook says.
   numbers: the change carries a new `MODEL_VERSION`, golden pins and a PRISM
   Analysis record rebuilt from a production run of the new code, all in one
   commit (docs/DRIVER_ANALYSIS.md, "Regeneration").
-- **The PRISM Analysis texts** of an existing database follow the generated
-  ones with `scripts/sync_analysis.py` (`--dry-run` first; writing to
-  PostgreSQL needs `--postgres`). It changes the analysis column, raises the
-  revision of each driver it changes (an admin editing one of them at that
-  moment is asked to reload before saving) and writes one audit entry per
-  driver.
 - **The audit log** records every driver edit (one row per changed field),
-  journey save, analysis sync and migration in the same transaction as the
-  change, with the acting identity. Role changes are recorded where the
-  entry can be written: `scripts/promote_admin.py` writes it in the same
-  transaction when the database has an audit log, and the dashboard's routes
-  write it after the change, so a failed entry there does not undo the
-  change. Nothing deletes from it.
+  journey save and migration in the same transaction as the change, with the
+  acting identity. Role changes are recorded where the entry can be written:
+  `scripts/promote_admin.py` writes it in the same transaction when the
+  database has an audit log, and the dashboard's routes write it after the
+  change, so a failed entry there does not undo the change. Nothing deletes
+  from it.
 
 ## Roles and users
 

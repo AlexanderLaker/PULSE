@@ -176,9 +176,11 @@ def test_documents_spell_the_british_way(path):
 
 
 def test_the_drivers_texts_spell_the_british_way():
+    from prism.analysis_texts import TEXTS
     from prism.seed_drivers import DRIVERS
-    hits = [f"{d.id} {field}: {form}" for d in DRIVERS for field in ("name", "description", "analysis")
+    hits = [f"{d.id} {field}: {form}" for d in DRIVERS for field in ("name", "description")
             for form in american_forms(getattr(d, field))]
+    hits += [f"{driver_id} analysis: {form}" for driver_id, text in TEXTS.items() for form in american_forms(text)]
     assert hits == []
 
 

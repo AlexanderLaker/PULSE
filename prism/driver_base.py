@@ -134,7 +134,7 @@ def load_base(path: Path = BASE_PATH) -> list:
     return base["drivers"]
 
 
-def driver_from_base(d: dict, analysis: str = "") -> Driver:
+def driver_from_base(d: dict) -> Driver:
     """The Driver a base entry becomes; the generated seed module builds the same."""
     return Driver(
         id=d["id"], force=d["force"], name=d["name"], description=d["description"],
@@ -146,7 +146,6 @@ def driver_from_base(d: dict, analysis: str = "") -> Driver:
         vc_epicentre=d["vc_epicentre"],
         sources=[{"title": s["title"], "url": s["url"], "tier": s["tier"], "published": s["published"]}
                  for s in d["sources"]],
-        analysis=analysis,
     )
 
 

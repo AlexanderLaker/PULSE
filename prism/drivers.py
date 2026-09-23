@@ -48,7 +48,6 @@ class Driver:
     probability: Optional[int] = None  # 1-5; the Beta prior's mean is probability / 6
     # Onset: no effect up to and including this year, or the base year when that is later.
     start_year: Optional[int] = None
-    analysis: str = ""                # the PRISM Analysis reading (generated, read-only)
     category_exposure: dict = field(default_factory=dict)  # {category: 0-5}, every category
     regional_exposure: dict = field(default_factory=dict)  # {region: 0-5}, every region
     vc_epicentre: Optional[str] = None  # the value-chain stage where the impact centres (config.VC_STAGES)

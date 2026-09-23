@@ -211,7 +211,6 @@ def _schema() -> List[str]:
             uncertainty INTEGER NOT NULL CHECK (uncertainty BETWEEN 0 AND 5),
             vc_epicentre TEXT NOT NULL CHECK (vc_epicentre IN ({one_of(VC_STAGES)})),
             confidence TEXT NOT NULL CHECK (confidence IN ({one_of(CONFIDENCE_LEVELS)})),
-            analysis TEXT NOT NULL,
             baseline TEXT NOT NULL,
             scores_edited BOOLEAN NOT NULL DEFAULT FALSE,
             revision INTEGER NOT NULL DEFAULT 1,
@@ -469,7 +468,7 @@ def insert_audit(cursor, entries: Sequence[AuditEntry]) -> None:
 _DRIVER_COLUMNS = (
     "id", "force", "name", "description", "direction", "probability", "start_year",
     "peak_year", "diffusion_curve", "gp1_pct_affected", "uncertainty", "vc_epicentre", "confidence",
-    "analysis", "baseline", "scores_edited",
+    "baseline", "scores_edited",
 )
 
 
@@ -477,7 +476,7 @@ def _driver_values(d: Driver) -> tuple:
     """The values of _DRIVER_COLUMNS for one driver, in that order."""
     return (d.id, d.force, d.name, d.description, d.direction, d.probability, d.start_year,
             d.peak_year, d.diffusion_curve, d.gp1_pct_affected, d.uncertainty, d.vc_epicentre, d.confidence,
-            d.analysis, dumps(d.baseline), d.scores_edited)
+            dumps(d.baseline), d.scores_edited)
 
 
 def _require_simulatable(drivers: Sequence[Driver]) -> None:
@@ -634,7 +633,6 @@ def load_drivers() -> List[Driver]:
             direction=r["direction"],
             probability=int(r["probability"]),
             start_year=int(r["start_year"]),
-            analysis=r["analysis"],
             category_exposure=e["category"],
             regional_exposure=e["region"],
             vc_epicentre=r["vc_epicentre"],

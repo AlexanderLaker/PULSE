@@ -16,9 +16,12 @@ or the write lock (SQLite), so nothing can write in between.
    corrected in the dashboard of the release still deployed (a force, a start
    year or a confidence, which that dashboard cannot edit, with SQL).
 2. The driver tables are created and filled from the previous ones:
-     trends                    -> drivers      (strategic_implication -> analysis,
-                                                ai_suggestion -> baseline,
-                                                user_override -> scores_edited)
+     trends                    -> drivers      (ai_suggestion -> baseline,
+                                                user_override -> scores_edited;
+                                                strategic_implication, the
+                                                PRISM Analysis, is not carried
+                                                over: the readings ship with
+                                                the code)
      trend_category_exposure, trend_regional_exposure
                                -> driver_category_exposure, driver_regional_exposure
      trend_vc_exposure         -> drivers.vc_epicentre (the stage the stored
@@ -72,7 +75,6 @@ or the write lock (SQLite), so nothing can write in between.
    the drivers' do, so the next production run compares like with like. No
    number changes.
 5. The content is brought up to date:
-     - every driver of the seed gets its current PRISM Analysis text;
      - a description that still holds a previously shipped text gets the current
        one (descriptions.json); an edited description is left alone and reported;
      - the newest Consumer Journey content gets the key driverCodes instead of
@@ -181,7 +183,6 @@ def _ddl(postgres: bool) -> list:
             uncertainty INTEGER NOT NULL CHECK (uncertainty BETWEEN 0 AND 5),
             vc_epicentre TEXT NOT NULL CHECK (vc_epicentre IN ({one_of(VC_STAGES)})),
             confidence TEXT NOT NULL CHECK (confidence IN ({one_of(CONFIDENCE_LEVELS)})),
-            analysis TEXT NOT NULL,
             baseline TEXT NOT NULL,
             scores_edited BOOLEAN NOT NULL DEFAULT FALSE,
             revision INTEGER NOT NULL DEFAULT 1,
@@ -685,11 +686,11 @@ def migrate(db: Database) -> dict:
         r = d["row"]
         db.execute(
             "INSERT INTO drivers (id, force, name, description, direction, probability, start_year, peak_year, "
-            "diffusion_curve, gp1_pct_affected, uncertainty, vc_epicentre, confidence, analysis, baseline, "
-            f"scores_edited, created_at, updated_at) VALUES ({', '.join([p] * 18)})",
+            "diffusion_curve, gp1_pct_affected, uncertainty, vc_epicentre, confidence, baseline, "
+            f"scores_edited, created_at, updated_at) VALUES ({', '.join([p] * 17)})",
             (r["id"], r["force"], r["name"], r.get("description") or "", r["direction"], r["probability"],
              r["start_year"], r["peak_year"], r["diffusion_curve"], r["gp1_pct_affected"], r["uncertainty"],
-             d["stage"], r["confidence"], r.get("strategic_implication") or "", json.dumps(d["baseline"]),
+             d["stage"], r["confidence"], json.dumps(d["baseline"]),
              bool(r.get("user_override")), r.get("created_at"), r.get("updated_at")))
         for table, key, values in (("driver_category_exposure", "category", d["category"]),
                                    ("driver_regional_exposure", "region", d["region"])):
@@ -804,17 +805,7 @@ def migrate(db: Database) -> dict:
     report["runs"] = {"with_renamed_keys": renamed_runs, "with_the_fingerprint_completed": completed_runs}
 
     # ── content ─────────────────────────────────────────────────────────────
-    from prism.seed_drivers import DRIVERS
-    present = {r["id"]: r for r in db.rows("SELECT id, description, analysis FROM drivers")}
-    analysis_updated = 0
-    for d in DRIVERS:
-        if d.id in present and present[d.id]["analysis"] != d.analysis:
-            db.execute(f"UPDATE drivers SET analysis = {p}, revision = revision + 1, "
-                       f"updated_at = CURRENT_TIMESTAMP WHERE id = {p}",
-                       (d.analysis, d.id))
-            analysis_updated += 1
-    report["analysis_updated"] = analysis_updated
-
+    present = {r["id"]: r for r in db.rows("SELECT id, description FROM drivers")}
     descriptions = json.loads(DESCRIPTIONS_FILE.read_text(encoding="utf-8"))["descriptions"]
     moved, current, edited = [], [], []
     for driver_id, entry in descriptions.items():

@@ -373,7 +373,7 @@ def sqlite_schema(path: Path) -> dict:
 
 
 DRIVER_FIELDS = ("force", "name", "description", "direction", "probability", "start_year", "gp1_pct_affected",
-                 "peak_year", "diffusion_curve", "uncertainty", "confidence", "analysis",
+                 "peak_year", "diffusion_curve", "uncertainty", "confidence",
                  "category_exposure", "regional_exposure", "vc_epicentre", "sources", "baseline", "scores_edited")
 #: consumer_r02's sources after the migration: the list saved in the editor.
 MIGRATED_EDITOR_SOURCES = [
@@ -428,7 +428,6 @@ class TestMigration:
         assert report["baselines"] == {"from_the_current_scores": ["technology_r01"],
                                        "fields_from_the_current_scores": {}}
         assert report["proposals"] == {"with_a_value_chain_stage": 1, "scores_cleared": {}}
-        assert report["analysis_updated"] == 51
         assert report["descriptions"] == {"updated": 1, "already_current": 1, "edited_left_alone": ["consumer_r04"]}
         assert report["runs"] == {"with_renamed_keys": 1, "with_the_fingerprint_completed": 1}
 

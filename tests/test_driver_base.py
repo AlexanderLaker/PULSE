@@ -52,7 +52,7 @@ class TestSeed:
             assert set(d.category_exposure) == set(CATEGORIES) and set(d.regional_exposure) == set(REGIONS)
             assert d.vc_epicentre in VC_STAGES
             assert max(d.category_exposure.values()) > 0 and max(d.regional_exposure.values()) > 0
-            assert d.name and d.description and d.analysis
+            assert d.name and d.description
             assert d.sources and all(s["url"].startswith("http") and s["tier"] in ("S", "A", "B") for s in d.sources)
             assert d.baseline is None and d.scores_edited is False
 

@@ -7,12 +7,12 @@
       shift; the jitter expectation is the engine's schedule table averaged;
   (b) the committed record, the parity fixture and the rendered texts are
       what the code produces from the driver base and the configuration, and
-      the seed carries the rendered texts;
+      prism/analysis_texts.py, which the API serves, holds the rendered texts;
   (c) every reading follows the rules: the four labelled paragraphs and the
       basis line, every model figure a placeholder, no restated score, no
       history of the base, no management response, no dash or filler, the
       driver vocabulary.
-Writing the texts into a database is scripts/sync_analysis.py (test_operations.py).
+The API serves the texts next to the stored drivers (tests/test_api.py).
 """
 from __future__ import annotations
 
@@ -241,15 +241,17 @@ class TestCommittedArtefacts:
         assert shares == pytest.approx(1.0, abs=1e-3)
         assert sum(tot["pool_region_shares"].values()) == pytest.approx(1.0, abs=1e-3)
 
-    def test_rendered_texts_and_seed_agree(self, render, record, analysis):
+    def test_the_served_texts_are_the_rendered_ones(self, render, record, analysis):
+        """prism/analysis_texts.py, which the API serves, holds every driver's rendered text."""
+        from prism.analysis_texts import TEXTS
         rendered = render.render_all(record, analysis)
         by_code = {d["code"]: driver_id for driver_id, d in record["drivers"].items()}
-        seed = {d.id: d for d in seed_drivers.DRIVERS}
         assert set(analysis["drivers"]) == set(by_code)
+        assert set(TEXTS) == {d.id for d in seed_drivers.DRIVERS} == set(by_code.values())
         for code, entry in analysis["drivers"].items():
             driver_id = by_code[code]
             assert entry["text"] == rendered[driver_id], code
-            assert seed[driver_id].analysis == entry["text"], code
+            assert TEXTS[driver_id] == entry["text"], code
 
     def test_every_placeholder_is_a_field_and_the_key_ones_are_used(self, render, record, analysis):
         by_code = {d["code"]: d for d in record["drivers"].values()}

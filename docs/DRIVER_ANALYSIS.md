@@ -109,18 +109,18 @@ read from its QA workbook (`prism/workbook.py`, `read_workbook`).
 ## The readings
 
 `data/drivers/driver_analysis.json` holds one template per driver: authored
-prose in which every figure the model produces is a named placeholder, such
-as `{pp}` for its contribution, `{reach}`, `{peak_year}` or `{pool_europe}`
+prose in which every figure the model produces is a named placeholder, such as
+`{pp}` for its contribution, `{reach}`, `{peak_year}` or `{pool_europe}`
 (`render_fields` in `prism/readings.py` lists them all). The renderer fills
-the placeholders from the record and appends the basis line.
-The rendered text is stored next to the template, carried into
-`prism/seed_drivers.py` by the seed generator, and written into existing
-databases by `scripts/sync_analysis.py`. The Drivers page renders the
-four labels as small headings, the basis line in small type and a footnote
-under the card: "Attribution at the score means, reconciled to the portfolio
-median in the basis line; a reading authored on those figures. Read as
-exposure if nobody acts, not as a forecast." The card is read-only for every
-role.
+the placeholders from the record and appends the basis line. The rendered text
+is stored next to the template and carried into `prism/analysis_texts.py` by
+the seed generator; the API serves it with each driver, so a deploy brings new
+texts and no database holds them (a driver the base does not know has none).
+The Drivers page renders the four labels as small headings, the basis line in
+small type and a footnote under the card: "Attribution at the score means,
+reconciled to the portfolio median in the basis line; a reading authored on
+those figures. Read as exposure if nobody acts, not as a forecast." The card
+is read-only for every role.
 
 The Shift Analysis uses the same arithmetic (`lib/driverAttribution.ts`, a
 TypeScript port held to the Python decomposition by a parity fixture that
@@ -230,10 +230,8 @@ When the scores or the model's parameters change:
 3. read the re-rendered texts, in particular every comparative claim ("the
    widest range in the base"): the figures inside a comparative regenerate,
    the comparative itself does not;
-4. run `python3 scripts/generate_seed.py` and commit the regenerated files;
-5. run `python3 scripts/sync_analysis.py --dry-run` against each database,
-   then again without `--dry-run` (with `--postgres` for a PostgreSQL
-   database).
+4. run `python3 scripts/generate_seed.py`, commit the regenerated files and
+   deploy: the dashboard shows the new texts from the deploy on.
 
 ### On the finance shares
 

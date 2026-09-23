@@ -30,7 +30,7 @@ def _driver(driver_id="consumer_r01", **overrides) -> Driver:
     fields = dict(
         id=driver_id, force="Consumer", name="original name", description="original description",
         direction="Contraction", probability=3, gp1_pct_affected=0.10, start_year=2025, peak_year=2030,
-        diffusion_curve="linear", confidence="Medium", uncertainty=2, analysis="the reading",
+        diffusion_curve="linear", confidence="Medium", uncertainty=2,
         category_exposure={c: 1 for c in CATEGORIES}, regional_exposure={r: 1 for r in REGIONS},
         vc_epicentre="Supply Chain",
         sources=[{"title": "original source", "url": "https://example.org/a", "tier": "A", "published": "Apr 2026"}],
@@ -126,7 +126,7 @@ class TestDrivers:
         loaded = db.load_drivers()[0]
         expected = _driver()
         for field in ("id", "force", "name", "description", "direction", "probability", "gp1_pct_affected",
-                      "start_year", "peak_year", "diffusion_curve", "confidence", "uncertainty", "analysis",
+                      "start_year", "peak_year", "diffusion_curve", "confidence", "uncertainty",
                       "category_exposure", "regional_exposure", "vc_epicentre", "sources"):
             assert getattr(loaded, field) == getattr(expected, field), field
         assert loaded.baseline == expected.scores()

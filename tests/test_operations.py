@@ -1,4 +1,4 @@
-"""The operator's tools: the production run, its QA workbook and the analysis sync."""
+"""The operator's tools: the production run, its QA workbook, the .env loader and the admin script."""
 import json
 import os
 import sys
@@ -212,44 +212,6 @@ class TestWorkbook:
         text = "\n".join(str(c) for row in openpyxl.load_workbook(path)["Cell Weights"].iter_rows(values_only=True)
                          for c in row if c is not None)
         assert "How these shares were built" not in text and "Source: Finance FY2025" in text
-
-
-class TestSyncAnalysis:
-    def test_dry_run_then_sync(self, seeded, capsys):
-        sync = load_module("scripts/sync_analysis.py")
-        with seeded.get_db_connection() as conn:
-            conn.cursor().execute(
-                "UPDATE drivers SET analysis = 'outdated' WHERE id IN ('consumer_r01', 'technology_r01')")
-        assert sync.main(["--dry-run"]) == 0
-        assert "2 with an outdated analysis" in capsys.readouterr().out
-        assert {d.id: d.analysis for d in seeded.load_drivers()}["consumer_r01"] == "outdated"
-        assert sync.main([]) == 0
-        from prism.seed_drivers import DRIVERS
-        expected = {d.id: d.analysis for d in DRIVERS}
-        assert {d.id: d.analysis for d in seeded.load_drivers()} == expected
-        with seeded.get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM audit_log WHERE action = 'analysis_synced'")
-            assert cursor.fetchone()[0] == 2
-        assert sync.main([]) == 0
-        assert "0 with an outdated analysis" in capsys.readouterr().out
-
-    def test_writing_postgresql_needs_the_flag(self, monkeypatch, capsys):
-        """Refused before any connection is made; a dry run needs no flag."""
-        sync = load_module("scripts/sync_analysis.py")
-        monkeypatch.setattr(sync, "USE_POSTGRES", True)
-        monkeypatch.setattr(sync, "POSTGRES_URL", "postgresql://user@db.example.org/prism")
-        monkeypatch.setattr(sync, "get_db_connection", lambda: pytest.fail("connected without --postgres"))
-        assert sync.main([]) == 1
-        assert "pass --postgres to write to it" in capsys.readouterr().out
-
-    def test_a_database_awaiting_a_migration_is_refused(self, monkeypatch, tmp_path, capsys):
-        awaiting = tmp_path / "awaiting.db"
-        database_awaiting_a_migration(awaiting)
-        monkeypatch.setenv("PRISM_DB_PATH", str(awaiting))
-        sync = load_module("scripts/sync_analysis.py")
-        assert sync.main(["--dry-run"]) == 1
-        assert "migrations/0001_driver_schema" in capsys.readouterr().out
 
 
 class TestEnvFile:

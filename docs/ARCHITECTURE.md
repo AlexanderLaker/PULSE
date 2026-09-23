@@ -88,7 +88,7 @@ engine.
 |---|---|---|
 | `GET /api/v1/health` | anonymous | Status, version, driver count, whether a run exists and its id; when the database cannot be used, status `degraded` and the reason (`migration_pending`, `no_database` or `db_error`) |
 | `GET /api/v1/diagnostics` | anonymous | Whether this instance reaches the database, how many runs it holds and whether the latest can be served; it names nothing about the database itself |
-| `GET /api/v1/drivers` | signed in | Every driver with its scores, sources, PRISM Analysis, baseline and a summary of the expert proposals |
+| `GET /api/v1/drivers` | signed in | Every driver with its scores, sources, PRISM Analysis (from `prism/analysis_texts.py`, which ships with the code), baseline and a summary of the expert proposals |
 | `PUT /api/v1/drivers/{id}` | admin | An edit of the fields sent, made on the driver revision the request names (409 when the driver changed since); an exposure map changes only the cells it names; every changed field goes to the audit log. Name, force and onset are not edited here, and a peak year must fall after the onset |
 | `GET /api/v1/drivers/{id}/proposals` | signed in | The caller's own proposal, the aggregate across experts and who scored what |
 | `PUT /api/v1/drivers/{id}/proposals` | signed in | Merges the fields sent into the caller's own proposal (a field sent as null is cleared); never changes the driver |
@@ -225,10 +225,10 @@ version replaces the bundled tiles. The Profit Pool Explorer's data is
 ## The database
 
 PostgreSQL in production. On a development machine with no database URL set,
-the API, the migration and `scripts/sync_analysis.py` fall back to a SQLite
-file (`PRISM_DB_PATH`, default `data/prism.db`); the production run does so
-only with `--allow-sqlite`, `scripts/promote_admin.py` needs PostgreSQL, and
-on Vercel the API refuses to. All SQL is written once for both
+the API and the migration fall back to a SQLite file (`PRISM_DB_PATH`,
+default `data/prism.db`); the production run does so only with
+`--allow-sqlite`, `scripts/promote_admin.py` needs PostgreSQL, and on Vercel
+the API refuses to. All SQL is written once for both
 (`prism/database.py`). The database holds scores, shares and percentage
 shifts, never an HCB financial figure; texts (driver descriptions and
 sources, the Consumer Journey content) may quote public market figures as
@@ -236,13 +236,13 @@ evidence.
 
 | Table | Written by | Content |
 |---|---|---|
-| `drivers` | seed, admin edits, `sync_analysis.py` | One row per driver: scores (the value-chain epicentre among them), texts, the baseline it was seeded with, whether an admin changed a model field, a revision counter |
+| `drivers` | seed, admin edits, migrations | One row per driver: scores (the value-chain epicentre among them), name, description, the baseline it was seeded with, whether an admin changed a model field, a revision counter |
 | `driver_category_exposure`, `driver_regional_exposure` | as above | An exposure score 0 to 5 for every category and every region of every driver |
 | `driver_sources` | as above | The evidence behind each driver: title, link, credibility tier and publication date |
 | `driver_score_proposals` | experts | One partial proposal per driver and expert |
 | `simulation_runs` | production run | One results bundle per run |
 | `journey_content` | admins | Versions of the Consumer Journey tile map; the newest wins |
-| `audit_log` | API, dashboard, scripts | Driver edits (one row per changed field, the field named in `reason`, old and new value as JSON), journey saves, role changes where the entry can be written, analysis syncs and migrations, each with the acting identity |
+| `audit_log` | API, dashboard, scripts | Driver edits (one row per changed field, the field named in `reason`, old and new value as JSON), journey saves, role changes where the entry can be written and migrations, each with the acting identity |
 | `schema_migrations` | API, migrations | The migrations the schema already contains |
 | `user_roles` | dashboard | Clerk user id, email and role |
 

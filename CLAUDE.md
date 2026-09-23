@@ -36,10 +36,11 @@ README.md; the documents in `docs/` explain everything below in full.
   drivers the pins are computed on also regenerates them, without a new
   version. Never regenerate pins to make a test pass.
 - **Generated files are never edited by hand**: `prism/seed_drivers.py`,
-  `prism/overlap_correction.py`, `prism/cell_weight_estimate.py`,
-  `data/driverCodeMap.ts`, `data/parameters/*.json`,
-  `lib/cellWeightProvenance.ts`, `data/drivers/driver_attribution.json`, the
-  rendered texts in `data/drivers/driver_analysis.json` and
+  `prism/analysis_texts.py`, `prism/overlap_correction.py`,
+  `prism/cell_weight_estimate.py`, `data/driverCodeMap.ts`,
+  `data/parameters/*.json`, `lib/cellWeightProvenance.ts`,
+  `data/drivers/driver_attribution.json`, the rendered texts in
+  `data/drivers/driver_analysis.json` and
   `tests/frontend/fixtures/driverAttribution.fixture.json`. Change the input
   and run the generator; every generator has `--check`.
 - **The cell weights are an estimate.** Until finance provides the real
@@ -131,7 +132,7 @@ also tested on PostgreSQL. The Python suite never touches the database in
 | `prism/attribution.py`, `prism/readings.py` | the per-driver attribution behind the PRISM Analysis; its renderer |
 | `prism/workbook.py` | the QA workbook, written and read back |
 | `prism/api/` | the API: routers, auth, the stored-run contract (`runs.py`) |
-| `scripts/` | production run, generators, `sync_analysis.py`, `promote_admin.py`, handover packaging |
+| `scripts/` | production run, generators, `promote_admin.py`, handover packaging |
 | `data/drivers/` | the driver base and the PRISM Analysis sources |
 | `components/dashboard/` | the views: each page in one file, its parts in a folder of its own (`drivers/`, `shift/`, `journey/`, `explorer/`, `settings/`), and the pieces several views share |
 | `lib/`, `hooks/`, `types/` | shared dashboard logic and the API client, the store, the types |

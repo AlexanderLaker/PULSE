@@ -8,8 +8,9 @@ select = ["F", "E9", "E501", "B", "W6"]
 ignore = ["B008", "B905"]
 
 [lint.per-file-ignores]
-# Generated modules: the driver texts and the parameter tables are written as
-# single lines by their generators.
+# Generated modules: the driver texts, the PRISM Analysis readings and the
+# parameter tables are written as single lines by their generators.
 "prism/seed_drivers.py" = ["E501"]
+"prism/analysis_texts.py" = ["E501"]
 "prism/overlap_correction.py" = ["E501"]
 "prism/cell_weight_estimate.py" = ["E501"]

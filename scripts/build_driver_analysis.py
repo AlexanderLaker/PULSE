@@ -29,7 +29,8 @@ writes nothing.
 
 After a re-scoring: run scripts/run_production.py, then this script with
 --reference --workbook FILE, review the re-rendered texts, run
-scripts/generate_seed.py and scripts/sync_analysis.py.
+scripts/generate_seed.py (which writes prism/analysis_texts.py, the texts
+the API serves) and deploy.
 """
 from __future__ import annotations
 

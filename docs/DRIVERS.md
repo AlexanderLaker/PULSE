@@ -141,23 +141,24 @@ above, each entry carries a classification (theme, foresight tier, scope,
 megatrend, the year first observed, the mechanism); the model and the
 dashboard do not use it.
 
-`prism/driver_base.py` reads and validates the base for everything built from
-it (the seed, the overlap correction and the PRISM Analysis): every model
-input by the engine's own rules, as the database and the API apply them, and
-on top of those the id and code pattern, a number that is neither retired nor
-past a gap, an onset and a peak inside the horizon, a known confidence, and
-sources the editor can save again (a title, an http(s) link, a tier on the
-scale or none, within the API's lengths), at least one of them of tier S, A or
-B. `scripts/generate_seed.py` writes two files from it that are never edited
-by hand:
+`prism/driver_base.py` reads and validates the base for everything built
+from it (the seed, the overlap correction and the PRISM Analysis): every
+model input by the engine's own rules, as the database and the API apply
+them, and on top of those the id and code pattern, a number that is neither
+retired nor past a gap, an onset and a peak inside the horizon, a known
+confidence, and sources the editor can save again (a title, an http(s) link,
+a tier on the scale or none, within the API's lengths), at least one of them
+of tier S, A or B. `scripts/generate_seed.py` writes three files from it
+that are never edited by hand:
 
-- `prism/seed_drivers.py`: the drivers a new database is seeded with,
-  including each driver's PRISM Analysis text (docs/DRIVER_ANALYSIS.md) and
-  its baseline, the scores the Edited chip compares against;
+- `prism/seed_drivers.py`: the drivers a new database is seeded with, each
+  with its baseline, the scores the Edited chip compares against;
+- `prism/analysis_texts.py`: each driver's PRISM Analysis text
+  (docs/DRIVER_ANALYSIS.md), which the API serves with the stored driver;
 - `data/driverCodeMap.ts`: display code to driver id, with each driver's
   name, force, direction and the first sentence of its description.
 
-`generate_seed.py --check` fails when either file differs from what the base
+`generate_seed.py --check` fails when any of them differs from what the base
 produces; CI runs it.
 
 ## Changing a driver
@@ -200,7 +201,7 @@ texts. After an edit to `driver_base.json`, in this order:
 2. if a score, an exposure or the set of drivers changed, regenerate the
    PRISM Analysis as docs/DRIVER_ANALYSIS.md describes; an added driver needs
    its template in `data/drivers/driver_analysis.json` first;
-3. run `scripts/generate_seed.py`. The seed carries the analysis texts, so it
+3. run `scripts/generate_seed.py`. It writes the analysis texts too, so it
    comes after them. A changed source needs only this step, a changed
    description this step and step 4. A changed name needs
    `python3 scripts/build_driver_analysis.py` before it (without
@@ -212,10 +213,9 @@ texts. After an edit to `driver_base.json`, in this order:
    Consumer Journey text goes into `journey_edits.json` the same way);
 5. commit the regenerated files; CI checks all of them.
 
-A new database picks up the base when it is seeded. An existing database
-keeps its own drivers: a changed analysis text reaches it through
-`scripts/sync_analysis.py`, which writes nothing else; scores, descriptions
-and sources are changed on the Drivers page. Adding or removing drivers, or
-making changed scores the new baseline of an existing database, is a
-database migration: a new folder under `migrations/`, built like
-`0001_driver_schema`.
+A new database picks up the base when it is seeded. An existing database keeps
+its own drivers: the PRISM Analysis ships with the code and reaches it with
+the next deploy; scores, descriptions and sources are changed on the Drivers
+page. Adding or removing drivers, or making changed scores the new baseline of
+an existing database, is a database migration: a new folder under
+`migrations/`, built like `0001_driver_schema`.

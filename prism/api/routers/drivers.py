@@ -5,6 +5,7 @@ import math
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from prism.analysis_texts import TEXTS as ANALYSIS_TEXTS
 from prism.api import state
 from prism.api.auth import identity_from_user, require_admin, require_auth
 from prism.api.proposals import build_proposal_summary, build_proposals_response
@@ -36,7 +37,8 @@ def _driver_json(d, proposals: list, user_id: str) -> dict:
         "category_exposure": d.category_exposure,
         "regional_exposure": d.regional_exposure,
         "vc_epicentre": d.vc_epicentre,
-        "analysis": d.analysis,
+        # The generated reading ships with the code; a driver the base does not know has none.
+        "analysis": ANALYSIS_TEXTS.get(d.id, ""),
         "sources": d.sources,
         "baseline": d.baseline,
         "scores_edited": d.scores_edited,
