@@ -83,7 +83,7 @@ def driver_from_base(d: dict, analysis: str = "") -> Driver:
         category_exposure={c: d["category_exposure"][c] for c in CATEGORIES},
         regional_exposure={r: d["regional_exposure"][r] for r in REGIONS},
         vc_epicentre=d["vc_epicentre"],
-        sources=[{"title": s["title"], "url": s["url"], "tier": s["tier"], "note": s.get("published", "")}
+        sources=[{"title": s["title"], "url": s["url"], "tier": s["tier"], "published": s["published"]}
                  for s in d["sources"]],
         analysis=analysis,
     )

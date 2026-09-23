@@ -174,18 +174,22 @@ export function fmtDateTimeUtc(d: string | number | Date | null | undefined): st
 
 // ── Evidence ────────────────────────────────────────────────────────────────
 
+/** The credibility tiers of a source, strongest first (prism/drivers.py
+ *  SOURCE_TIERS holds the same list; docs/DRIVERS.md describes them). */
+export const SOURCE_TIERS = ['S', 'A', 'A-', 'B+', 'B', 'B-', 'C', 'D', 'E'] as const;
+
 /**
  * A driver's evidence in one line: the publisher of each of its first three
- * sources with the note (usually the date), as in "Circana (Apr 2026); YouGov
+ * sources with its publication date, as in "Circana (Apr 2026); YouGov
  * Germany (Jul 2026)". The publisher is the title before its first colon,
  * shortened to 48 characters; a source without a title is left out.
  */
-export function evidenceLine(sources: ReadonlyArray<{ title: string; note: string }>): string {
+export function evidenceLine(sources: ReadonlyArray<{ title: string; published: string }>): string {
   return sources.slice(0, 3)
     .map((s) => {
       const title = s.title.split(':')[0]!.trim();
       const publisher = title.length <= 48 ? title : `${title.slice(0, 47).trimEnd()}…`;
-      return publisher && s.note.trim() ? `${publisher} (${s.note.trim()})` : publisher;
+      return publisher && s.published.trim() ? `${publisher} (${s.published.trim()})` : publisher;
     })
     .filter(Boolean)
     .join('; ');

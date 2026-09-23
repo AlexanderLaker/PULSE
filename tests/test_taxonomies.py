@@ -1,14 +1,16 @@
 """The dashboard's copies of the model's taxonomies and horizon.
 
-The dashboard reads and writes forces, categories, regions and value-chain
-stages by name, and the API refuses a name that is not the model's; it lays
-out the matrix by the path years. Its lists (lib/format.ts, lib/valueChain.ts)
-must therefore hold the values of prism/config.py, in the same order.
+The dashboard reads and writes forces, categories, regions, value-chain
+stages and source tiers by name, and the API refuses a name that is not the
+model's; it lays out the matrix by the path years. Its lists (lib/format.ts,
+lib/valueChain.ts) must therefore hold the values of prism/config.py and
+prism/drivers.py, in the same order.
 """
 import re
 from pathlib import Path
 
 from prism.config import CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS, VC_STEPS
+from prism.drivers import SOURCE_TIERS
 
 LIB = Path(__file__).resolve().parents[1] / "lib"
 FORMAT = (LIB / "format.ts").read_text(encoding="utf-8")
@@ -45,3 +47,7 @@ def test_horizon():
     assert re.search(r"export const BASE_YEAR = (\d{4});", FORMAT).group(1) == str(DEFAULT_BASE_YEAR)
     years = re.search(r"export const YEARS: number\[\] = \[([^\]]*)\];", FORMAT).group(1)
     assert [int(y) for y in years.split(",")] == list(DEFAULT_PATH_YEARS)
+
+
+def test_source_tiers():
+    assert tuple(quoted(FORMAT, "export const SOURCE_TIERS =")) == SOURCE_TIERS

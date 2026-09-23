@@ -6,7 +6,7 @@
  */
 import React, { type FC } from 'react';
 import { FileText, ExternalLink, AlertTriangle } from 'lucide-react';
-import { CATEGORIES, FIRST_YEAR, HORIZON, NO_VALUE, REGIONS, fmtPct } from '@/lib/format';
+import { CATEGORIES, FIRST_YEAR, HORIZON, NO_VALUE, REGIONS, SOURCE_TIERS, fmtPct } from '@/lib/format';
 import { UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import { S, HEADLINE_FONT } from '@/lib/theme';
 import Chip from '@/components/dashboard/Chip';
@@ -51,25 +51,24 @@ export const MetaChip: FC<{ label: string }> = ({ label }) => (
 );
 
 // ─── Source tier: the credibility scale, from S (official regulators and
-// statistics) to E (social, unverified); the tooltip explains each tier. ─
-// The grades the driver base uses (docs/DRIVERS.md, Sources); a + or - moves
-// a source a little up or down from its grade, for a reason its note gives.
+// statistics) to E (social, unverified); the tooltip explains each tier
+// (docs/DRIVERS.md, Sources). A-, B+ and B- sit between two grades. ─
 export const TIER_CONFIG: Record<SourceTier, { color: string; description: string }> = {
   'S':  { color: '#22c55e', description: 'Statute, regulator, official statistics or peer-reviewed research' },
   'A':  { color: '#3b82f6', description: 'Analyst, consulting or market-measurement research; a major poll or major press; a company’s reports, results or published positions' },
-  'A-': { color: '#60a5fa', description: 'A little below A; the note says why' },
-  'B+': { color: '#a78bfa', description: 'A little above B; the note says why' },
+  'A-': { color: '#60a5fa', description: 'Between A and B, nearer A' },
+  'B+': { color: '#a78bfa', description: 'Between A and B, nearer B' },
   'B':  { color: '#c084fc', description: 'Specialist research firm or trade press; an earnings-call transcript; a survey' },
-  'B-': { color: '#e879f9', description: 'A little below B; the note says why' },
+  'B-': { color: '#e879f9', description: 'Between B and C, nearer B' },
   'C':  { color: '#f59e0b', description: 'General business press' },
   'D':  { color: '#ef4444', description: 'Aggregator or forecast' },
   'E':  { color: '#991b1b', description: 'Social media or unverified' },
 };
-export const TIER_OPTIONS = Object.keys(TIER_CONFIG) as SourceTier[];
+export const TIER_OPTIONS: readonly SourceTier[] = SOURCE_TIERS;
 
 // ─── Source item ──────────────────────────────────────────────────
 export const SourceItem: FC<{ src: DriverSource }> = ({ src }) => {
-  const caption = [sourceHost(src.url), src.note].filter(Boolean).join(' · ');
+  const caption = [sourceHost(src.url), src.published].filter(Boolean).join(' · ');
   const tier = src.tier ? TIER_CONFIG[src.tier] : undefined;
   return (
     <a

@@ -225,7 +225,7 @@ quote public market figures as evidence.
 |---|---|---|
 | `drivers` | seed, admin edits, `sync_analysis.py` | One row per driver: scores (the value-chain epicentre among them), texts, the baseline it was seeded with, whether an admin changed a model field, a revision counter |
 | `driver_category_exposure`, `driver_regional_exposure` | as above | An exposure score 0 to 5 for every category and every region of every driver |
-| `driver_sources` | as above | The evidence behind each driver: title, link, credibility tier and a note |
+| `driver_sources` | as above | The evidence behind each driver: title, link, credibility tier and publication date |
 | `driver_score_proposals` | experts | One partial proposal per driver and expert |
 | `simulation_runs` | production run | One results bundle per run |
 | `journey_content` | admins | Versions of the Consumer Journey tile map; the newest wins |

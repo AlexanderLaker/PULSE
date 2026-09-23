@@ -63,16 +63,16 @@ describe('dates', () => {
 describe('evidenceLine', () => {
   it('names the publishers of the first three sources with their dates', () => {
     expect(evidenceLine([
-      { title: 'Circana: private label reaches record 50% unit share', note: 'Apr 2026' },
-      { title: 'YouGov Germany: nur Eigenmarken gewinnen hinzu', note: 'Jul 2026' },
-      { title: 'BCG: European consumers are still cutting back', note: '' },
-      { title: 'NIQ: Premium has a new price', note: 'Jun 2026' },
+      { title: 'Circana: private label reaches record 50% unit share', published: 'Apr 2026' },
+      { title: 'YouGov Germany: nur Eigenmarken gewinnen hinzu', published: 'Jul 2026' },
+      { title: 'BCG: European consumers are still cutting back', published: '' },
+      { title: 'NIQ: Premium has a new price', published: 'Jun 2026' },
     ])).toBe('Circana (Apr 2026); YouGov Germany (Jul 2026); BCG');
   });
 
   it('shortens a long publisher and leaves out a source without a title', () => {
     const long = 'A'.repeat(60);
-    expect(evidenceLine([{ title: '', note: '2026' }, { title: long, note: '' }])).toBe(`${'A'.repeat(47)}…`);
+    expect(evidenceLine([{ title: '', published: '2026' }, { title: long, published: '' }])).toBe(`${'A'.repeat(47)}…`);
     expect(evidenceLine([])).toBe('');
   });
 });

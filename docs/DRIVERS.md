@@ -52,7 +52,7 @@ explain them.
 | `category_exposure` | 0 to 5 per category | How strongly the mechanism acts on each of the 13 categories |
 | `regional_exposure` | 0 to 5 per region | How strongly it acts in each of the four regions |
 | value-chain epicentre | one of eight stages | The stage where the impact centres (below) |
-| `sources` | list | The evidence: title, link, tier and a note (in the base, the month of publication) |
+| `sources` | list | The evidence: title, link, tier and when it was published (`published`, as in "Apr 2026") |
 
 The uncertainty score is one number per driver for the dispersion around the
 modelled size and timing, given the direction. It is neither the probability
@@ -107,8 +107,9 @@ and a tie leaves the choice to the admin.
 
 ### Sources
 
-Every source has a tier, from S (the most authoritative) to E, as the base
-grades its sources and the Drivers page describes them:
+Every source of the base has a tier, from S (the most authoritative) to E,
+as the base grades its sources and the Drivers page describes them; a source
+added on the Drivers page may be left unrated:
 
 | Tier | Source kind |
 |---|---|
@@ -119,13 +120,18 @@ grades its sources and the Drivers page describes them:
 | D | Aggregator or forecast |
 | E | Social media or unverified |
 
-A-, B+ and B- move a source a little down from A, up from B or down from B;
-its note says why. The base uses S, A and B only.
+A- and B+ sit between A and B, nearer A and nearer B; B- sits between B and C,
+nearer B. The base uses S, A and B only. It grades the company results it
+cites from SEC filings (the 8-K exhibits of Amazon and P&G, five citations)
+S, where the table puts a company's results at A. `prism/drivers.py` and
+`lib/format.ts` hold the scale (`SOURCE_TIERS`), and the database refuses a
+tier outside it.
 
 Every driver of the base needs at least one source of tier S, A or B; a base
-that lacks one is refused before anything is generated from it. The Drivers page sums up a
-driver's first three sources in one evidence line, each as its publisher
-(the title up to its first colon) with the note, as in "Circana (Apr 2026)".
+that lacks one is refused before anything is generated from it. The Drivers
+page sums up a driver's first three sources in one evidence line, each as its
+publisher (the title up to its first colon) with its publication date, as in
+"Circana (Apr 2026)".
 
 ## Where the base lives
 

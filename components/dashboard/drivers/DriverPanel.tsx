@@ -39,7 +39,7 @@ type Draft = Pick<Driver,
   | 'description' | 'direction' | 'confidence' | 'probability' | 'gp1_pct_affected' | 'peak_year'
   | 'diffusion_curve' | 'uncertainty' | 'category_exposure' | 'regional_exposure' | 'vc_epicentre' | 'sources'>;
 
-const sourceCopy = (s: DriverSource): DriverSource => ({ title: s.title, url: s.url, tier: s.tier, note: s.note });
+const sourceCopy = (s: DriverSource): DriverSource => ({ title: s.title, url: s.url, tier: s.tier, published: s.published });
 
 const draftOf = (d: Driver): Draft => ({
   description: d.description,
@@ -66,7 +66,7 @@ const changedCells = (draft: ExposureMap, stored: ExposureMap): ExposureMap | un
 
 const sameSources = (a: DriverSource[], b: DriverSource[]): boolean =>
   a.length === b.length && a.every((s, i) => (
-    s.title === b[i].title && s.url === b[i].url && s.tier === b[i].tier && s.note === b[i].note
+    s.title === b[i].title && s.url === b[i].url && s.tier === b[i].tier && s.published === b[i].published
   ));
 
 /** The DriverUpdate of a save: the revision the draft was taken from, and only
@@ -151,7 +151,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
   };
 
   const addSource = () =>
-    edit({ sources: [...draft.sources, { title: '', url: '', tier: '', note: '' }] });
+    edit({ sources: [...draft.sources, { title: '', url: '', tier: '', published: '' }] });
   const removeSource = (idx: number) =>
     edit({ sources: draft.sources.filter((_, i) => i !== idx) });
   const patchSource = (idx: number, patch: Partial<DriverSource>) =>
@@ -459,7 +459,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
             )}
           </SectionCard>
 
-          {/* Sources; edit mode gives each a title, link, note and tier */}
+          {/* Sources; edit mode gives each a title, link, publication date and tier */}
           {(isEditing || driver.sources.length > 0) && (
             <SectionCard title={`Sources · ${isEditing ? draft.sources.length : driver.sources.length}`} icon={Newspaper}>
               {isEditing ? (
@@ -532,10 +532,11 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                         />
                         <input
                           type="text"
-                          placeholder="Publication date or note"
-                          value={s.note}
+                          placeholder="Published (e.g. Apr 2026)"
+                          aria-label="Published"
+                          value={s.published}
                           maxLength={500}
-                          onChange={(e) => patchSource(i, { note: e.target.value })}
+                          onChange={(e) => patchSource(i, { published: e.target.value })}
                           style={{
                             flex: 3, padding: '6px 10px', borderRadius: 6,
                             border: `1px solid ${S.cardBorder}`,

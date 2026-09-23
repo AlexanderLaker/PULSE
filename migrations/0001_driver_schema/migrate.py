@@ -23,9 +23,11 @@ or the write lock (SQLite), so nothing can write in between.
                                -> driver_category_exposure, driver_regional_exposure
      trend_vc_exposure         -> drivers.vc_epicentre (the stage the stored
                                                          profile centres on)
-     trend_sources             -> driver_sources (source_type -> note: the publication
-                                                  date where the old value read
-                                                  "<kind> (<date>)", else the old text)
+     trend_sources             -> driver_sources (source_type -> published: the
+                                                  publication date where the old
+                                                  value read "<kind> (<date>)",
+                                                  else the old text; a tier outside
+                                                  the scale becomes unrated)
      trend_score_proposals     -> driver_score_proposals (without user_role, which
                                                          held "viewer" for everyone)
    The previous schema stored a value chain as eight 0-5 scores, the editor's
@@ -110,7 +112,7 @@ sys.path.insert(0, str(REPO))
 import prism.env_loader  # noqa: E402,F401  (loads .env; shell variables win)
 from prism.config import (CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS,  # noqa: E402
                           VALID_DIFFUSION_CURVES, VC_STEPS, display_code)
-from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, SCORE_FIELDS  # noqa: E402
+from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, SCORE_FIELDS, SOURCE_TIERS  # noqa: E402
 
 MIGRATION = "0001_driver_schema"
 ARCHIVE_DIR = HERE / "archive"
@@ -191,8 +193,8 @@ def _ddl(postgres: bool) -> list:
             driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
             title TEXT NOT NULL,
             url TEXT NOT NULL,
-            tier TEXT NOT NULL,
-            note TEXT NOT NULL
+            tier TEXT NOT NULL CHECK (tier IN ({one_of(("",) + SOURCE_TIERS)})),
+            published TEXT NOT NULL
         )""",
         f"""CREATE TABLE driver_score_proposals (
             id {serial},
@@ -251,8 +253,8 @@ def sha256(text) -> str:
     return hashlib.sha256((text or "").encode("utf-8")).hexdigest()
 
 
-def source_note(old: str) -> str:
-    """The note of a source from its previous source_type value."""
+def published_from(old: str) -> str:
+    """When a source was published, from its previous source_type value."""
     text = (old or "").strip()
     m = re.fullmatch(r"(?:%s)\s*\((.+)\)" % "|".join(re.escape(k) for k in SOURCE_KINDS), text, re.I)
     if m:
@@ -295,7 +297,7 @@ def editor_sources(data_source):
     previous API stored it in data_source as JSON, while the sources table kept
     the rows the driver was created with. Such a list is the one the admin
     last saved. Entries with neither a title nor a URL are skipped; the old
-    "data" field becomes the note the way source_note reads it.
+    "data" field becomes the publication date the way published_from reads it.
     """
     if not isinstance(data_source, str) or not data_source.lstrip().startswith("["):
         return None
@@ -311,7 +313,7 @@ def editor_sources(data_source):
         if not (title.strip() or url.strip()):
             continue
         kind = s.get("data") if s.get("data") is not None else s.get("source_type")
-        out.append({"title": title, "url": url, "tier": str(s.get("tier") or ""), "note": source_note(kind)})
+        out.append({"title": title, "url": url, "tier": str(s.get("tier") or ""), "published": published_from(kind)})
     return out or None
 
 
@@ -671,17 +673,23 @@ def migrate(db: Database) -> dict:
         for r in db.rows(f"SELECT * FROM trend_sources WHERE {owned} ORDER BY id"):
             table_sources.setdefault(r["trend_id"], []).append(
                 {"title": r["title"], "url": r["url"], "tier": r.get("tier") or "",
-                 "note": source_note(r.get("source_type"))})
-    source_count = 0
+                 "published": published_from(r.get("source_type"))})
+    source_count, unrated = 0, {}
     for driver_id in sorted(set(table_sources) | set(from_editor)):
         for src in from_editor.get(driver_id, table_sources.get(driver_id, [])):
-            db.execute(f"INSERT INTO driver_sources (driver_id, title, url, tier, note) "
+            tier = src["tier"].strip()
+            if tier not in SOURCE_TIERS:
+                if tier:
+                    unrated.setdefault(driver_id, []).append(tier)
+                tier = ""
+            db.execute(f"INSERT INTO driver_sources (driver_id, title, url, tier, published) "
                        f"VALUES ({p}, {p}, {p}, {p}, {p})",
-                       (driver_id, src["title"], src["url"], src["tier"], src["note"]))
+                       (driver_id, src["title"], src["url"], tier, src["published"]))
             source_count += 1
     report["sources_from_editor"] = {
         driver_id: {"saved_in_editor": len(saved), "table_rows": len(table_sources.get(driver_id, []))}
         for driver_id, saved in sorted(from_editor.items())}
+    report["source_tiers_outside_the_scale"] = unrated
 
     proposals, cleared = [], {}
     if "trend_score_proposals" in tables:

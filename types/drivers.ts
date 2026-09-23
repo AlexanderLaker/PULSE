@@ -2,17 +2,19 @@
  * Drivers as GET /api/v1/drivers returns them, the admin edit and the expert
  * proposals (prism/api/routers/drivers.py, prism/api/proposals.py).
  */
+import type { SOURCE_TIERS } from '@/lib/format';
 import type { Confidence, Direction, ForceName } from './index';
 
 /** Credibility tier of a source, from S (official statistics, regulators) to E (social media). */
-export type SourceTier = 'S' | 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C' | 'D' | 'E';
+export type SourceTier = (typeof SOURCE_TIERS)[number];
 
-/** One piece of evidence behind a driver. `note` usually holds the publication date. */
+/** One piece of evidence behind a driver: a title, a link or both, its tier
+ *  ('' when unrated) and when it was published ("Apr 2026"). */
 export interface DriverSource {
   title: string;
   url: string;
   tier: SourceTier | '';
-  note: string;
+  published: string;
 }
 
 /** Scores 0 to 5 keyed by category or by region. */

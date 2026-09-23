@@ -194,7 +194,7 @@ describe('Drivers page: the admin editor', () => {
       revision: 1,
       description: 'Private label keeps gaining share across European grocery.',
       sources: [{
-        title: 'Circana: private label reaches a record share', url: 'https://example.org/circana', tier: 'A', note: 'May 2026',
+        title: 'Circana: private label reaches a record share', url: 'https://example.org/circana', tier: 'A', published: 'May 2026',
       }],
     });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy());

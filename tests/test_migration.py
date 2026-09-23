@@ -40,7 +40,7 @@ ADMIN_DESCRIPTION = "Wording an admin chose."
 #: field held the source_type), one tier changed and one source added, plus an
 #: empty row that editor would have filtered out.
 EDITOR_SOURCES = [
-    *({"title": s["title"], "url": s["url"], "data": f"analyst report ({s['note']})" if s["note"] else "",
+    *({"title": s["title"], "url": s["url"], "data": f"analyst report ({s['published']})" if s["published"] else "",
        "tier": "S" if i == 0 else s["tier"]} for i, s in enumerate(SEED["consumer_r02"].sources)),
     {"title": "Added in the editor", "url": "https://example.org/added", "data": "Company filing, FY2025"},
     {"title": "", "url": "  "},
@@ -241,7 +241,7 @@ def fill_previous_database(conn, p: str, serial: str, json_type: str = "TEXT", o
                 cur.execute(f"INSERT INTO {table} (trend_id, {key}, exposure_score) VALUES ({p}, {p}, {p})",
                             (d.id, k, v))
         for s in d.sources:
-            kind = f"analyst report ({s['note']})" if s["note"] else "trade press"
+            kind = f"analyst report ({s['published']})" if s["published"] else "trade press"
             cur.execute(f"INSERT INTO trend_sources (trend_id, title, url, source_type, tier) "
                         f"VALUES ({p}, {p}, {p}, {p}, {p})", (d.id, s["title"], s["url"], kind, s["tier"]))
     cur.execute(f"INSERT INTO trend_score_proposals (trend_id, user_id, user_name, user_role, probability, "
@@ -370,9 +370,10 @@ DRIVER_FIELDS = ("force", "name", "description", "direction", "probability", "st
                  "category_exposure", "regional_exposure", "vc_epicentre", "sources", "baseline", "scores_edited")
 #: consumer_r02's sources after the migration: the list saved in the editor.
 MIGRATED_EDITOR_SOURCES = [
-    *({"title": s["title"], "url": s["url"], "tier": "S" if i == 0 else s["tier"], "note": s["note"]}
+    *({"title": s["title"], "url": s["url"], "tier": "S" if i == 0 else s["tier"], "published": s["published"]}
       for i, s in enumerate(SEED["consumer_r02"].sources)),
-    {"title": "Added in the editor", "url": "https://example.org/added", "tier": "", "note": "Company filing, FY2025"},
+    {"title": "Added in the editor", "url": "https://example.org/added", "tier": "",
+     "published": "Company filing, FY2025"},
 ]
 
 
@@ -412,7 +413,7 @@ class TestMigration:
         assert report["sources_from_editor"] == {
             "consumer_r02": {"saved_in_editor": len(SEED["consumer_r02"].sources) + 1,
                              "table_rows": len(SEED["consumer_r02"].sources)}}
-        assert report["orphans_skipped"] == {}
+        assert report["orphans_skipped"] == {} and report["source_tiers_outside_the_scale"] == {}
         assert report["exposures"] == {"names_outside_the_taxonomy_dropped": {}, "missing_names_set_to_0": {}}
         # technology_r01 was stored without a baseline, so it takes its current scores
         assert report["baselines"] == {"from_the_current_scores": ["technology_r01"],
@@ -559,6 +560,20 @@ class TestMigration:
         event = compute_input_drift_event(driver_fingerprint(drivers), stored, previous_run_id=run_id)
         assert event["message"] == (f"Input drift vs run #{run_id}: no changes; "
                                     "the driver inputs are identical to that run's.")
+
+    def test_a_source_tier_outside_the_scale_is_stored_unrated(self, migration, previous, capsys, monkeypatch):
+        conn = sqlite3.connect(previous)
+        conn.execute("UPDATE trend_sources SET tier = 'A+' WHERE id = (SELECT MIN(id) FROM trend_sources "
+                     "WHERE trend_id = 'consumer_r01')")
+        conn.commit()
+        conn.close()
+        assert migration.main(["--sqlite", str(previous)]) == 0
+        report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])
+        assert report["source_tiers_outside_the_scale"] == {"consumer_r01": ["A+"]}
+        monkeypatch.setenv("PRISM_DB_PATH", str(previous))
+        import prism.database as dbm
+        first = next(d for d in dbm.load_drivers() if d.id == "consumer_r01").sources[0]
+        assert first["tier"] == "" and first["title"] == SEED["consumer_r01"].sources[0]["title"]
 
     def test_the_journey_content_is_saved_as_a_new_version(self, migration, previous, capsys):
         assert migration.main(["--sqlite", str(previous)]) == 0
@@ -722,13 +737,13 @@ class TestMigration:
 
 
 class TestHelpers:
-    @pytest.mark.parametrize("old, note", [
+    @pytest.mark.parametrize("old, published", [
         ("analyst report (Aug 2026)", "Aug 2026"), ("primary source (2026)", "2026"),
         ("trade_press (Jul 2026)", "Jul 2026"), ("trade press", ""), ("", ""), (None, ""),
         ("Company filing, FY2025", "Company filing, FY2025"),
     ])
-    def test_source_note(self, migration, old, note):
-        assert migration.source_note(old) == note
+    def test_the_publication_date_of_a_previous_source(self, migration, old, published):
+        assert migration.published_from(old) == published
 
     def test_run_keys_are_renamed_only_where_needed(self, migration):
         results = json.loads(json.dumps(FIRST_RUN))
@@ -742,8 +757,8 @@ class TestHelpers:
                  {"title": "B", "url": "", "source_type": "trade press"},
                  {"title": " ", "url": ""}]
         assert migration.editor_sources(json.dumps(saved)) == [
-            {"title": "A", "url": "https://a", "tier": "A", "note": "Aug 2026"},
-            {"title": "B", "url": "", "tier": "", "note": ""}]
+            {"title": "A", "url": "https://a", "tier": "A", "published": "Aug 2026"},
+            {"title": "B", "url": "", "tier": "", "published": ""}]
         for not_a_list in (None, "", "Circana (Apr 2026)", "[not json", '{"a": 1}', "[]", '["a"]',
                            json.dumps([{"title": "", "url": ""}])):
             assert migration.editor_sources(not_a_list) is None, not_a_list

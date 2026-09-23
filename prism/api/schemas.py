@@ -1,10 +1,11 @@
 """Request bodies of the write endpoints."""
+import re
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from prism.config import DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS
-from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS
+from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, SOURCE_TIERS
 
 #: The years a peak year can take: after the base year, within the horizon.
 #: The API also refuses a peak year at or before the driver's own onset.
@@ -13,17 +14,18 @@ FIRST_PEAK, LAST_PEAK = DEFAULT_BASE_YEAR + 1, DEFAULT_PATH_YEARS[-1]
 
 def one_of(values) -> str:
     """A regular expression that matches exactly one of the values."""
-    return "^(" + "|".join(values) + ")$"
+    return "^(" + "|".join(re.escape(v) for v in values) + ")$"
 
 
 class SourceRef(BaseModel):
-    """One piece of evidence behind a driver: a title, a link, or both."""
+    """One piece of evidence behind a driver: a title, a link, or both; its
+    credibility tier (empty when unrated) and when it was published."""
     model_config = ConfigDict(extra="forbid")
 
     title: str = Field("", max_length=500)
     url: str = Field("", max_length=2000)
-    tier: str = Field("", pattern="^(|S|A|A-|B\\+|B|B-|C|D|E)$")
-    note: str = Field("", max_length=500)
+    tier: str = Field("", pattern=one_of(("",) + SOURCE_TIERS))
+    published: str = Field("", max_length=500)
 
     @model_validator(mode="after")
     def _title_or_url(self):

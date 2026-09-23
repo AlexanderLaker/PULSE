@@ -129,7 +129,7 @@ def render_seed(drivers: list, texts: dict) -> str:
         a("        sources=[")
         for s in d["sources"]:
             a(f"            {{\"title\": {q(s['title'])}, \"url\": {q(s['url'])}, "
-              f"\"tier\": {q(s['tier'])}, \"note\": {q(s.get('published', ''))}}},")
+              f"\"tier\": {q(s['tier'])}, \"published\": {q(s['published'])}}},")
         a("        ],")
         try:
             a(f"        analysis={q(texts[d['code']])},")

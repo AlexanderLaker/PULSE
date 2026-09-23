@@ -24,7 +24,8 @@ from typing import Any, Callable, Dict, List, Optional, Sequence
 from urllib.parse import urlparse
 
 from prism.config import CATEGORIES, FORCES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS
-from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, Driver, InvalidDriversError, simulation_problems
+from prism.drivers import (CONFIDENCE_LEVELS, DIRECTIONS, SOURCE_TIERS, Driver, InvalidDriversError,
+                           simulation_problems)
 
 logger = logging.getLogger(__name__)
 
@@ -232,8 +233,8 @@ def _schema() -> List[str]:
             driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
             title TEXT NOT NULL,
             url TEXT NOT NULL,
-            tier TEXT NOT NULL,
-            note TEXT NOT NULL
+            tier TEXT NOT NULL CHECK (tier IN ({one_of(("",) + SOURCE_TIERS)})),
+            published TEXT NOT NULL
         )""",
         # One row per (driver, expert): any signed-in user can propose scores
         # for a driver; admins endorse by editing the driver itself.
@@ -498,8 +499,8 @@ def _write_driver_children(cursor, d: Driver) -> None:
         cursor.execute(f"INSERT INTO driver_regional_exposure (driver_id, region, exposure_score) VALUES ({ph(3)})",
                        (d.id, region, score))
     for src in d.sources:
-        cursor.execute(f"INSERT INTO driver_sources (driver_id, title, url, tier, note) VALUES ({ph(5)})",
-                       (d.id, src["title"], src["url"], src["tier"], src["note"]))
+        cursor.execute(f"INSERT INTO driver_sources (driver_id, title, url, tier, published) VALUES ({ph(5)})",
+                       (d.id, src["title"], src["url"], src["tier"], src["published"]))
 
 
 def insert_drivers(drivers: List[Driver]) -> None:
@@ -566,10 +567,11 @@ def load_drivers() -> List[Driver]:
                 r = _row(r)
                 exposures[r["driver_id"]][key][r["k"]] = int(r["exposure_score"])
         sources: Dict[str, list] = {r["id"]: [] for r in rows}
-        cursor.execute("SELECT driver_id, title, url, tier, note FROM driver_sources ORDER BY id")
+        cursor.execute("SELECT driver_id, title, url, tier, published FROM driver_sources ORDER BY id")
         for r in cursor.fetchall():
             r = _row(r)
-            sources[r["driver_id"]].append({"title": r["title"], "url": r["url"], "tier": r["tier"], "note": r["note"]})
+            sources[r["driver_id"]].append({"title": r["title"], "url": r["url"], "tier": r["tier"],
+                                            "published": r["published"]})
 
     drivers = []
     for r in rows:

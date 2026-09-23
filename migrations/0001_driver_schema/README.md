@@ -101,6 +101,8 @@ environment from `requirements-dev.txt` and a `.env` whose `DATABASE_URL` (or
    - `sources_from_editor`: the drivers whose source list an admin saved in
      the previous editor. That list becomes their sources; each entry shows
      how many rows it has and how many rows the old sources table held;
+   - `source_tiers_outside_the_scale`: per driver, the source tiers that are
+     not on the scale; those sources are stored unrated;
    - `proposals`: how many proposals got a value-chain stage, and per
      proposal the scores cleared because the API would refuse them now (the
      expert can score them again);

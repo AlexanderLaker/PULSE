@@ -18,6 +18,10 @@ MODEL_FIELDS = ("direction",) + SCORE_FIELDS
 DIRECTIONS = ("Expansion", "Contraction")
 #: How well a driver's present state is evidenced; shown, never simulated.
 CONFIDENCE_LEVELS = ("High", "Medium", "Low")
+#: The credibility tiers of a source, strongest first (docs/DRIVERS.md,
+#: Sources); lib/format.ts SOURCE_TIERS holds the same list. A source may be
+#: unrated ("").
+SOURCE_TIERS = ("S", "A", "A-", "B+", "B", "B-", "C", "D", "E")
 
 
 @dataclass
@@ -42,7 +46,7 @@ class Driver:
     category_exposure: dict = field(default_factory=dict)  # {category: 0-5}, every category
     regional_exposure: dict = field(default_factory=dict)  # {region: 0-5}, every region
     vc_epicentre: Optional[str] = None  # the value-chain stage where the impact centres (config.VC_STEPS)
-    sources: list = field(default_factory=list)           # [{title, url, tier, note}]
+    sources: list = field(default_factory=list)           # [{title, url, tier, published}]
     # High, Medium or Low: how well the present state is evidenced (display only).
     confidence: Optional[str] = None
     # Share of the category's gross profit the driver can move at full

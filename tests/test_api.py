@@ -290,7 +290,7 @@ class TestDrivers:
         assert driver["baseline"]["vc_epicentre"] == "Commercial"
 
     def test_text_edits_do_not_mark_the_scores_as_edited(self, api):
-        sources = [{"title": "Circana, April 2026", "url": "https://example.org/c", "tier": "A", "note": "Apr 2026"}]
+        sources = [{"title": "Circana, April 2026", "url": "https://example.org/c", "tier": "A", "published": "Apr 2026"}]
         response = api.put("/api/v1/drivers/consumer_r02", headers=bearer("admin"),
                            json={"revision": 1, "description": "New text.", "confidence": "Low", "sources": sources})
         assert response.status_code == 200

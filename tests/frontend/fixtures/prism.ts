@@ -59,7 +59,7 @@ export function makeDriver(overrides: Partial<Driver> = {}): Driver {
     confidence: 'Medium',
     normalized_score: -(5 / 6) * 0.22,
     analysis: ANALYSIS,
-    sources: [{ title: 'Circana: private label reaches a record share', url: 'https://example.org/circana', tier: 'A', note: 'Apr 2026' }],
+    sources: [{ title: 'Circana: private label reaches a record share', url: 'https://example.org/circana', tier: 'A', published: 'Apr 2026' }],
     ...scores,
     baseline: { ...scores },
     scores_edited: false,

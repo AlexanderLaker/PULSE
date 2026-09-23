@@ -32,7 +32,7 @@ def _driver(driver_id="consumer_r01", **overrides) -> Driver:
         diffusion_curve="linear", confidence="Medium", uncertainty=2, analysis="the reading",
         category_exposure={c: 1 for c in CATEGORIES}, regional_exposure={r: 1 for r in REGIONS},
         vc_epicentre="Supply Chain",
-        sources=[{"title": "original source", "url": "https://example.org/a", "tier": "A", "note": "Apr 2026"}],
+        sources=[{"title": "original source", "url": "https://example.org/a", "tier": "A", "published": "Apr 2026"}],
     )
     fields.update(overrides)
     return Driver(**fields)
@@ -117,14 +117,14 @@ class TestDrivers:
                          probability=5, gp1_pct_affected=0.42, start_year=2027, peak_year=2033,
                          diffusion_curve="front_loaded", confidence="High", uncertainty=5, scores_edited=True,
                          category_exposure={c: (5 if c == "Hair: Care" else 0) for c in CATEGORIES},
-                         sources=[{"title": "new source", "url": "https://example.org/b", "tier": "S", "note": ""}])
+                         sources=[{"title": "new source", "url": "https://example.org/b", "tier": "S", "published": ""}])
         edited.baseline = _driver().scores()
         db.save_driver_edit(edited, db.load_drivers()[0].revision)
         loaded = db.load_drivers()[0]
         assert (loaded.name, loaded.direction, loaded.probability, loaded.peak_year) == ("edited name", "Expansion", 5, 2033)
         assert loaded.scores_edited is True and loaded.uncertainty == 5
         assert loaded.category_exposure["Hair: Care"] == 5 and loaded.category_exposure["LHC: FCN"] == 0
-        assert loaded.sources == [{"title": "new source", "url": "https://example.org/b", "tier": "S", "note": ""}]
+        assert loaded.sources == [{"title": "new source", "url": "https://example.org/b", "tier": "S", "published": ""}]
         assert loaded.baseline == _driver().scores()
 
     def test_an_edit_keeps_the_expert_proposals(self, db):
@@ -223,6 +223,7 @@ class TestDrivers:
         "UPDATE drivers SET baseline = NULL",
         "UPDATE driver_category_exposure SET exposure_score = 6",
         "UPDATE driver_regional_exposure SET region = 'Europa'",
+        "UPDATE driver_sources SET tier = 'Z'",
         "UPDATE driver_score_proposals SET gp1_pct_affected = 0",
         "UPDATE driver_score_proposals SET vc_epicentre = 'Retail'",
     ])
