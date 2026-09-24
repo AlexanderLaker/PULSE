@@ -86,27 +86,43 @@ function usePrismStore(): PrismStore {
   const [connectionState, setConnectionState] = useState<ConnectionState>('reconnecting');
   const mounted = useRef(true);
   const loadSequence = useRef(0);
-  // The health check reads the state through a ref, so its callback can stay stable.
+  // The health check and the edit read the connection, the last health answer
+  // and the run on screen through refs, so their callbacks can stay stable.
+  // Each ref is set together with its state, so a call made right after a load
+  // reads what the load brought, whether or not React has rendered it yet.
   const connectionRef = useRef<ConnectionState>('reconnecting');
-  useEffect(() => { connectionRef.current = connectionState; }, [connectionState]);
+  const healthRef = useRef<HealthStatus | null>(null);
+  const simulationRef = useRef<SimulationResult | null>(null);
+  const showConnection = useCallback((state: ConnectionState) => {
+    connectionRef.current = state;
+    setConnectionState(state);
+  }, []);
+  const showHealth = useCallback((h: HealthStatus | null) => {
+    healthRef.current = h;
+    setHealth(h);
+  }, []);
+  const showSimulation = useCallback((run: SimulationResult | null) => {
+    simulationRef.current = run;
+    setSimulation(run);
+  }, []);
 
   /** Load the served run (when health says there is one); keeps the last good run on failure. */
   const loadSimulation = useCallback((hasSimulation: boolean, current: () => boolean) => {
     if (!hasSimulation) {
-      setSimulation(null);
+      showSimulation(null);
       setSimulationError(null);
       return Promise.resolve();
     }
     return settle(api.getSimulation()).then((run) => {
       if (!current()) return;
       if (run.ok) {
-        setSimulation(run.value);
+        showSimulation(run.value);
         setSimulationError(null);
       } else {
         setSimulationError(run.error);
       }
     });
-  }, []);
+  }, [showSimulation]);
 
   // A promise chain rather than async/await: every state write happens in a
   // continuation, so the mount effect can start a load without setting state
@@ -118,9 +134,9 @@ function usePrismStore(): PrismStore {
       .then(() => Promise.all([api.getHealth(), settle(api.getDrivers()), settle(api.getConfig())]))
       .then(([h, d, c]) => {
         if (!current()) return undefined;
-        setConnectionState('connected');
+        showConnection('connected');
         setError(null);
-        setHealth(h);
+        showHealth(h);
         if (d.ok) { setDrivers(d.value); setDriversError(null); } else setDriversError(d.error);
         if (c.ok) { setConfig(c.value); setConfigError(null); } else setConfigError(c.error);
         // A degraded answer says nothing about the run (has_simulation is
@@ -130,50 +146,43 @@ function usePrismStore(): PrismStore {
       })
       .catch((e: unknown) => {
         if (!current()) return;
-        setConnectionState('offline');
-        setHealth(null);
+        showConnection('offline');
+        showHealth(null);
         setError(`The PRISM service is unavailable: ${(e as Error).message}`);
       })
       .finally(() => {
         if (current()) setLoading(false);
       });
-  }, [loadSimulation]);
+  }, [loadSimulation, showConnection, showHealth]);
 
   const reload = useCallback(() => {
     setLoading(true);
-    setConnectionState('reconnecting');
+    showConnection('reconnecting');
     return load();
-  }, [load]);
-
-  // The poll and the edit compare with the last health answer and the run on
-  // screen through refs, so their callbacks can stay stable.
-  const healthRef = useRef<HealthStatus | null>(null);
-  useEffect(() => { healthRef.current = health; }, [health]);
-  const simulationRef = useRef<SimulationResult | null>(null);
-  useEffect(() => { simulationRef.current = simulation; }, [simulation]);
+  }, [load, showConnection]);
 
   const checkHealth = useCallback(async () => {
     try {
       const h = await api.getHealth();
       if (!mounted.current) return;
       const wasDisconnected = connectionRef.current !== 'connected';
-      setConnectionState('connected');
+      showConnection('connected');
       setError(null);
       if (wasDisconnected) {
         void reload();   // the data may be stale or missing
         return;
       }
       const prev = healthRef.current;
-      if (!sameHealth(prev, h)) setHealth(h);
+      if (!sameHealth(prev, h)) showHealth(h);
       // The database can be used again, or a production run wrote a newer run
       // (or the runs were removed): load again, without the loading state, so
       // open views keep their place. A degraded answer only brings up the
       // service notice; the views keep what they have.
       if (h.status === 'ok' && (prev?.status !== 'ok' || prev.latest_run_id !== h.latest_run_id)) void load();
     } catch {
-      if (mounted.current) setConnectionState('offline');
+      if (mounted.current) showConnection('offline');
     }
-  }, [reload, load]);
+  }, [reload, load, showConnection, showHealth]);
 
   const degraded = health?.status === 'degraded';
   useEffect(() => {

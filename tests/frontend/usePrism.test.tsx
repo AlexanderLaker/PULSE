@@ -176,6 +176,26 @@ describe('usePrism', () => {
     expect(api.getSimulation).toHaveBeenCalledTimes(2);
   });
 
+  it('reloads the run after an edit made before React has rendered the load before it', async () => {
+    // The edit reads the last health answer the store received, not the last one
+    // rendered, so it cannot depend on when React runs its effects.
+    vi.mocked(api.getHealth).mockResolvedValue(makeHealth());
+    vi.mocked(api.updateDriver).mockResolvedValue({
+      status: 'updated', driver_id: 'consumer_r01', changed: ['probability'], revision: 2,
+    });
+    let edit: Promise<void> | undefined;
+    vi.mocked(api.getSimulation).mockImplementationOnce(() => {
+      // The load has its health answer and asks for the run; nothing is rendered yet.
+      edit = lastStore!.updateDriver('consumer_r01', { revision: 1, probability: 4 });
+      return Promise.resolve(makeSimulation());
+    });
+    mount();
+    await loaded();
+    await act(async () => { await edit; });
+    expect(api.getSimulation).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId('run').textContent).toBe('yes');
+  });
+
   it('loads the run after a refused edit that replaced a load still bringing it', async () => {
     vi.mocked(api.getHealth).mockResolvedValue(makeHealth({ latest_run_id: 99 }));
     let answerRun: (run: ReturnType<typeof makeSimulation>) => void = () => {};
