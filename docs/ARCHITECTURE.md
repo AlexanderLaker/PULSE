@@ -174,7 +174,7 @@ The dashboard's server routes (`app/api`):
 
 | Route | Access | Does |
 |---|---|---|
-| `GET /api/prism-cookie` | signed in | Sets the viewer cookie for `/api/v1` |
+| `GET /api/prism-cookie` | signed in | Sets the viewer cookie for `/api/v1`; 503 while `PRISM_JWT_SECRET` is missing or shorter than 32 characters |
 | `DELETE /api/prism-cookie` | anyone | Expires the viewer cookie |
 | `GET /api/me` | signed in | The user's Clerk id, email and role |
 | `PUT /api/drivers/{id}` | admin | Forwards a driver edit to the API with an admin token |

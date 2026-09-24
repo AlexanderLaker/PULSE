@@ -62,15 +62,22 @@ README.md; the documents in `docs/` explain everything below in full.
   `docs/adr/0007-honest-display.md` has the reasons.
 - **Only the drivers feed the Shift Matrix.** The Consumer Journey and the
   Profit Pool Explorer never read or write the simulation.
-- **Parity.** The taxonomies, the source tiers and a source's link and
-  length rules (`prism/config.py`, `prism/drivers.py` and `lib/format.ts`,
-  `lib/valueChain.ts`), the uncertainty tables (`prism/config.py` and
+- **Parity.** The taxonomies (forces, categories, regions, value-chain stages,
+  directions, confidence levels, diffusion curves), the horizon, the source
+  tiers and a source's link and length rules (`prism/config.py`,
+  `prism/drivers.py` and `lib/format.ts`, `lib/valueChain.ts`,
+  `types/index.ts`, `components/dashboard/drivers/shared.ts`), the category
+  names the PRISM Analysis uses (`prism/readings.py` and the category labels
+  in `lib/format.ts`), the uncertainty tables (`prism/config.py` and
   `lib/uncertainty.ts`), the per-driver attribution (`prism/attribution.py`
   and `lib/driverAttribution.ts`), the PRISM Analysis labels
-  (`prism/readings.py` and `components/dashboard/drivers/PrismAnalysis.tsx`)
-  and the Consumer Journey tile shape (`prism/journey.py` and
-  `data/consumerJourney.ts`) exist twice and are tested against each other;
-  change both or neither.
+  (`prism/readings.py` and `components/dashboard/drivers/PrismAnalysis.tsx`),
+  the driver request shapes (`prism/api/schemas.py` and `types/drivers.ts`),
+  the estimate's label, the earliest peak year and the token secret's
+  minimum length (`prism/config.py`, `prism/api/auth.py` and
+  `lib/cellWeights.ts`, `lib/format.ts`, `lib/prismJwt.ts`) and the Consumer
+  Journey tile shape (`prism/journey.py` and `data/consumerJourney.ts`) exist
+  twice and are tested against each other; change both or neither.
 - **Shift Matrix arithmetic** lives in `lib/shiftMatrix.ts`;
   `scripts/check_single_source.sh` (part of `npm run lint`) fails on a copy.
 - **Design tokens.** Colours, shadows and fonts come from `lib/theme.ts` (the

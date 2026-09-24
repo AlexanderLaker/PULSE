@@ -3,7 +3,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  BASE_YEAR, CONTRACTION, EXPANSION, FORCES, FORCE_COLORS, NO_VALUE, REGIONS, categoryDisplay, evidenceLine,
+  BASE_YEAR, CONTRACTION, EXPANSION, FORCES, FORCE_COLORS, NO_VALUE, REGIONS, categoryDisplay, categoryFullName,
+  evidenceLine,
   firstPeakYear,
   fmtDate, fmtDateTime, fmtDateTimeUtc, fmtDateUtc, fmtPct, fmtShift, groupDisplay, heatFill, heatScaleFor, heatText, shiftArrow,
   shiftColor, shortCat,
@@ -119,6 +120,10 @@ describe('taxonomy', () => {
     expect(groupDisplay('Hair')).toBe('Hair');
     expect(shortCat('Hair: Color')).toBe('Colour');
     expect(shortCat('LHC: FCN')).toBe('FCN');
+    // In full where no group heading stands over the name
+    expect(categoryFullName('Hair: Color')).toBe('Hair Colour');
+    expect(categoryFullName('Hair: Body')).toBe('Body Care');
+    expect(categoryFullName('LHC: TOI')).toBe('Toilet Care');
     // Every key comes from the API, which serves the taxonomy's only.
     expect(() => categoryDisplay('LHC: HSC (old)')).toThrow(/not a category/);
     expect(() => shortCat('Other: Thing')).toThrow(/not a category/);

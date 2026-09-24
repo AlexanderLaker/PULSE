@@ -12,7 +12,9 @@ import {
 } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import { ApiError } from '@/lib/apiClient';
-import { HORIZON, SOURCE_FIELD_LIMITS, SOURCE_URL, evidenceLine, firstPeakYear, fmtPct } from '@/lib/format';
+import {
+  CONFIDENCE_LEVELS, DIRECTIONS, HORIZON, SOURCE_FIELD_LIMITS, SOURCE_URL, evidenceLine, firstPeakYear, fmtPct,
+} from '@/lib/format';
 import { UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import Chip from '@/components/dashboard/Chip';
@@ -35,10 +37,8 @@ interface DriverPanelProps {
   updateDriver: (driverId: string, update: DriverUpdate) => Promise<void>;
 }
 
-// ─── The admin editor's working copy ──────────────────────────────
-type Draft = Pick<Driver,
-  | 'description' | 'direction' | 'confidence' | 'probability' | 'gp1_pct_affected' | 'peak_year'
-  | 'diffusion_curve' | 'uncertainty' | 'category_exposure' | 'regional_exposure' | 'vc_epicentre' | 'sources'>;
+// ─── The admin editor's working copy: every field an edit can send ──
+type Draft = Required<Omit<DriverUpdate, 'revision'>>;
 
 const sourceCopy = (s: DriverSource): DriverSource => ({ title: s.title, url: s.url, tier: s.tier, published: s.published });
 
@@ -224,8 +224,7 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
                   border: `1px solid ${S.cardBorder}`,
                 }}
               >
-                <option value="Expansion">Expansion</option>
-                <option value="Contraction">Contraction</option>
+                {DIRECTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
             </label>
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -240,9 +239,7 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
                   border: `1px solid ${S.cardBorder}`,
                 }}
               >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
+                {CONFIDENCE_LEVELS.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </label>
           </>

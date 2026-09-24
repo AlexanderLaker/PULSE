@@ -111,11 +111,14 @@ A few rules the suite holds:
 - **One version**: `prism.__version__`, the engine's `MODEL_VERSION`,
   `package.json` and `package-lock.json` must agree.
 - **Generated files** are never edited by hand.
-- **Parity**: the taxonomies (the names of forces, categories, regions and
-  value-chain stages), the source tiers and a source's link and length rules,
-  the uncertainty tables, the per-driver attribution, the PRISM Analysis
-  labels and the Consumer Journey tile shape exist in Python and TypeScript;
-  tests keep each pair identical.
+- **Parity**: the taxonomies (the names of forces, categories, regions,
+  value-chain stages, directions, confidence levels and diffusion curves),
+  the horizon, the source tiers and a source's link and length rules, the
+  category names the PRISM Analysis uses, the uncertainty tables, the
+  per-driver attribution, the PRISM Analysis labels, the driver request
+  shapes, the estimate's label, the earliest peak year, the token secret's
+  minimum length and the Consumer Journey tile shape exist in Python and
+  TypeScript; tests keep each pair identical.
 - **Colours** come from `lib/theme.ts` (the force and category palettes
   from `lib/format.ts`): a literal colour anywhere else in the dashboard's
   code, a named one or a class of Tailwind's own palette included, fails

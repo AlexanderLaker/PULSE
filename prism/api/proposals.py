@@ -18,8 +18,9 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from prism.drivers import EXPOSURE_FIELDS
+
 SCALAR_MEAN_FIELDS = ("probability", "gp1_pct_affected")
-EXPOSURE_FIELDS = ("category_exposure", "regional_exposure")
 
 
 def _non_null(values: List[Any]) -> List[Any]:

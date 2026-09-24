@@ -341,6 +341,15 @@ class TestSimulation:
 
 
 class TestDrivers:
+    def test_the_requests_carry_the_fields_the_database_writes(self):
+        """An admin edit sends the editable fields and its revision, a proposal the scores and a
+        comment: the request bodies and the database's field lists describe the same fields."""
+        from prism.api.schemas import DriverUpdate, ProposalUpdate
+        from prism.database import EDITABLE_FIELDS
+        from prism.drivers import SCORE_FIELDS
+        assert set(DriverUpdate.model_fields) == {"revision"} | EDITABLE_FIELDS
+        assert set(ProposalUpdate.model_fields) == set(SCORE_FIELDS) | {"comment"}
+
     def test_the_list(self, api):
         drivers = api.get("/api/v1/drivers", headers=bearer()).json()
         assert len(drivers) == 51 and [d["id"] for d in drivers] == sorted(d["id"] for d in drivers)

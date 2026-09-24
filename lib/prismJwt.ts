@@ -8,10 +8,13 @@
  * forwards (lib/adminWrite.ts).
  *
  * Server-side only. Returns null when the secret is missing or shorter than
- * 32 characters, which the API would refuse as well.
+ * MIN_SECRET_LENGTH, which the API would refuse as well.
  */
 import crypto from 'node:crypto';
 import type { Role } from '@/types';
+
+/** The shortest PRISM_JWT_SECRET accepted, as the API holds it (prism/api/auth.py MIN_SECRET_LENGTH). */
+export const MIN_SECRET_LENGTH = 32;
 
 export interface PrismJwtClaims {
   sub: string;
@@ -26,7 +29,7 @@ const b64url = (input: Buffer | string): string =>
 
 export function signPrismJwt(claims: PrismJwtClaims, ttlSeconds = 300): string | null {
   const secret = process.env.PRISM_JWT_SECRET;
-  if (!secret || secret.length < 32) return null;
+  if (!secret || secret.length < MIN_SECRET_LENGTH) return null;
   const header = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const body: Record<string, unknown> = { ...claims, exp: Math.floor(Date.now() / 1000) + ttlSeconds };
   if (!claims.name) delete body.name;

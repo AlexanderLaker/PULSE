@@ -35,37 +35,26 @@ const COOKIE = {
 };
 
 export async function GET() {
-  const configured = Boolean(
-    process.env.PRISM_JWT_SECRET && process.env.PRISM_JWT_SECRET.length >= 32,
-  );
   try {
     const me = await requireSignedIn();
-    if (!configured) {
-      return NextResponse.json(
-        { ok: false, configured, error: 'PRISM_JWT_SECRET not configured' },
-        { status: 503 },
-      );
-    }
     // Viewer only, whatever the user's role (see above).
     const token = signPrismJwt(
       { sub: me.clerkUserId, email: me.email, name: me.name, role: 'viewer' },
       TTL_SECONDS,
     );
     if (!token) {
-      return NextResponse.json(
-        { ok: false, configured, error: 'The API token could not be signed' },
-        { status: 503 },
-      );
+      // The deployment has no PRISM_JWT_SECRET of at least 32 characters.
+      return NextResponse.json({ ok: false, error: 'PRISM_JWT_SECRET is not configured' }, { status: 503 });
     }
-    const res = NextResponse.json({ ok: true, configured });
+    const res = NextResponse.json({ ok: true });
     res.cookies.set('prism-token', token, { ...COOKIE, maxAge: TTL_SECONDS });
     return res;
   } catch (err) {
     if (err instanceof UnauthorizedError) {
-      return NextResponse.json({ error: err.message, configured }, { status: 401 });
+      return NextResponse.json({ error: err.message }, { status: 401 });
     }
     console.error('[/api/prism-cookie] error:', err);
-    return NextResponse.json({ error: 'Failed to sign the API token', configured }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to sign the API token' }, { status: 500 });
   }
 }
 

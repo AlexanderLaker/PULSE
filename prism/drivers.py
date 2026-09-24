@@ -11,6 +11,11 @@ from prism.numbers import finite_number, whole_in_range
 SCORE_FIELDS = ("probability", "gp1_pct_affected", "peak_year", "diffusion_curve", "uncertainty",
                 "category_exposure", "regional_exposure", "vc_epicentre")
 
+#: The scores held as a map: one 0-5 score per category or per region.
+EXPOSURE_FIELDS = ("category_exposure", "regional_exposure")
+#: The scores held as one value.
+SCALAR_SCORE_FIELDS = tuple(name for name in SCORE_FIELDS if name not in EXPOSURE_FIELDS)
+
 #: Every editable field that feeds the model: the scores plus the direction.
 #: An admin edit to any of them sets ``scores_edited``.
 MODEL_FIELDS = ("direction",) + SCORE_FIELDS

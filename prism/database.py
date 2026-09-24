@@ -24,8 +24,8 @@ from pathlib import Path
 from typing import Any, Callable, Collection, Dict, List, Optional, Sequence
 
 from prism.config import CATEGORIES, FORCES, REGIONS, VALID_DIFFUSION_CURVES, VC_STAGES
-from prism.drivers import (CONFIDENCE_LEVELS, DIRECTIONS, SOURCE_TIERS, Driver, InvalidDriversError,
-                           simulation_problems)
+from prism.drivers import (CONFIDENCE_LEVELS, DIRECTIONS, EXPOSURE_FIELDS, MODEL_FIELDS, SCALAR_SCORE_FIELDS,
+                           SOURCE_TIERS, Driver, InvalidDriversError, simulation_problems)
 
 logger = logging.getLogger(__name__)
 
@@ -545,11 +545,9 @@ def insert_drivers(drivers: List[Driver]) -> None:
     logger.info("Seeded %d drivers", len(drivers))
 
 
-#: The fields an admin edit can change (prism/api/schemas.py DriverUpdate).
-EDITABLE_FIELDS = frozenset({
-    "description", "direction", "probability", "gp1_pct_affected", "peak_year", "diffusion_curve",
-    "uncertainty", "confidence", "vc_epicentre", *_CHILD_WRITERS,
-})
+#: The fields an admin edit can change (prism/api/schemas.py DriverUpdate):
+#: the model's fields, the texts and the sources.
+EDITABLE_FIELDS = frozenset({*MODEL_FIELDS, "description", "confidence", *_CHILD_WRITERS})
 
 
 def save_driver_edit(driver: Driver, expected_revision: int, changed: Collection[str],
@@ -779,13 +777,11 @@ def save_journey_content(content: dict, updated_by: str, base_version: int,
 # A proposal is partial: any subset of the scoreable fields may be set, and a
 # NULL field means "this expert did not score that".
 
-_PROPOSAL_SCALAR_FIELDS = ("probability", "gp1_pct_affected", "peak_year", "diffusion_curve", "uncertainty",
-                           "vc_epicentre")
-_PROPOSAL_MAP_FIELDS = ("category_exposure", "regional_exposure")
+_PROPOSAL_SCALAR_FIELDS = SCALAR_SCORE_FIELDS
+_PROPOSAL_MAP_FIELDS = EXPOSURE_FIELDS
 _PROPOSAL_TEXT_FIELDS = ("comment",)
-_PROPOSAL_COLUMNS = ("user_id, user_name, probability, gp1_pct_affected, peak_year, "
-                     "diffusion_curve, uncertainty, vc_epicentre, category_exposure, regional_exposure, "
-                     "comment, updated_at")
+_PROPOSAL_COLUMNS = ", ".join(("user_id", "user_name", *_PROPOSAL_SCALAR_FIELDS, *_PROPOSAL_MAP_FIELDS,
+                               *_PROPOSAL_TEXT_FIELDS, "updated_at"))
 
 
 def _proposal(raw) -> dict:

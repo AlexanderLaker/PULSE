@@ -6,8 +6,9 @@
  * must equal ADMIN_BOOTSTRAP_SECRET instead.
  *
  *   - secret unset: the route answers 404, as if it did not exist
- *   - secret shorter than 32 characters: 503, and nothing is compared (the
- *     route has no rate limit; the length is what keeps guessing hopeless)
+ *   - secret shorter than MIN_SECRET_LENGTH (lib/prismJwt.ts), the minimum
+ *     of PRISM_JWT_SECRET too: 503, and nothing is compared (the route has no
+ *     rate limit; the length is what keeps guessing hopeless)
  *   - wrong or missing header: 403
  *   - no user_roles row for the email (the Clerk webhook adds one when a
  *     user signs up; it has not added this user): 404
@@ -23,15 +24,13 @@
 import { createHash, timingSafeEqual } from 'crypto';
 import { NextResponse } from 'next/server';
 import { getSQL } from '@/lib/db';
+import { MIN_SECRET_LENGTH } from '@/lib/prismJwt';
 import { ensureUserRolesTable } from '@/lib/roles';
 import { recordRoleChange } from '@/lib/audit';
 import type { Role } from '@/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-/** The shortest secret the route works with, as for PRISM_JWT_SECRET. */
-const MIN_SECRET_LENGTH = 32;
 
 interface BootstrapBody {
   email?: unknown;

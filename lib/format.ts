@@ -1,8 +1,8 @@
 /**
  * How the dashboard shows a shift: colour, sign, arrow and rounding, the
- * force, region and category lists, the date format and a driver's one-line
- * evidence. Every view formats through here, so a shift reads the same
- * everywhere.
+ * force, region and category lists, a driver's directions and confidence
+ * levels, the date format and a driver's one-line evidence. Every view
+ * formats through here, so a shift reads the same everywhere.
  *
  *   - One colour pair: green for expansion, red for contraction. A shift also
  *     carries a sign and an arrow, so its direction never depends on colour.
@@ -10,7 +10,7 @@
  *     support more.
  *   - Below FLAT_EPS a shift counts as flat: no sign, no arrow, no colour.
  */
-import type { ForceName } from '@/types';
+import type { Confidence, Direction, ForceName } from '@/types';
 import { CONTRACTION_RGB, EXPANSION_RGB, S } from '@/lib/theme';
 
 // ── Shift colours ───────────────────────────────────────────────────────────
@@ -35,6 +35,12 @@ export const NO_VALUE = '–';
 
 /** The six forces in the engine's order (prism/config.py FORCES). */
 export const FORCES: ForceName[] = ['Consumer', 'Customer', 'Technology', 'Government', 'Environmental', 'Competitive'];
+
+/** A driver's two directions (prism/drivers.py DIRECTIONS). */
+export const DIRECTIONS: Direction[] = ['Expansion', 'Contraction'];
+
+/** How well a driver's present state is evidenced, strongest first (prism/drivers.py CONFIDENCE_LEVELS). */
+export const CONFIDENCE_LEVELS: Confidence[] = ['High', 'Medium', 'Low'];
 
 /** The four regions in the engine's order (prism/config.py REGIONS). */
 export const REGIONS: string[] = ['Europe', 'North America', 'Asia', 'High Growth'];
@@ -97,6 +103,16 @@ export function categoryOf(name: string): CategoryDefinition {
 /** The plain-English label of a category key ("LHC: FCN" -> "Fabric Clean"). */
 export function categoryDisplay(name: string): string {
   return categoryOf(name).label;
+}
+
+/** A category named in full where no group heading stands over it: a hair
+ *  category carries its group ("Hair Colour", "Body Care"), a laundry and
+ *  home care one its label ("Fabric Clean"). The PRISM Analysis names the
+ *  categories the same way, in lower case (prism/readings.py CATEGORY_SHORT). */
+export function categoryFullName(name: string): string {
+  const { group, label } = categoryOf(name);
+  if (group === 'LHC') return label;
+  return label === 'Body' ? 'Body Care' : `Hair ${label}`;
 }
 
 /** A group's heading: "LHC" reads "Laundry & Home Care". */

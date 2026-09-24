@@ -11,7 +11,7 @@ from prism.api.auth import identity_from_user, require_admin, require_auth
 from prism.api.proposals import build_proposal_summary, build_proposals_response
 from prism.api.schemas import DriverUpdate, ProposalUpdate
 from prism.config import CATEGORIES, REGIONS, first_peak_year
-from prism.drivers import MODEL_FIELDS, InvalidDriversError
+from prism.drivers import MODEL_FIELDS, SCALAR_SCORE_FIELDS, InvalidDriversError
 from prism.numbers import whole_in_range
 
 #: The names an exposure map may use, per field.
@@ -161,7 +161,7 @@ def put_driver_proposal(driver_id: str, proposal: ProposalUpdate, user: dict = D
         _check_peak_year(driver, proposal.peak_year)
 
     fields: dict = {}
-    for name in ("probability", "gp1_pct_affected", "peak_year", "uncertainty", "diffusion_curve", "vc_epicentre"):
+    for name in SCALAR_SCORE_FIELDS:
         if name in sent:
             fields[name] = getattr(proposal, name)
     for name in EXPOSURE_KEYS:

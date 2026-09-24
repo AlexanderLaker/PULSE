@@ -8,7 +8,7 @@ import { SlidersHorizontal } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import SectionCard from '@/components/dashboard/SectionCard';
 import { S, MONO_FONT } from '@/lib/theme';
-import { BASE_YEAR, CATEGORY_NAMES, FORCES, NO_VALUE, REGIONS } from '@/lib/format';
+import { BASE_YEAR, CATEGORY_NAMES, FORCES, NO_VALUE, REGIONS, categoryFullName } from '@/lib/format';
 import { cellMarginals, cellWeightsBasis } from '@/lib/cellWeights';
 import type { ForceName, ModelConfig, SimulationResult } from '@/types';
 import {
@@ -213,7 +213,7 @@ const RunCellWeights: FC<{ run: SimulationResult }> = ({ run }) => {
         <tbody>
           {CATEGORY_NAMES.map((c) => (
             <tr key={c}>
-              <th scope="row" style={{ ...CELL_LABEL, borderTop: `1px solid ${S.cardBorder}` }}>{c}</th>
+              <th scope="row" style={{ ...CELL_LABEL, borderTop: `1px solid ${S.cardBorder}` }}>{categoryFullName(c)}</th>
               {REGIONS.map((r) => <td key={r} style={CELL_NUM}>{pct2(run.cell_weights_used[c]![r]!)}</td>)}
               <td style={CELL_SUM}>{pct2(m.rowSums[c]!)}%</td>
             </tr>

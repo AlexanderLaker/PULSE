@@ -26,12 +26,15 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from prism.numbers import finite_number
 
 _bearer = HTTPBearer(auto_error=False)
+#: The shortest PRISM_JWT_SECRET accepted; the dashboard signs with no shorter
+#: one (lib/prismJwt.ts MIN_SECRET_LENGTH).
+MIN_SECRET_LENGTH = 32
 
 
 def _jwt_secret() -> Optional[str]:
-    """The signing secret, or None when it is missing or shorter than 32 characters."""
+    """The signing secret, or None when it is missing or shorter than MIN_SECRET_LENGTH."""
     secret = os.environ.get("PRISM_JWT_SECRET", "")
-    return secret if len(secret) >= 32 else None
+    return secret if len(secret) >= MIN_SECRET_LENGTH else None
 
 
 def _b64decode(s: str) -> bytes:

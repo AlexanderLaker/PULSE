@@ -74,13 +74,13 @@ describe('/api/prism-cookie', () => {
     expect(sc.toLowerCase()).toContain('httponly');
   });
 
-  it('503 when PRISM_JWT_SECRET is missing (configured:false surfaced)', async () => {
+  it('503 when PRISM_JWT_SECRET is missing, naming the setting', async () => {
     delete process.env.PRISM_JWT_SECRET;
     clerk.auth.mockResolvedValue({ userId: 'user_1' });
     clerk.currentUser.mockResolvedValue({ primaryEmailAddress: { emailAddress: 'a@b.de' } });
     db.roleRows = [{ role: 'viewer' }];
     const res = await cookieGET();
     expect(res.status).toBe(503);
-    expect((await res.json()).configured).toBe(false);
+    expect((await res.json()).error).toBe('PRISM_JWT_SECRET is not configured');
   });
 });

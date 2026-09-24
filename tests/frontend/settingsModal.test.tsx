@@ -152,7 +152,7 @@ describe('Model configuration: the served run\'s cell weights', () => {
 
     const grid = cellGrid();
     expect(within(grid).getAllByRole('row')).toHaveLength(1 + 13 + 1);
-    const colour = within(grid).getByRole('row', { name: /^Hair: Color/ });
+    const colour = within(grid).getByRole('row', { name: /^Hair Colour/ });
     expect(within(colour).getByText('9.40')).toBeTruthy();
     expect(within(colour).getByText('17.10%')).toBeTruthy();
     const regions = within(grid).getByRole('row', { name: /^Σ region/ });
@@ -184,7 +184,7 @@ describe('Model configuration: the served run\'s cell weights', () => {
     expect(screen.getByText('Source: Finance: HCB gross-profit shares FY2025')).toBeTruthy();
     expect(screen.queryByText('Estimated HCB mix')).toBeNull();
     expect(screen.queryByText(/How these 52 shares were built/)).toBeNull();
-    const colour = within(cellGrid()).getByRole('row', { name: /^Hair: Color/ });
+    const colour = within(cellGrid()).getByRole('row', { name: /^Hair Colour/ });
     expect(within(colour).getByText('8.00')).toBeTruthy();
     expect(within(within(cellGrid()).getByRole('row', { name: /^Σ region/ })).getByText('50.02%')).toBeTruthy();
   });

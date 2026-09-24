@@ -1,26 +1,36 @@
-"""The dashboard's copies of the model's taxonomies and horizon, and of the Consumer Journey tile shape.
+"""The dashboard's copies of the model's taxonomies and horizon, of the driver request shapes and of
+the Consumer Journey tile shape.
 
 The dashboard reads and writes forces, categories, regions, value-chain
-stages and source tiers by name, and the API refuses a name that is not the
-model's; it lays out the matrix by the path years, and its editor checks a
-source's link and lengths as the API will. Its copies (lib/format.ts,
-lib/valueChain.ts) must therefore hold the values of prism/config.py and
-prism/drivers.py, in the same order. Likewise the journey tile map the
-dashboard renders and saves (data/consumerJourney.ts) must be the shape the
-API stores (prism/journey.py).
+stages, directions, confidence levels, diffusion curves and source tiers by
+name, and the API refuses a name that is not the model's; it lays out the
+matrix by the path years, and its editor checks a source's link and lengths as
+the API will. Its copies (lib/format.ts, lib/valueChain.ts, types/index.ts,
+components/dashboard/drivers/shared.ts) must therefore hold the values of
+prism/config.py and prism/drivers.py, in the same order. The PRISM Analysis
+names the categories with the labels the page shows (prism/readings.py). The
+driver types (types/drivers.ts) name the fields of the scores and of the two
+request bodies the API accepts (prism/api/schemas.py). The estimate's label,
+the earliest peak year and the token secret's minimum length are decided on
+both sides. Likewise the journey tile map the dashboard renders and saves
+(data/consumerJourney.ts) must be the shape the API stores (prism/journey.py).
 """
 import re
 from pathlib import Path
 
-from prism.config import BASE_YEAR, CATEGORIES, DEFAULT_PATH_YEARS, FORCES, REGIONS, VC_STAGES
-from prism.drivers import SOURCE_FIELD_LIMITS, SOURCE_TIERS, SOURCE_URL_PATTERN
+from prism.config import (BASE_YEAR, CATEGORIES, DEFAULT_PATH_YEARS, FORCES, REGIONS, VALID_DIFFUSION_CURVES,
+                          VC_STAGES, first_peak_year)
+from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, SOURCE_FIELD_LIMITS, SOURCE_TIERS, SOURCE_URL_PATTERN
 from prism.journey import (INTENSITIES, JOURNEYS, OPTIONAL_TILE_KEYS, POOL_IMPACT_GRADES, POOL_IMPACT_KEYS,
                            PROVENANCE_GRADES, PROVENANCE_KEYS, STAGE_KEYS, TILE_KEYS, TILE_TYPES)
+from prism.readings import CATEGORY_SHORT, CURVE_NAMES
 
 REPO = Path(__file__).resolve().parents[1]
 FORMAT = (REPO / "lib" / "format.ts").read_text(encoding="utf-8")
 VALUE_CHAIN = (REPO / "lib" / "valueChain.ts").read_text(encoding="utf-8")
 JOURNEY = (REPO / "data" / "consumerJourney.ts").read_text(encoding="utf-8")
+TYPES = (REPO / "types" / "index.ts").read_text(encoding="utf-8")
+DRIVER_PARTS = (REPO / "components" / "dashboard" / "drivers" / "shared.ts").read_text(encoding="utf-8")
 
 
 def quoted(source: str, declaration: str) -> list:
@@ -44,6 +54,33 @@ def test_regions():
     assert quoted(FORMAT, "export const REGIONS: string[] =") == REGIONS
 
 
+def test_category_names_in_the_readings():
+    """The PRISM Analysis names a category with the page's label in lower case, a hair category in
+    full, as categoryFullName in lib/format.ts does."""
+    block = re.search(r"export const CATEGORIES: CategoryDefinition\[\] = \[(.*?)\n\];", FORMAT, re.S).group(1)
+    labels = dict(re.findall(r"\{ name: '([^']+)',\s+label: '([^']+)'", block))
+    assert list(CATEGORY_SHORT) == CATEGORIES == list(labels)
+    for name, label in labels.items():
+        full = label if name.startswith("LHC") else ("Body care" if label == "Body" else f"Hair {label}")
+        assert CATEGORY_SHORT[name] == full.lower(), name
+    rule = re.search(r"export function categoryFullName\(name: string\): string \{(.*?)\n\}", FORMAT, re.S).group(1)
+    assert "if (group === 'LHC') return label;" in rule
+    assert "return label === 'Body' ? 'Body Care' : `Hair ${label}`;" in rule
+
+
+def test_directions_and_confidence_levels():
+    assert tuple(quoted(FORMAT, "export const DIRECTIONS: Direction[] =")) == DIRECTIONS == union(TYPES, "Direction")
+    assert (tuple(quoted(FORMAT, "export const CONFIDENCE_LEVELS: Confidence[] ="))
+            == CONFIDENCE_LEVELS == union(TYPES, "Confidence"))
+
+
+def test_diffusion_curves():
+    """The editor offers the curves the engine knows (the keys of DIFFUSION_LABELS), and the readings name each."""
+    block = re.search(r"export const DIFFUSION_LABELS[^=]*= \{(.*?)\n\};", DRIVER_PARTS, re.S).group(1)
+    assert re.findall(r"^\s*(\w+):", block, re.M) == VALID_DIFFUSION_CURVES
+    assert set(CURVE_NAMES) == set(VALID_DIFFUSION_CURVES)
+
+
 def test_value_chain_stages():
     assert quoted(VALUE_CHAIN, "export const VC_STAGES =") == VC_STAGES
     assert len(quoted(VALUE_CHAIN, "export const VC_SHORT_LABELS =")) == len(VC_STAGES)
@@ -53,6 +90,22 @@ def test_horizon():
     assert re.search(r"export const BASE_YEAR = (\d{4});", FORMAT).group(1) == str(BASE_YEAR)
     years = re.search(r"export const YEARS: number\[\] = \[([^\]]*)\];", FORMAT).group(1)
     assert [int(y) for y in years.split(",")] == list(DEFAULT_PATH_YEARS)
+
+
+def test_the_rules_both_sides_apply():
+    """The estimate's label, the earliest peak year and the token secret's minimum length: the
+    dashboard and the API decide these the same way."""
+    from prism.api.auth import MIN_SECRET_LENGTH
+    from prism.config import ESTIMATE_SOURCE_PREFIX
+    cell_weights = (REPO / "lib" / "cellWeights.ts").read_text(encoding="utf-8")
+    prefix = re.search(r"export const ESTIMATE_SOURCE_PREFIX = '([^']+)';", cell_weights).group(1)
+    assert prefix == ESTIMATE_SOURCE_PREFIX
+    # prism/config.py first_peak_year: the year after the later of the base year and the onset
+    assert "return Math.max(BASE_YEAR, startYear) + 1;" in FORMAT
+    assert [first_peak_year(y) for y in (2020, BASE_YEAR, 2030)] == [
+        BASE_YEAR + 1, BASE_YEAR + 1, 2031]
+    jwt = (REPO / "lib" / "prismJwt.ts").read_text(encoding="utf-8")
+    assert int(re.search(r"export const MIN_SECRET_LENGTH = (\d+);", jwt).group(1)) == MIN_SECRET_LENGTH
 
 
 def test_source_tiers():
@@ -81,6 +134,17 @@ def fields(source: str, interface: str, optional: bool | None = None) -> tuple:
     body = re.sub(r"/\*.*?\*/", "", match.group(1), flags=re.S)
     return tuple(name for name, mark in re.findall(r"^\s*(\w+)(\??):", body, re.M)
                  if optional is None or (mark == "?") == optional)
+
+
+def test_driver_request_shapes():
+    """The dashboard's driver types (types/drivers.ts) name the fields the API reads and writes:
+    the scores, an admin edit's body and an expert proposal's body."""
+    from prism.api.schemas import DriverUpdate, ProposalUpdate
+    from prism.drivers import SCORE_FIELDS
+    drivers = (REPO / "types" / "drivers.ts").read_text(encoding="utf-8")
+    assert fields(drivers, "DriverScores") == SCORE_FIELDS
+    assert fields(drivers, "DriverUpdate") == tuple(DriverUpdate.model_fields)
+    assert fields(drivers, "DriverProposal") == tuple(ProposalUpdate.model_fields)
 
 
 def test_journey_tile_shape():

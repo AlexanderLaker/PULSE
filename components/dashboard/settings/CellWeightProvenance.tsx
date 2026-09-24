@@ -5,7 +5,7 @@
  */
 import type { CSSProperties, FC } from 'react';
 import { S, HEADLINE_FONT, MONO_FONT } from '@/lib/theme';
-import { CATEGORY_NAMES, fmtPct } from '@/lib/format';
+import { CATEGORY_NAMES, categoryFullName, fmtPct } from '@/lib/format';
 import {
   BLOCK_SPLIT, CATEGORY_MIX, ESTIMATE_MARGINALS, ESTIMATE_VERSION, GRADE_LEGEND, MARGIN_INDEX,
   MARGIN_INDEX_NOTE, REGION_MIX, REGION_MIX_NOTE, type Grade,
@@ -82,7 +82,7 @@ const PROV_REGION_LINE = Object.entries(ESTIMATE_MARGINALS.region)
   .map(([r, w]) => `${r} ${fmtPct(w)}`).join(' · ');
 const PROV_TOP_CATEGORIES = Object.entries(ESTIMATE_MARGINALS.category)
   .sort((a, b) => b[1] - a[1]).slice(0, 3)
-  .map(([c, w]) => `${c} ${fmtPct(w)}`).join(' · ');
+  .map(([c, w]) => `${categoryFullName(c)} ${fmtPct(w)}`).join(' · ');
 
 /** The graded derivation of the estimated mix. */
 export const CellWeightProvenance: FC = () => (
@@ -165,7 +165,7 @@ export const CellWeightProvenance: FC = () => (
                 const margin = MARGIN_INDEX[c];
                 return (
                   <tr key={c}>
-                    <td style={PROV_ROW_LABEL}>{c}</td>
+                    <td style={PROV_ROW_LABEL}>{categoryFullName(c)}</td>
                     <td style={PROV_NUM}>{fmtPct(mix.shareOfBlock)}</td>
                     <td style={PROV_GRADE_CELL}><InputGradeChip grade={mix.grade} /></td>
                     <td style={PROV_NUM}>{margin ? margin.index.toFixed(2) : ''}</td>
@@ -196,7 +196,7 @@ export const CellWeightProvenance: FC = () => (
               const rm = REGION_MIX[c];
               return (
                 <tr key={c}>
-                  <td style={PROV_ROW_LABEL}>{c}</td>
+                  <td style={PROV_ROW_LABEL}>{categoryFullName(c)}</td>
                   {PROV_REGIONS.map((r) => <td key={r} style={PROV_NUM}>{fmtPct(rm.mix[r] ?? 0)}</td>)}
                   <td style={PROV_GRADE_CELL}><InputGradeChip grade={rm.grade} /></td>
                   <td style={PROV_NOTE_CELL}>{rm.note}</td>
