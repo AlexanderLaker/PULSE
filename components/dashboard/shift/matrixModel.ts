@@ -79,14 +79,17 @@ export function buildMatrix(simulation: SimulationResult, lens: Lens, year: numb
     return { columns, data, colTotals: columnTotals(data, columns, weights), grandTotal: null, cellDetails };
   }
 
+  // The API serves a run only with every category's attribution, in every
+  // column of the lens, and its total in every year (prism/api/runs.py); a
+  // category no driver reaches has shares of zero.
   const yearKey = String(year);
   const columns = LENS_COLUMNS[lens];
-  const decomposition = simulation.decompositions[lens][yearKey];
+  const decomposition = simulation.decompositions[lens][yearKey]!;
   const data: CellMap = {};
   const rowTotals: Record<string, number | null> = {};
   for (const c of CATEGORY_NAMES) {
-    data[c] = Object.fromEntries(columns.map((d) => [d, decomposition?.[c]?.[d] ?? null]));
-    rowTotals[c] = simulation.totals.category_path[c]?.[yearKey] ?? null;
+    data[c] = Object.fromEntries(columns.map((d) => [d, decomposition[c]![d]!]));
+    rowTotals[c] = simulation.totals.category_path[c]![yearKey]!;
   }
   return {
     columns,

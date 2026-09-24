@@ -7,7 +7,7 @@ shapes it for GET /api/v1/simulation.
 from datetime import timezone
 from typing import Iterable, Optional
 
-from prism.config import CATEGORIES, DEFAULT_PATH_YEARS, REGIONS
+from prism.config import CATEGORIES, DEFAULT_PATH_YEARS, FORCES, REGIONS, VC_STAGES
 from prism.input_drift import changed_drivers, driver_fingerprint, incomplete_entries
 from prism.numbers import finite_number
 
@@ -28,6 +28,8 @@ META_KEYS = (
 #: The years the dashboard lays out (lib/format.ts YEARS), as stored run keys.
 YEARS = tuple(str(y) for y in DEFAULT_PATH_YEARS)
 QUANTILES = ("p10", "median", "p90")
+#: The columns of each attribution lens (the Shift Matrix's lens columns).
+LENS_COLUMNS = {"force": FORCES, "vc": VC_STAGES, "region": REGIONS}
 
 
 def _bands_complete(bands) -> bool:
@@ -50,10 +52,10 @@ def _grid(value, rows, columns) -> Iterable:
 
 
 def incomplete_parts(results: dict) -> list:
-    """The parts of the run the dashboard indexes by category, region and year
-    that do not cover all of them: a run on another horizon or taxonomy (made
-    before a deploy that changed either) is not served until the next
-    production run."""
+    """The parts of the run the dashboard indexes by category, region, lens
+    column and year that do not cover all of them: a run on another horizon or
+    taxonomy (made before a deploy that changed either) is not served until
+    the next production run."""
     out = []
     span = f"{YEARS[0]} to {YEARS[-1]}"
     shift = results.get("shift_matrix")
@@ -63,30 +65,37 @@ def incomplete_parts(results: dict) -> list:
     if not _paths_complete(_grid(regional, CATEGORIES, REGIONS)):
         out.append(f"a shift path of every category and region over {span}")
     decompositions = results.get("decompositions")
-    for lens in ("force", "vc", "region"):
+    for lens, columns in LENS_COLUMNS.items():
         grid = decompositions.get(lens) if isinstance(decompositions, dict) else None
-        if not all(isinstance(part, dict) for part in _grid(grid, YEARS, CATEGORIES)):
+        if not all(isinstance(part, dict) and all(finite_number(part.get(column)) for column in columns)
+                   for part in _grid(grid, YEARS, CATEGORIES)):
             out.append(f"the {lens} attribution of every category over {span}")
     totals = results.get("totals")
     if not (isinstance(totals, dict) and _bands_complete(totals.get("portfolio"))
             and all(v is not None for v in _grid(totals.get("category_path"), CATEGORIES, YEARS))):
         out.append(f"the portfolio band and every category's total over {span}")
-    categories = results.get("category_weights_used")
+    categories, regions = results.get("category_weights_used"), results.get("region_weights_used")
     if not (all(finite_number(w) for w in _grid(results.get("cell_weights_used"), CATEGORIES, REGIONS))
-            and isinstance(categories, dict) and all(finite_number(categories.get(c)) for c in CATEGORIES)):
+            and isinstance(categories, dict) and all(finite_number(categories.get(c)) for c in CATEGORIES)
+            and isinstance(regions, dict) and all(finite_number(regions.get(r)) for r in REGIONS)):
         out.append("the gross-profit share of every category and region")
     return out
 
 
-def missing_keys(results: dict) -> list:
+def missing_keys(results) -> list:
     """The parts of the contract a stored results bundle lacks: the parts
     above, each over every category, region and path year (incomplete_parts),
     the run metadata and a complete fingerprint of the drivers, which the
-    next run and inputs_since_run compare with."""
+    next run and inputs_since_run compare with. Stored results that are not
+    a JSON object (a list, or text that is not JSON) lack everything, and a
+    meta that is not one lacks every key."""
+    if not isinstance(results, dict):
+        return ["a results object"]
     missing = [k for k in REQUIRED_KEYS if k not in results]
     if not missing:
         missing += incomplete_parts(results)
-    meta = results.get("meta") or {}
+    meta = results.get("meta")
+    meta = meta if isinstance(meta, dict) else {}
     missing += [f"meta.{k}" for k in META_KEYS + ("driver_fingerprint",) if k not in meta]
     if "driver_fingerprint" in meta and incomplete_entries(meta["driver_fingerprint"]):
         missing.append("a complete meta.driver_fingerprint")

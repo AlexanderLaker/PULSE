@@ -25,7 +25,7 @@ from urllib.parse import quote
 
 import pytest
 
-from prism.config import CATEGORIES, VC_STAGES
+from prism.config import CATEGORIES, FORCES, VC_STAGES
 from prism.input_drift import FINGERPRINT_KEYS, driver_fingerprint
 from prism.journey import content_problem
 from prism.seed_drivers import DRIVERS
@@ -226,14 +226,16 @@ def previous_release_run() -> dict:
     production = load_module("scripts/run_production.py")
     bundle = json.loads(json.dumps(production.results_bundle(result, config, len(drivers), driver_fingerprint(drivers)),
                                    default=float))
-    meta, dimensions = bundle["meta"], bundle["decompositions"]["dimensions"]
+    meta = bundle["meta"]
     meta["trend_count"] = meta.pop("driver_count")
-    meta["trend_fingerprint"] = {driver_id: {k: v for k, v in entry.items() if k != "s"}
+    # without the onset year, and with the epicentre as the stage's place in the chain
+    meta["trend_fingerprint"] = {driver_id: {**{k: v for k, v in entry.items() if k != "s"},
+                                             "ve": VC_STAGES.index(entry["ve"]) + 1}
                                  for driver_id, entry in meta.pop("driver_fingerprint").items()}
-    dimensions["vc_steps"] = dimensions.pop("vc_stages")
     meta["attenuation_source"] = meta.pop("overlap_correction_source")
     # parts the previous release stored besides
     meta.update(engine_fidelity="scipy", vc_attribution_basis="epicentre")
+    bundle["decompositions"]["dimensions"] = {"forces": list(FORCES), "vc_steps": list(VC_STAGES)}
     bundle["vc_decomposition"] = {}
     return bundle
 
@@ -569,8 +571,7 @@ class TestMigration:
             "retired_r99": {**unknown, "p": 2, "ce": {"Hair: Care": 1}}}}
         assert [e["detail"] for e in first["integrity_events"]] == [
             {"driver_ids": ["consumer_r01"]}, {"unscored_driver_ids": ["technology_r01"]}, None]
-        assert first["decompositions"] == {
-            "force": {}, "dimensions": {"vc_stages": ["Raw Materials", "Consumer"], "regions": ["Europe"]}}
+        assert first["decompositions"] == {"force": {}}   # the taxonomy lists a current run does not carry
         assert first["totals"] == FIRST_RUN["totals"]
         assert rows[1]["results"] == "{not json"
         assert json.loads(rows[2]["results"]) == {"meta": {"driver_count": 51}}
@@ -811,7 +812,7 @@ class TestMigration:
 
         def fail(results):
             raise RuntimeError("disk full")
-        monkeypatch.setattr(migration, "rename_run_keys", fail)   # after the drops
+        monkeypatch.setattr(migration, "update_run_keys", fail)   # after the drops
         assert migration.main(["--sqlite", str(previous)]) == 2
         out = capsys.readouterr().out
         assert "rolled back" in out and "disk full" in out
@@ -855,14 +856,24 @@ class TestHelpers:
     def test_the_publication_date_of_a_previous_source(self, migration, old, published):
         assert migration.published_from(old) == published
 
-    def test_run_keys_are_renamed_only_where_needed(self, migration):
+    def test_run_keys_are_updated_only_where_needed(self, migration):
         results = json.loads(json.dumps(FIRST_RUN))
-        assert migration.rename_run_keys(results) is True
-        assert migration.rename_run_keys(results) is False
-        assert migration.rename_run_keys({"meta": {"driver_count": 5, "trend_count": 4}}) is False
-        assert migration.rename_run_keys({"integrity_events": ["not a dict"]}) is False
-        assert migration.rename_run_keys({"decompositions": {"dimensions": {"vc_steps": [], "vc_stages": []}}}) is False
-        assert migration.rename_run_keys({"decompositions": ["not a dict"]}) is False
+        assert migration.update_run_keys(results) is True
+        assert migration.update_run_keys(results) is False
+        assert migration.update_run_keys({"meta": {"driver_count": 5, "trend_count": 4}}) is False
+        assert migration.update_run_keys({"integrity_events": ["not a dict"]}) is False
+        assert migration.update_run_keys({"decompositions": {"force": {}}}) is False
+        assert migration.update_run_keys({"decompositions": ["not a dict"]}) is False
+
+    def test_a_stored_epicentre_becomes_the_stage_it_names(self, migration):
+        """The previous release fingerprinted the epicentre as its place in the chain, older ones as the
+        eight-step profile; anything else compares as changed."""
+        fingerprint = {"a": {"ve": 6}, "b": {"ve": previous_profile("Packaging")}, "c": {"ve": 9},
+                       "d": {"ve": "Consumer"}, "e": {"ve": True}}
+        results = {"meta": {"driver_fingerprint": fingerprint}}
+        assert migration.complete_fingerprint(results, {}) is True
+        assert {i: e["ve"] for i, e in fingerprint.items()} == {
+            "a": "Marketing", "b": "Packaging", "c": None, "d": "Consumer", "e": None}
 
     def test_a_proposal_vote_that_names_no_stage_is_reported(self, migration):
         values, cleared = migration.proposal_scores({"vc_exposure": json.dumps({"supply_chain": 5})}, 2025)

@@ -96,7 +96,6 @@ export function makeSimulation(overrides: Partial<SimulationResult> = {}): Simul
       force: split(FORCES),
       vc: split(VC_STAGES),
       region: split(REGIONS),
-      dimensions: { forces: FORCES, vc_stages: [...VC_STAGES], regions: REGIONS, categories: CATEGORY_NAMES, years: YEARS },
     },
     totals: {
       category_path: Object.fromEntries(CATEGORY_NAMES.map((c) => [c, Object.fromEntries(YEARS.map((y) => [String(y), median(c, y)]))])),

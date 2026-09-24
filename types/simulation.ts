@@ -42,13 +42,6 @@ export interface Decompositions {
   force: Decomposition;
   vc: Decomposition;
   region: Decomposition;
-  dimensions: {
-    forces: string[];
-    vc_stages: string[];
-    regions: string[];
-    categories: string[];
-    years: number[];
-  };
 }
 
 export interface Totals {

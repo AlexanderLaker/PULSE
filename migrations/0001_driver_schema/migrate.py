@@ -68,14 +68,15 @@ or the write lock (SQLite), so nothing can write in between.
    know, such as user_roles, are never touched.
 4. The keys of the stored runs follow the new names: meta.trend_count ->
    meta.driver_count, meta.trend_fingerprint -> meta.driver_fingerprint,
-   meta.attenuation_source -> meta.overlap_correction_source,
-   decompositions.dimensions.vc_steps -> vc_stages, and trend_ids /
+   meta.attenuation_source -> meta.overlap_correction_source, and trend_ids /
    unscored_trend_ids -> driver_ids / unscored_driver_ids in the integrity
-   events. Each driver fingerprint gains every field the previous one did
-   not record: the onset years, and None (compares as changed) for a field
-   that cannot be known; its exposure maps move onto the taxonomy's names as
-   the drivers' do, so the next production run compares like with like. No
-   number changes.
+   events; decompositions.dimensions, which only listed the taxonomies and
+   which a current run does not carry, is removed. Each driver fingerprint
+   gains every field the previous one did not record: the onset years, and
+   None (compares as changed) for a field that cannot be known; its
+   value-chain stage is stored by name, and its exposure maps move onto the
+   taxonomy's names as the drivers' do, so the next production run compares
+   like with like. No number changes.
 5. The content is brought up to date. A previously shipped text is one that
    any version since release 2.11.0 (the first on the 51-driver base) shipped:
      - a description that still holds a previously shipped text gets the current
@@ -167,7 +168,6 @@ LOCK_TIMEOUT = "10s"
 RUN_META_RENAMES = {"trend_count": "driver_count", "trend_fingerprint": "driver_fingerprint",
                     "attenuation_source": "overlap_correction_source"}
 EVENT_DETAIL_RENAMES = {"trend_ids": "driver_ids", "unscored_trend_ids": "unscored_driver_ids"}
-DIMENSION_RENAMES = {"vc_steps": "vc_stages"}
 SOURCE_KINDS = ("primary source", "analyst report", "trade press", "primary_source", "analyst_report", "trade_press")
 #: A source link as the API accepts it.
 WEB_ADDRESS = re.compile(SOURCE_URL_PATTERN)
@@ -352,8 +352,10 @@ def editor_sources(data_source):
     return out or None
 
 
-def rename_run_keys(results: dict) -> bool:
-    """Give the keys of one stored results bundle their current names, in place; True if any changed."""
+def update_run_keys(results: dict) -> bool:
+    """Give the keys of one stored results bundle their current names, in place,
+    and remove decompositions.dimensions, which a current run does not carry
+    (it only listed the taxonomies); True if anything changed."""
     changed = False
     meta = results.get("meta")
     if isinstance(meta, dict):
@@ -362,12 +364,9 @@ def rename_run_keys(results: dict) -> bool:
                 meta[new] = meta.pop(old)
                 changed = True
     decompositions = results.get("decompositions")
-    dimensions = decompositions.get("dimensions") if isinstance(decompositions, dict) else None
-    if isinstance(dimensions, dict):
-        for old, new in DIMENSION_RENAMES.items():
-            if old in dimensions and new not in dimensions:
-                dimensions[new] = dimensions.pop(old)
-                changed = True
+    if isinstance(decompositions, dict) and "dimensions" in decompositions:
+        del decompositions["dimensions"]
+        changed = True
     for event in results.get("integrity_events") or []:
         detail = event.get("detail") if isinstance(event, dict) else None
         if isinstance(detail, dict):
@@ -389,7 +388,10 @@ def complete_fingerprint(results: dict, start_years: dict) -> bool:
     missing field is None, which compares as changed. A driver's exposure
     maps ("ce", "re") move onto the taxonomy's names, as the migration puts
     the drivers' own: a missing name 0, the value the previous engine read
-    for it, and a name outside the taxonomy dropped.
+    for it, and a name outside the taxonomy dropped. The value-chain
+    epicentre ("ve"), which the previous release stored as the stage's place
+    in the chain (1 to 8) and older releases as the eight-step profile,
+    becomes the stage's name; anything else None.
     """
     fingerprint = (results.get("meta") or {}).get("driver_fingerprint")
     changed = False
@@ -402,6 +404,12 @@ def complete_fingerprint(results: dict, start_years: dict) -> bool:
             if key not in entry:
                 entry[key] = int(start_years[driver_id]) if key == "s" and driver_id in start_years else None
                 changed = True
+        stage = entry["ve"]
+        if stage is not None and stage not in VC_STAGES:
+            place = isinstance(stage, int) and not isinstance(stage, bool) and 1 <= stage <= len(VC_STAGES)
+            entry["ve"] = (VC_STAGES[stage - 1] if place
+                           else epicentre_of(stage) if isinstance(stage, dict) else None)
+            changed = True
         if driver_id not in start_years:
             continue
         for key, names in (("ce", CATEGORIES), ("re", REGIONS)):
@@ -805,7 +813,7 @@ def migrate(db: Database) -> dict:
             continue
         if not isinstance(results, dict):
             continue
-        renamed = rename_run_keys(results)
+        renamed = update_run_keys(results)
         completed = complete_fingerprint(results, start_years)
         if renamed or completed:
             db.execute(f"UPDATE simulation_runs SET results = {p} WHERE id = {p}", (json.dumps(results), row["id"]))

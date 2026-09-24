@@ -103,9 +103,9 @@ class MonteCarloEngine:
     #: Version of the model. A change to any number it produces means a new
     #: version and, in the same commit, regenerated golden pins and a PRISM
     #: Analysis record rebuilt from a production run of the new code
-    #: (docs/adr/0014-versioning-and-golden-pins.md). A result key the
-    #: dashboard needs is listed in prism/api/runs.py, which refuses to serve
-    #: a run without it.
+    #: (docs/adr/0014-versioning-and-golden-pins.md). What the dashboard
+    #: needs of a run is checked in prism/api/runs.py, which refuses to serve
+    #: a run that lacks any of it.
     MODEL_VERSION = "2.12.0"
     ENGINE_NAME = "beta_copula"
 
@@ -530,13 +530,6 @@ class MonteCarloEngine:
             "force": force_decomp,    # year -> category -> force  -> shift
             "vc": vc_decomp,          # year -> category -> stage  -> shift
             "region": region_decomp,  # year -> category -> region -> shift
-            "dimensions": {
-                "forces": list(FORCES),
-                "vc_stages": list(VC_STAGES),
-                "regions": list(REGIONS),
-                "categories": cats,
-                "years": [int(y) for y in years],
-            },
         }
 
         # The portfolio band is the joint percentile of the per-iteration

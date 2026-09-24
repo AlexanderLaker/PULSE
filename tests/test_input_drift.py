@@ -65,10 +65,9 @@ def test_every_field_that_moves_the_simulation_is_fingerprinted():
     assert set(_fp(_driver("a"))["a"]) == {"p", "g", "d", "f", "ce", "ve", "re", "s", "pk", "dc", "u"}
 
 
-def test_the_value_chain_stage_is_fingerprinted_by_its_place_in_the_chain():
-    """"ve" is the epicentre's position in VC_STAGES, 1 to 8, the value the stored
-    runs carry; moving the stage is drift."""
-    assert _fp(_driver("a"))["a"]["ve"] == 6
+def test_the_value_chain_stage_is_fingerprinted_by_its_name():
+    """"ve" is the epicentre stage; moving the stage is drift."""
+    assert _fp(_driver("a"))["a"]["ve"] == "Marketing"
     moved = _fp(_driver("a", vc_epicentre=VC_STAGES[1]))
     assert compute_input_drift_event(moved, _fp(_driver("a")))["detail"]["structure_changes"] == ["a"]
 

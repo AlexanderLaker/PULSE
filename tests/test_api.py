@@ -44,6 +44,16 @@ def persist(results: dict, iterations: int = 200) -> int:
     return save_simulation_run(iterations, results)
 
 
+def persist_text(results: str) -> int:
+    """Store a run whose results column holds this text, which no production job writes."""
+    from prism.database import get_db_connection, init_db
+    init_db()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO simulation_runs (iterations, results) VALUES (200, ?)", (results,))
+        return cursor.lastrowid
+
+
 @pytest.fixture
 def api(monkeypatch, tmp_path):
     """A client on a fresh SQLite database, with a real token secret."""
@@ -264,18 +274,32 @@ class TestSimulation:
         assert response.status_code == 404 and response.json()["detail"]["reason"] == "malformed"
         assert f"meta.{key}" in response.json()["detail"]["error"]
 
+    @pytest.mark.parametrize("meta", [5, ["driver_fingerprint"], "driver_fingerprint"],
+                             ids=["a-number", "a-list", "text"])
+    def test_metadata_that_is_not_an_object_is_reported_not_raised(self, api, valid_run, meta):
+        """A stored meta that is not a JSON object lacks every key: the run is refused with the reason,
+        never with a server error."""
+        persist({**valid_run, "meta": meta})
+        response = api.get("/api/v1/simulation", headers=bearer())
+        assert response.status_code == 404 and response.json()["detail"]["reason"] == "malformed"
+        assert "meta.model_version" in response.json()["detail"]["error"]
+        assert api.get("/api/v1/diagnostics").json()["simulation_reason"] == "malformed"
+
     @pytest.mark.parametrize("remove, part", [
         (lambda r: r["shift_matrix"]["LHC: TOI"]["path"].pop("2035"), "a shift path of every category"),
         (lambda r: r["regional_shift_matrix"]["Hair: Care"].pop("Asia"), "every category and region"),
         (lambda r: r["decompositions"]["region"].pop("2031"), "the region attribution of every category"),
+        (lambda r: r["decompositions"]["vc"]["2030"]["LHC: FCN"].pop("Packaging"),
+         "the vc attribution of every category"),
         (lambda r: r["totals"]["portfolio"]["2035"].pop("p90"), "the portfolio band"),
         (lambda r: r["cell_weights_used"]["LHC: IC"].pop("Asia"), "the gross-profit share of every category"),
         (lambda r: r["category_weights_used"].pop("Hair: Body"), "the gross-profit share of every category"),
+        (lambda r: r["region_weights_used"].pop("Asia"), "the gross-profit share of every category"),
     ])
     def test_a_run_that_does_not_cover_every_category_region_and_year_is_not_served(
             self, api, valid_run, remove, part):
-        """The dashboard indexes the run by category, region and year; a run with a gap is refused, never
-        half drawn."""
+        """The dashboard indexes the run by category, region, lens column and year; a run with a gap is
+        refused, never half drawn."""
         run = json.loads(json.dumps(valid_run, default=float))
         remove(run)
         persist(run)
@@ -303,6 +327,17 @@ class TestSimulation:
         assert response.status_code == 404 and response.json()["detail"]["reason"] == "malformed"
         assert "a complete meta.driver_fingerprint" in response.json()["detail"]["error"]
         assert api.get("/api/v1/diagnostics").json()["simulation_reason"] == "malformed"
+
+    @pytest.mark.parametrize("stored", ["[1, 2]", "{not json"], ids=["a-json-list", "text-that-is-not-json"])
+    def test_results_that_are_not_a_json_object_are_reported_not_raised(self, api, stored):
+        """A newest run whose stored results are not a JSON object is malformed, like a run with a gap:
+        refused with the reason, and never a database error."""
+        run_id = persist_text(stored)
+        response = api.get("/api/v1/simulation", headers=bearer())
+        assert response.status_code == 404 and response.json()["detail"]["reason"] == "malformed"
+        assert f"run {run_id} lacks a results object" in response.json()["detail"]["error"]
+        diag = api.get("/api/v1/diagnostics").json()
+        assert diag["db_reachable"] is True and diag["simulation_reason"] == "malformed"
 
 
 class TestDrivers:

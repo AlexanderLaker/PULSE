@@ -687,7 +687,9 @@ def _as_datetime(val):
 
 
 def load_latest_run() -> Optional[Dict[str, Any]]:
-    """The newest persisted run with its decoded results, or None."""
+    """The newest persisted run with its decoded results, or None. Stored text
+    that is not JSON stays text, which prism/api/runs.py reports as a run that
+    lacks everything."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT id, run_date, iterations, results FROM simulation_runs "
@@ -696,8 +698,12 @@ def load_latest_run() -> Optional[Dict[str, Any]]:
     if raw is None:
         return None
     r = _row(raw)
+    try:
+        results = _loads(r["results"])
+    except ValueError:   # not JSON
+        results = r["results"]
     return {"id": r["id"], "run_date": _as_datetime(r["run_date"]), "iterations": r["iterations"],
-            "results": _loads(r["results"]) or {}}
+            "results": results}
 
 
 def latest_run_summary() -> Optional[Dict[str, Any]]:
