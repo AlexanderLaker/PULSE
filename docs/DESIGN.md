@@ -105,8 +105,8 @@ value a reader needs.
   than 0.1 percent of the pool; and the About this model section gives the
   sampling noise (the Monte Carlo standard error and the seed stability) to
   three decimals of a point, because it is that small. The Profit Pool
-  Explorer's derivation tooltips show their arithmetic at the precision of
-  its inputs.
+  Explorer shows no model output; its derivation tooltips give their
+  arithmetic at the precision of their inputs.
 - A shift always shows its sign; below 0.05 percent it counts as flat and
   shows neither sign nor colour.
 - A missing value shows `–`.

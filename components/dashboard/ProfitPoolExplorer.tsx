@@ -1,6 +1,6 @@
 /**
- * The Profit Pool Explorer (Beta, open to every signed-in user): Bain-style
- * profit pool views over public data, one chart per view.
+ * The Profit Pool Explorer (Beta, open to every signed-in user): profit pool
+ * views over public data, one chart per view.
  *
  *   Chart: bar width = revenue share, bar height = GP1 margin, bar area = the
  *   profit pool; rows keep their authored order (value chain raw to retail,
@@ -43,8 +43,8 @@ const ProfitPoolExplorer: FC = () => {
   // The Beta notice opens once per browser: on the first Explorer visit
   // (the tab stays mounted once visited) and never again once acknowledged.
   // "Got it" stores the acknowledgement; Escape or a backdrop click only
-  // dismisses. The acknowledgement is read in the state initializer: this tab
-  // renders on the client only (`ssr: false` in page.tsx) and
+  // dismisses. The acknowledgement is read when the state is initialised: this
+  // tab renders on the client only (`ssr: false` in page.tsx) and
   // `noticeAcked()` is SSR-safe anyway, so there is nothing to hydrate
   // against and no effect is needed to reach the open state.
   const [noticeOpen, setNoticeOpen] = useState(() => !noticeAcked());
@@ -95,11 +95,11 @@ const ProfitPoolExplorer: FC = () => {
             Industry Profit Pools: HCB Lens
           </h1>
           <p style={{ color: S.mutedText, fontSize: 13, margin: '6px 0 0', maxWidth: 780 }}>
-            Bain-classic pool views. Arrows show the development of the
+            Profit pool views. Arrows show the development of the
             <b> profit pool</b> (revenue × GP1 proxy, {POOL_HORIZON_LABEL}). Click any bar for the
             revenue / margin decomposition, € pool sizes and clickable sources.
-            Y-axis = <b>GP1 proxy</b> (estimated). Market sizing: <b>Euromonitor</b> (consumer hair · laundry/home care),
-            <b> Kline</b> (professional hair).
+            Y-axis = <b>GP1 proxy</b> (estimated). Market sizing: public triangulations on the <b>Euromonitor</b>
+            (consumer hair · laundry/home care) and <b>Kline</b> (professional hair) category trees.
           </p>
         </div>
 
@@ -222,7 +222,7 @@ const ProfitPoolExplorer: FC = () => {
           bar <b>width</b> = revenue share · bar <b>height</b> = GP1 proxy ·
           bar <b>area</b> = GP1 profit pool · <b>arrow</b> = pool development p.a.
           <span style={{ color: S.mutedText }}>
-            {' '}The arrow combines a verified revenue CAGR with a <b>structured margin-drift estimate</b>{' '}
+            {' '}The arrow combines a sourced revenue CAGR with a <b>structured margin-drift estimate</b>{' '}
             (the drift is judgment, graded Estimate in the drill-down; treat the arrow as directional, not a forecast).
             Sub-1% pools render as slim slivers: hover or click a bar to inspect them.
             {view.kind === 'ValueChain' && (
@@ -272,8 +272,9 @@ const ProfitPoolExplorer: FC = () => {
         The Y-axis is a <b>GP1 proxy</b>: GP1 / CM1 is not separately disclosed at tier level by any
         player, so tier values are structured estimates calibrated against the linked, verified company
         gross margins (grades shown). Where a company-level figure is itself the anchor it is used exactly
-        as disclosed. Market sizing: <b>Euromonitor</b> (consumer hair · laundry/home care),
-        <b> Kline</b> (professional hair). Nominal terms; € at planning rate 1.15.
+        as disclosed. Market sizing: public triangulations on the <b>Euromonitor</b> (consumer hair ·
+        laundry/home care) and <b>Kline</b> (professional hair) category trees. Nominal terms; € at
+        planning rate 1.15.
       </div>
 
       {/* Hover tooltip */}

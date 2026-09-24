@@ -17,9 +17,12 @@ const arrowGlyphs = (rating: CagrRating): string =>
 export const fmtEurBn = (bn: number): string =>
   `€${bn >= 10 ? bn.toFixed(0) : bn.toFixed(1)}bn`;
 
+/** A fraction as a percentage at the given precision: the derivations show
+ *  their arithmetic at the precision of their inputs (docs/DESIGN.md). */
+export const fmtPercent = (v: number, decimals = 1): string => `${(v * 100).toFixed(decimals)}%`;
+
 /** Share as a clean %: whole number ≥1%, one decimal below 1% (so micro-pools don't read "0%"). */
-export const fmtShare = (v: number): string =>
-  `${v * 100 >= 1 ? (v * 100).toFixed(0) : (v * 100).toFixed(1)}%`;
+export const fmtShare = (v: number): string => fmtPercent(v, v * 100 >= 1 ? 0 : 1);
 
 // ─── Arrow stacks (shared glyph treatment) ───────────────────────
 export const ArrowsSVG: FC<{ rating: CagrRating; cx: number; cy: number; ariaPrefix: string }> = ({

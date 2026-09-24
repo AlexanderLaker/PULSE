@@ -20,15 +20,6 @@ describe('the views', () => {
     ]);
   });
 
-  it('each names its scope, which its title opens with', () => {
-    const scopes = Object.fromEntries(PROFIT_POOL_VIEWS.map((s) => [s.id, s.scope]));
-    expect(scopes).toEqual({
-      hair_categories: 'Hair Care', hair_core_adjacent: 'Hair Care', hair_value_chain: 'Hair Care',
-      home_care_categories: 'Home Care', laundry_core_adjacent: 'Laundry Care', laundry_value_chain: 'Laundry Care',
-    });
-    for (const view of PROFIT_POOL_VIEWS) expect(view.title.startsWith(`${view.scope}: `), view.id).toBe(true);
-  });
-
   it("each view's revenue shares add up to 1 (to their three-decimal rounding)", () => {
     for (const view of PROFIT_POOL_VIEWS) {
       const total = view.items.reduce((a, it) => a + it.revenueShare, 0);

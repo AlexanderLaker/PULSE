@@ -33,6 +33,7 @@ import ShiftAnalysis from '@/components/dashboard/ShiftAnalysis';
 import Drivers from '@/components/dashboard/Drivers';
 import ConsumerJourney from '@/components/dashboard/ConsumerJourney';
 import HomeGate from '@/components/dashboard/HomeGate';
+import ProfitPoolExplorer from '@/components/dashboard/ProfitPoolExplorer';
 
 STORE.store = makeStore();
 
@@ -53,6 +54,12 @@ describe('every tab mounts on a complete store', () => {
     const { container, findByText } = render(<ConsumerJourney />);
     expect(container.textContent).toContain('Where Profit Pools Shift Along the Journey');
     expect(await findByText('AI stain/fabric recognition apps')).toBeTruthy();
+  });
+
+  it('Profit Pool Explorer, whose card says what the view covers rather than repeating the group', () => {
+    const { container, getByText } = render(<ProfitPoolExplorer />);
+    expect(container.textContent).toContain('Laundry Care: Industry Value Chain Profit Pool');
+    expect(getByText('Value Chain · revenue pool ~€277bn')).toBeTruthy();
   });
 
   it('the entry gate', () => {

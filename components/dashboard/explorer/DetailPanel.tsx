@@ -14,7 +14,7 @@ import {
 } from '@/lib/profitPoolData';
 import { S, SHADOW, INK_RGB, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { NO_VALUE } from '@/lib/format';
-import { arrowColorFor, fmtEurBn, fmtShare } from './arrows';
+import { arrowColorFor, fmtEurBn, fmtPercent as pct, fmtShare } from './arrows';
 import { GradeChip, SourceChip, sourceParts, taggedSources } from './sources';
 
 export const DetailPanel: FC<{
@@ -43,7 +43,6 @@ export const DetailPanel: FC<{
   const revBasis = revSrc ? `${revSrc.label}${revSrc.detail ? `\nDerivation: ${revSrc.detail}` : ''}` : NO_VALUE;
   const gp1EndPct = gp1Terminal(item);
   const marginCagr = Math.pow(gp1EndPct / item.gp1Margin, 1 / POOL_HORIZON_YEARS) - 1;
-  const pct = (v: number, d = 1) => `${(v * 100).toFixed(d)}%`;
   const tips = {
     revShare: `Revenue share = this row's revenue ÷ sum of all rows on this view (shares normalised per view).\n\nRow size basis: ${revBasis}`,
     gp1Share: `GP1 pool share = this row's GP1 pool (${fmtEurBn(gp1Now)}) ÷ the sum of all rows' GP1 pools on this view.\n\nGP1 pool = revenue × GP1 margin per row (see the trajectory table).`,
@@ -97,8 +96,9 @@ export const DetailPanel: FC<{
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.onSurfaceVariant, marginBottom: 4 }}>
-                {view.kind === 'ValueChain' ? 'Value chain tier' : view.kind === 'Categories' ? 'Category' : 'Core / adjacent pool'}
-                {' · '}{view.scope}
+                {/* The kind of bar only: the card's title says what the view covers,
+                    which can be less than the group it is chosen under. */}
+                {view.kind === 'ValueChain' ? 'Value-chain tier' : view.kind === 'Categories' ? 'Category' : 'Core / adjacent pool'}
               </div>
               <h2 style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 20, color: S.onBg, margin: 0, lineHeight: 1.2 }}>
                 {name}
@@ -150,10 +150,10 @@ export const DetailPanel: FC<{
             />
             <TrajRow
               metric="GP1 margin (proxy)"
-              today={`${(item.gp1Margin * 100).toFixed(1)}%`}
+              today={pct(item.gp1Margin)}
               change={gp1Rating.label}
               changeTone={gp1Rating.tone}
-              end={`${(gp1Terminal(item) * 100).toFixed(1)}%`}
+              end={pct(gp1Terminal(item))}
               driver={item.marginDriver}
               grade="estimate"
               todayTip={tips.gp1Today}

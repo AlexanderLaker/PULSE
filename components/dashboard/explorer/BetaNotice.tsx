@@ -56,10 +56,10 @@ export const ExplorerBetaNotice: FC<{ open: boolean; onAck: () => void; onClose:
           Profit Pool Explorer
         </h2>
         <p style={{ fontSize: 13, lineHeight: 1.6, color: S.onSurfaceVariant, margin: '0 0 18px' }}>
-          Market sizing is anchored to Euromonitor (consumer hair ·
-          laundry/home care) and Kline (professional hair); a few figures
-          are pending internal Passport confirmation. Margins are GP1
-          proxies calibrated to company filings.
+          Market sizes are public triangulations on Euromonitor&rsquo;s
+          category tree (consumer hair, laundry and home care) and on Kline
+          (professional hair); none is confirmed against Passport yet.
+          Margins are GP1 estimates calibrated to company filings.
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button type="button"

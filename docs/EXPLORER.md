@@ -20,11 +20,11 @@ them.
 | Hair: core and adjacent | branded retail hair against adjacent pools: salon services, professional products, tools and appliances, scalp care, subscription and direct-to-consumer, supplements | about €254bn |
 | Laundry: core and adjacent | branded laundry against adjacent pools: laundry services, appliance makers, surface care, on-demand laundry apps, hand and automatic dishwashing, air care, connected washing | about €315bn |
 
-A view's scope can be narrower than the group it is chosen under: under
-Laundry & Home Care, the value chain and the core-and-adjacent views cover
-Laundry Care, and the categories view covers all of Home Care. Each view
-names its scope (`scope`), its title opens with it, and a bar's drill-down
-repeats it.
+A view can cover less than the group it is chosen under, so its title says
+what it covers: under Laundry & Home Care, the value chain is that of Laundry
+Care, the core-and-adjacent view sets Laundry Care against the pools next to
+it (surface care, dishwashing and air care among them), and the categories
+view covers all of Home Care.
 
 In the value-chain views the tiers deliberately count the same consumer euro
 more than once, because each bar is that tier's own revenue; the subtitle

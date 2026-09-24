@@ -10,7 +10,7 @@ import {
   type PoolItem, type CagrRating,
 } from '@/lib/profitPoolData';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
-import { arrowColorFor, ArrowsSVG } from './arrows';
+import { arrowColorFor, ArrowsSVG, fmtPercent, fmtShare } from './arrows';
 
 const BAR_FILL = 'rgba(214, 227, 255, 0.85)';
 const BAR_FILL_ACTIVE = 'rgba(178, 205, 255, 0.95)';
@@ -73,9 +73,9 @@ export const HoverTip: FC<{ item: PoolItem; view: PoolView; x: number; y: number
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
-        <MiniMetric label="Revenue" value={`${(item.revenueShare * 100).toFixed(1)}%`} />
-        <MiniMetric label="GP1" value={`${(item.gp1Margin * 100).toFixed(1)}%`} />
-        <MiniMetric label="Pool share" value={`${(gp1PoolShare * 100).toFixed(1)}%`} />
+        <MiniMetric label="Revenue" value={fmtPercent(item.revenueShare)} />
+        <MiniMetric label="GP1" value={fmtPercent(item.gp1Margin)} />
+        <MiniMetric label="Pool share" value={fmtPercent(gp1PoolShare)} />
       </div>
       <div style={{ fontSize: 11, color: S.primaryDim, fontWeight: 700 }}>
         Click the bar for the full assessment →
@@ -165,7 +165,7 @@ export const PoolChart: FC<PoolChartProps> = ({ view, selectedId, onHover, onLea
               fontSize={11} fill={S.onSurfaceVariant}
               textAnchor="end" fontFamily={HEADLINE_FONT} fontWeight={600}
             >
-              {(t * 100).toFixed(0)}%
+              {fmtPercent(t, 0)}
             </text>
           </g>
         );
@@ -212,7 +212,7 @@ export const PoolChart: FC<PoolChartProps> = ({ view, selectedId, onHover, onLea
             tabIndex={0}
             onFocus={() => setFocusedId(b.item.id)}
             onBlur={() => setFocusedId(null)}
-            aria-label={`${name}: ${(b.item.revenueShare * 100).toFixed(1)}% revenue share, ${(b.item.gp1Margin * 100).toFixed(1)}% GP1, pool development ${b.poolRating.label} per year. Press Enter for the full assessment.`}
+            aria-label={`${name}: ${fmtPercent(b.item.revenueShare)} revenue share, ${fmtPercent(b.item.gp1Margin)} GP1, pool development ${b.poolRating.label} per year. Press Enter for the full assessment.`}
             onMouseEnter={(e) => onHover(b.item, e.clientX, e.clientY)}
             onMouseMove={(e) => onHover(b.item, e.clientX, e.clientY)}
             onMouseLeave={onLeave}
@@ -236,7 +236,7 @@ export const PoolChart: FC<PoolChartProps> = ({ view, selectedId, onHover, onLea
                 fill={S.onBg}
                 textAnchor="middle" fontFamily={HEADLINE_FONT}
               >
-                {(b.item.gp1Margin * 100).toFixed(0)}%
+                {fmtPercent(b.item.gp1Margin, 0)}
               </text>
             )}
             {labeled && (
@@ -245,9 +245,7 @@ export const PoolChart: FC<PoolChartProps> = ({ view, selectedId, onHover, onLea
                 fontSize={11} fill={S.primaryDim} fontWeight={700}
                 textAnchor="middle" fontFamily={HEADLINE_FONT}
               >
-                {(b.item.revenueShare * 100) >= 1
-                  ? (b.item.revenueShare * 100).toFixed(0)
-                  : (b.item.revenueShare * 100).toFixed(1)}%
+                {fmtShare(b.item.revenueShare)}
               </text>
             )}
             {labeled && (
