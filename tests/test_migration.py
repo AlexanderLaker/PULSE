@@ -847,6 +847,85 @@ class TestMigration:
         assert "refusing to guess" in capsys.readouterr().out
 
 
+class TestKeptTables:
+    """simulation_runs, journey_content and audit_log, which both schemas have, end on the driver
+    schema's definitions: nothing the previous schema let a writer leave out stays missing."""
+
+    @staticmethod
+    def add_incomplete_rows(conn, p: str) -> None:
+        """Rows the previous schema allowed: runs without results or an iteration count, an audit entry
+        without its entity or actor, and an older journey version without its author."""
+        cur = conn.cursor()
+        cur.execute("INSERT INTO simulation_runs (iterations) VALUES (30)")
+        cur.execute("INSERT INTO simulation_runs (results) VALUES ('{}')")
+        cur.execute(f"INSERT INTO audit_log (action, user_id) VALUES ('config_changed', {p})", (None,))
+        cur.execute(f"INSERT INTO journey_content (id, content, updated_by) VALUES (0, '{{}}', {p})", (None,))
+        conn.commit()
+
+    FILLED = {"audit_log.entity_type": 1, "audit_log.entity_id": 1, "audit_log.user_id": 1,
+              "journey_content.updated_by": 1}
+
+    def test_rows_the_previous_schema_allowed_are_completed_or_removed(self, migration, previous, capsys):
+        conn = sqlite3.connect(previous)
+        self.add_incomplete_rows(conn, "?")
+        conn.close()
+        [entry] = query(previous, "SELECT id FROM audit_log WHERE action = 'config_changed'")
+        assert migration.main(["--sqlite", str(previous)]) == 0
+        report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])
+        assert report["kept_tables"] == {"runs_removed_without_results_or_iterations": [4, 5],
+                                         "missing_values_filled": self.FILLED}
+        [archive_file] = list(migration.ARCHIVE_DIR.glob("*.json"))
+        archive = json.loads(archive_file.read_text(encoding="utf-8"))
+        removed = archive["simulation_runs_removed"]
+        assert [(r["id"], r["iterations"], r["results"]) for r in removed] == [(4, 30, None), (5, None, "{}")]
+        # which rows got a value in place of a missing one, so they can be told from stored values
+        assert archive["missing_values_filled"] == {
+            "audit_log.entity_type": [entry["id"]], "audit_log.entity_id": [entry["id"]],
+            "audit_log.user_id": [entry["id"]], "journey_content.updated_by": [0]}
+        assert [r["id"] for r in query(previous, "SELECT id FROM simulation_runs ORDER BY id")] == [1, 2, 3]
+        assert query(previous, "SELECT entity_type, entity_id, user_id FROM audit_log "
+                               "WHERE action = 'config_changed'") == [{"entity_type": "", "entity_id": "",
+                                                                        "user_id": "system"}]
+        assert query(previous, "SELECT updated_by FROM journey_content WHERE id = 0") == [{"updated_by": ""}]
+        # The next run takes a new id, not that of a run removed here.
+        conn = sqlite3.connect(previous)
+        assert conn.execute("INSERT INTO simulation_runs (iterations, results) VALUES (1, '{}')").lastrowid == 6
+        conn.close()
+
+    def test_nothing_may_be_left_out_after_the_migration(self, migration, previous):
+        assert migration.main(["--sqlite", str(previous)]) == 0
+        conn = sqlite3.connect(previous)
+        for sql in ("INSERT INTO simulation_runs (iterations) VALUES (1)",
+                    "INSERT INTO journey_content (content) VALUES ('{}')",
+                    "INSERT INTO audit_log (action, entity_type, entity_id) VALUES ('x', 'driver', 'consumer_r01')"):
+            with pytest.raises(sqlite3.IntegrityError, match="NOT NULL"):
+                conn.execute(sql)
+        conn.close()
+
+    def test_a_column_the_driver_schema_does_not_know_stops_the_migration(self, migration, previous, capsys):
+        conn = sqlite3.connect(previous)
+        conn.execute("ALTER TABLE audit_log ADD COLUMN client_ip TEXT")
+        conn.commit()
+        conn.close()
+        before = dump(previous)
+        assert migration.main(["--sqlite", str(previous)]) == 1
+        assert "audit_log has columns the driver schema does not know: client_ip" in capsys.readouterr().out
+        assert dump(previous) == before
+
+    def test_a_kept_table_without_a_column_of_the_driver_schema_stops_the_migration(self, migration, previous,
+                                                                                    capsys):
+        """Every release had these columns; a table without one was changed by hand, and the rebuild
+        would fail on it half way."""
+        conn = sqlite3.connect(previous)
+        conn.execute("ALTER TABLE journey_content DROP COLUMN updated_at")
+        conn.commit()
+        conn.close()
+        before = dump(previous)
+        assert migration.main(["--sqlite", str(previous)]) == 1
+        assert "journey_content lacks columns the driver schema has: updated_at" in capsys.readouterr().out
+        assert dump(previous) == before
+
+
 class TestHelpers:
     @pytest.mark.parametrize("old, published", [
         ("analyst report (Aug 2026)", "Aug 2026"), ("primary source (2026)", "2026"),
@@ -1069,6 +1148,33 @@ def test_postgres_older_leftovers_need_no_cascade(migration, monkeypatch, capsys
     assert older <= set(report["dropped_tables"])
     assert "config_snapshot_id" in report["dropped_simulation_run_columns"]
     assert not pg_tables(admin, schema) & set(migration.DROP_TABLES)
+
+
+@pytest.mark.skipif(not POSTGRES_URL, reason="PRISM_TEST_POSTGRES_URL is not set")
+def test_postgres_kept_tables_are_completed_and_held_to_the_schema(migration, monkeypatch, capsys, pg_previous):
+    """The rows the previous schema allowed are completed or removed, then the columns become NOT NULL
+    and lose their defaults, as on SQLite."""
+    import psycopg2
+    admin, schema = pg_previous
+    conn = psycopg2.connect(schema_url(schema))
+    try:
+        TestKeptTables.add_incomplete_rows(conn, "%s")
+    finally:
+        conn.close()
+    monkeypatch.setenv("POSTGRES_URL", schema_url(schema))
+    assert migration.main(["--postgres"]) == 0
+    report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])
+    assert report["kept_tables"] == {"runs_removed_without_results_or_iterations": [4, 5],
+                                     "missing_values_filled": TestKeptTables.FILLED}
+    cur = admin.cursor()
+    cur.execute("SELECT table_name, column_name, is_nullable, column_default FROM information_schema.columns "
+                "WHERE table_schema = %s AND (table_name, column_name) IN (('simulation_runs', 'iterations'), "
+                "('simulation_runs', 'results'), ('journey_content', 'updated_by'), ('audit_log', 'entity_type'), "
+                "('audit_log', 'entity_id'), ('audit_log', 'user_id'))", (schema,))
+    assert {(t, c): (n, d) for t, c, n, d in cur.fetchall()} == {
+        (t, c): ("NO", None) for t, c in (("simulation_runs", "iterations"), ("simulation_runs", "results"),
+                                          ("journey_content", "updated_by"), ("audit_log", "entity_type"),
+                                          ("audit_log", "entity_id"), ("audit_log", "user_id"))}
 
 
 @pytest.mark.skipif(not POSTGRES_URL, reason="PRISM_TEST_POSTGRES_URL is not set")

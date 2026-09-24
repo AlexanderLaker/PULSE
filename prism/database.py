@@ -110,8 +110,9 @@ def on_vercel() -> bool:
 
 
 def sqlite_path() -> Path:
-    """Path of the SQLite file: PRISM_DB_PATH, or data/prism.db when that is unset or empty."""
-    return Path(os.environ.get("PRISM_DB_PATH") or "data/prism.db")
+    """Path of the SQLite file: PRISM_DB_PATH, or data/prism.db in the
+    repository when that is unset or empty, wherever the process started."""
+    return Path(os.environ.get("PRISM_DB_PATH") or Path(__file__).resolve().parents[1] / "data" / "prism.db")
 
 
 def _connect():
@@ -184,33 +185,34 @@ def _row(row) -> dict:
 
 # ── Schema ──────────────────────────────────────────────────────────────────
 
-def one_of(values) -> str:
+def sql_list(values) -> str:
     """A SQL list of string literals, for a CHECK (column IN (...)) constraint."""
     return ", ".join("'" + str(v).replace("'", "''") + "'" for v in values)
 
 
-def _schema() -> List[str]:
-    """The current schema. Every field of a driver is required, each score and
-    share is checked against its scale and each name against the taxonomy;
-    the years and the completeness of the exposure maps are checked when a
-    driver is written (_require_simulatable). A proposal may leave any score
-    empty, but a score it holds is on its scale."""
-    serial = "SERIAL PRIMARY KEY" if USE_POSTGRES else "INTEGER PRIMARY KEY AUTOINCREMENT"
+def schema(postgres: bool) -> list[str]:
+    """The current schema, for PostgreSQL or SQLite; migration 0001 builds it
+    too. Every field of a driver is required, each score and share is checked
+    against its scale and each name against the taxonomy; the years and the
+    completeness of the exposure maps are checked when a driver is written
+    (_require_simulatable). A proposal may leave any score empty, but a score
+    it holds is on its scale."""
+    serial = "SERIAL PRIMARY KEY" if postgres else "INTEGER PRIMARY KEY AUTOINCREMENT"
     return [
         f"""CREATE TABLE IF NOT EXISTS drivers (
             id TEXT PRIMARY KEY,
-            force TEXT NOT NULL CHECK (force IN ({one_of(FORCES)})),
+            force TEXT NOT NULL CHECK (force IN ({sql_list(FORCES)})),
             name TEXT NOT NULL,
             description TEXT NOT NULL,
-            direction TEXT NOT NULL CHECK (direction IN ({one_of(DIRECTIONS)})),
+            direction TEXT NOT NULL CHECK (direction IN ({sql_list(DIRECTIONS)})),
             probability INTEGER NOT NULL CHECK (probability BETWEEN 1 AND 5),
             start_year INTEGER NOT NULL,
             peak_year INTEGER NOT NULL,
-            diffusion_curve TEXT NOT NULL CHECK (diffusion_curve IN ({one_of(VALID_DIFFUSION_CURVES)})),
+            diffusion_curve TEXT NOT NULL CHECK (diffusion_curve IN ({sql_list(VALID_DIFFUSION_CURVES)})),
             gp1_pct_affected DOUBLE PRECISION NOT NULL CHECK (gp1_pct_affected > 0 AND gp1_pct_affected <= 1),
             uncertainty INTEGER NOT NULL CHECK (uncertainty BETWEEN 0 AND 5),
-            vc_epicentre TEXT NOT NULL CHECK (vc_epicentre IN ({one_of(VC_STAGES)})),
-            confidence TEXT NOT NULL CHECK (confidence IN ({one_of(CONFIDENCE_LEVELS)})),
+            vc_epicentre TEXT NOT NULL CHECK (vc_epicentre IN ({sql_list(VC_STAGES)})),
+            confidence TEXT NOT NULL CHECK (confidence IN ({sql_list(CONFIDENCE_LEVELS)})),
             baseline TEXT NOT NULL,
             scores_edited BOOLEAN NOT NULL DEFAULT FALSE,
             revision INTEGER NOT NULL DEFAULT 1,
@@ -219,13 +221,13 @@ def _schema() -> List[str]:
         )""",
         f"""CREATE TABLE IF NOT EXISTS driver_category_exposure (
             driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
-            category TEXT NOT NULL CHECK (category IN ({one_of(CATEGORIES)})),
+            category TEXT NOT NULL CHECK (category IN ({sql_list(CATEGORIES)})),
             exposure_score INTEGER NOT NULL CHECK (exposure_score BETWEEN 0 AND 5),
             PRIMARY KEY (driver_id, category)
         )""",
         f"""CREATE TABLE IF NOT EXISTS driver_regional_exposure (
             driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
-            region TEXT NOT NULL CHECK (region IN ({one_of(REGIONS)})),
+            region TEXT NOT NULL CHECK (region IN ({sql_list(REGIONS)})),
             exposure_score INTEGER NOT NULL CHECK (exposure_score BETWEEN 0 AND 5),
             PRIMARY KEY (driver_id, region)
         )""",
@@ -234,7 +236,7 @@ def _schema() -> List[str]:
             driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
             title TEXT NOT NULL,
             url TEXT NOT NULL,
-            tier TEXT NOT NULL CHECK (tier IN ({one_of(("",) + SOURCE_TIERS)})),
+            tier TEXT NOT NULL CHECK (tier IN ({sql_list(("",) + SOURCE_TIERS)})),
             published TEXT NOT NULL
         )""",
         # One row per (driver, expert): any signed-in user can propose scores
@@ -247,40 +249,42 @@ def _schema() -> List[str]:
             probability INTEGER CHECK (probability BETWEEN 1 AND 5),
             gp1_pct_affected DOUBLE PRECISION CHECK (gp1_pct_affected > 0 AND gp1_pct_affected <= 1),
             peak_year INTEGER,
-            diffusion_curve TEXT CHECK (diffusion_curve IN ({one_of(VALID_DIFFUSION_CURVES)})),
+            diffusion_curve TEXT CHECK (diffusion_curve IN ({sql_list(VALID_DIFFUSION_CURVES)})),
             uncertainty INTEGER CHECK (uncertainty BETWEEN 0 AND 5),
             category_exposure TEXT,
             regional_exposure TEXT,
-            vc_epicentre TEXT CHECK (vc_epicentre IN ({one_of(VC_STAGES)})),
+            vc_epicentre TEXT CHECK (vc_epicentre IN ({sql_list(VC_STAGES)})),
             comment TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE (driver_id, user_id)
         )""",
-        # Append-only versions of the Consumer Journey content; the newest row wins.
-        # Migration 0001 keeps the next three tables as it finds them, so their
-        # definitions here are the ones a migrated database has.
+        # Append-only versions of the Consumer Journey content; the newest row
+        # wins. Every version names who saved it.
         f"""CREATE TABLE IF NOT EXISTS journey_content (
             id {serial},
             content TEXT NOT NULL,
-            updated_by TEXT DEFAULT '',
+            updated_by TEXT NOT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""",
+        # One results bundle per production run (prism/api/runs.py reads it).
         f"""CREATE TABLE IF NOT EXISTS simulation_runs (
             id {serial},
             run_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            iterations INTEGER,
-            results TEXT
+            iterations INTEGER NOT NULL,
+            results TEXT NOT NULL
         )""",
+        # Every entry names what it acted on and who acted; a creation has no
+        # old value and a deletion no new one.
         f"""CREATE TABLE IF NOT EXISTS audit_log (
             id {serial},
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             action TEXT NOT NULL,
-            entity_type TEXT,
-            entity_id TEXT,
+            entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
             old_value TEXT,
             new_value TEXT,
             reason TEXT,
-            user_id TEXT DEFAULT 'system'
+            user_id TEXT NOT NULL
         )""",
         """CREATE TABLE IF NOT EXISTS schema_migrations (
             version TEXT PRIMARY KEY,
@@ -304,7 +308,7 @@ def table_names(cursor) -> set:
 
 def schema_tables() -> set:
     """The tables the schema creates."""
-    return {m.group(1) for statement in _schema()
+    return {m.group(1) for statement in schema(USE_POSTGRES)
             for m in [re.match(r"\s*CREATE TABLE IF NOT EXISTS (\w+)", statement)] if m}
 
 
@@ -352,7 +356,7 @@ def init_db() -> None:
         migration = pending_migration(cursor)
         if migration:
             raise MigrationPendingError(migration)
-        for statement in _schema():
+        for statement in schema(USE_POSTGRES):
             cursor.execute(statement)
         for version in SCHEMA_MIGRATIONS:
             cursor.execute(f"INSERT INTO schema_migrations (version) VALUES ({placeholder()}) "

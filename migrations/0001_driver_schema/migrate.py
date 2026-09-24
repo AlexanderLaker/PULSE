@@ -66,6 +66,17 @@ or the write lock (SQLite), so nothing can write in between.
    dropped with CASCADE: if a table this migration does not know depends on
    one it drops, the migration stops and changes nothing. Tables it does not
    know, such as user_roles, are never touched.
+   The three tables both schemas have (simulation_runs, journey_content and
+   audit_log) are held to the current definitions: every run has its
+   iteration count and results, every journey version its author and every
+   audit entry its entity and actor, and no column keeps a default a writer
+   could lean on. A run without its results or iteration count cannot be
+   served, so it is archived and removed. A journey version or audit entry
+   written without a value gets the previous schema's default for the column
+   where it had one (an empty author, "system" as the actor) and an empty
+   entity otherwise; the archive lists the rows that got one. A kept table
+   that lacks a column of the driver schema, or a journey_content or
+   audit_log column the driver schema does not have, stops the migration.
 4. The keys of the stored runs follow the new names: meta.trend_count ->
    meta.driver_count, meta.trend_fingerprint -> meta.driver_fingerprint,
    meta.attenuation_source -> meta.overlap_correction_source, and trend_ids /
@@ -96,7 +107,7 @@ or the write lock (SQLite), so nothing can write in between.
 Before the commit, every dropped row and column is written to a local archive,
 migrations/0001_driver_schema/archive/<database>-<time>.json (readable by the
 owner only, never committed), except password columns, which are not
-archived. The audit log is kept as it is.
+archived. The audit log keeps every entry.
 
     python3 migrations/0001_driver_schema/migrate.py --dry-run      report what would change, change nothing
     python3 migrations/0001_driver_schema/migrate.py --postgres     migrate the PostgreSQL database in .env
@@ -106,9 +117,9 @@ Without --sqlite the target is POSTGRES_URL or DATABASE_URL (from the shell or
 .env), else the local SQLite file (PRISM_DB_PATH or data/prism.db). A run that
 changes a PostgreSQL database needs --postgres; a dry run does not.
 
-Exit codes: 0 migrated or already migrated; 1 refused (no suitable database,
-not the previous schema, --postgres missing, or drivers or journey content that
-need correcting); 2 failed and rolled back.
+Exit codes: 0 migrated, previewed by a dry run, or already migrated; 1 refused
+(no suitable database, not the previous schema, --postgres missing, or drivers,
+journey content or columns that need correcting); 2 failed and rolled back.
 """
 from __future__ import annotations
 
@@ -128,11 +139,11 @@ REPO = HERE.parents[1]
 sys.path.insert(0, str(REPO))
 
 import prism.env_loader  # noqa: E402,F401  (loads .env; shell variables win)
-from prism.config import (BASE_YEAR, CATEGORIES, DEFAULT_PATH_YEARS, FORCES, REGIONS,  # noqa: E402
+from prism.config import (BASE_YEAR, CATEGORIES, DEFAULT_PATH_YEARS, REGIONS,  # noqa: E402
                           VALID_DIFFUSION_CURVES, VC_STAGES)
-from prism.drivers import (CONFIDENCE_LEVELS, DIRECTIONS, SCORE_FIELDS, SOURCE_TIERS,  # noqa: E402
+from prism.database import describe_error, schema  # noqa: E402
+from prism.drivers import (CONFIDENCE_LEVELS, SCORE_FIELDS, SOURCE_TIERS,  # noqa: E402
                            SOURCE_URL_PATTERN)
-from prism.database import describe_error  # noqa: E402
 from prism.input_drift import FINGERPRINT_KEYS  # noqa: E402
 from prism.journey import (DRIVER_CODES, JOURNEYS, OPTIONAL_TILE_KEYS, POOL_IMPACT_KEYS,  # noqa: E402
                            PROVENANCE_KEYS, SIDES, STAGE_KEYS, TILE_KEYS, content_problem, unknown_keys)
@@ -158,12 +169,23 @@ DROP_TABLES = (
 #: The children of trends whose rows are copied into the driver tables.
 CHILD_TABLES = ("trend_category_exposure", "trend_vc_exposure", "trend_regional_exposure",
                 "trend_sources", "trend_score_proposals")
-#: The columns simulation_runs keeps; any other is archived and dropped (older
-#: databases also carry scenario, causal_decomposition and others). Dropping
-#: config_snapshot_id first also removes its foreign key to config_snapshots.
-SIMULATION_RUN_COLUMNS = ("id", "run_date", "iterations", "results")
+#: The tables both schemas have, with the columns the driver schema gives them.
+#: Any other column of simulation_runs is archived and dropped (older databases
+#: also carry scenario, causal_decomposition and others; dropping
+#: config_snapshot_id also removes its foreign key to config_snapshots).
+KEPT_COLUMNS = {
+    "simulation_runs": ("id", "run_date", "iterations", "results"),
+    "journey_content": ("id", "content", "updated_by", "updated_at"),
+    "audit_log": ("id", "timestamp", "action", "entity_type", "entity_id", "old_value", "new_value", "reason",
+                  "user_id"),
+}
+#: What a missing author, entity or actor becomes before its column turns NOT
+#: NULL: the previous schema's default where it had one (updated_by '',
+#: user_id 'system'), else an empty string.
+FILL_VALUES = {("audit_log", "entity_type"): "", ("audit_log", "entity_id"): "",
+               ("audit_log", "user_id"): "system", ("journey_content", "updated_by"): ""}
 #: Tables locked for the whole transaction besides DROP_TABLES.
-LOCKED_TABLES = ("simulation_runs", "journey_content")
+LOCKED_TABLES = ("simulation_runs", "journey_content", "audit_log")
 LOCK_TIMEOUT = "10s"
 RUN_META_RENAMES = {"trend_count": "driver_count", "trend_fingerprint": "driver_fingerprint",
                     "attenuation_source": "overlap_correction_source"}
@@ -171,108 +193,6 @@ EVENT_DETAIL_RENAMES = {"trend_ids": "driver_ids", "unscored_trend_ids": "unscor
 SOURCE_KINDS = ("primary source", "analyst report", "trade press", "primary_source", "analyst_report", "trade_press")
 #: A source link as the API accepts it.
 WEB_ADDRESS = re.compile(SOURCE_URL_PATTERN)
-
-
-def one_of(values) -> str:
-    """A SQL list of string literals, for a CHECK (column IN (...)) constraint."""
-    return ", ".join("'" + str(v).replace("'", "''") + "'" for v in values)
-
-
-def _ddl(postgres: bool) -> list:
-    """The driver schema, as prism/database.py creates it on a new database."""
-    serial = "SERIAL PRIMARY KEY" if postgres else "INTEGER PRIMARY KEY AUTOINCREMENT"
-    return [
-        f"""CREATE TABLE drivers (
-            id TEXT PRIMARY KEY,
-            force TEXT NOT NULL CHECK (force IN ({one_of(FORCES)})),
-            name TEXT NOT NULL,
-            description TEXT NOT NULL,
-            direction TEXT NOT NULL CHECK (direction IN ({one_of(DIRECTIONS)})),
-            probability INTEGER NOT NULL CHECK (probability BETWEEN 1 AND 5),
-            start_year INTEGER NOT NULL,
-            peak_year INTEGER NOT NULL,
-            diffusion_curve TEXT NOT NULL CHECK (diffusion_curve IN ({one_of(VALID_DIFFUSION_CURVES)})),
-            gp1_pct_affected DOUBLE PRECISION NOT NULL CHECK (gp1_pct_affected > 0 AND gp1_pct_affected <= 1),
-            uncertainty INTEGER NOT NULL CHECK (uncertainty BETWEEN 0 AND 5),
-            vc_epicentre TEXT NOT NULL CHECK (vc_epicentre IN ({one_of(VC_STAGES)})),
-            confidence TEXT NOT NULL CHECK (confidence IN ({one_of(CONFIDENCE_LEVELS)})),
-            baseline TEXT NOT NULL,
-            scores_edited BOOLEAN NOT NULL DEFAULT FALSE,
-            revision INTEGER NOT NULL DEFAULT 1,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )""",
-        f"""CREATE TABLE driver_category_exposure (
-            driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
-            category TEXT NOT NULL CHECK (category IN ({one_of(CATEGORIES)})),
-            exposure_score INTEGER NOT NULL CHECK (exposure_score BETWEEN 0 AND 5),
-            PRIMARY KEY (driver_id, category)
-        )""",
-        f"""CREATE TABLE driver_regional_exposure (
-            driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
-            region TEXT NOT NULL CHECK (region IN ({one_of(REGIONS)})),
-            exposure_score INTEGER NOT NULL CHECK (exposure_score BETWEEN 0 AND 5),
-            PRIMARY KEY (driver_id, region)
-        )""",
-        f"""CREATE TABLE driver_sources (
-            id {serial},
-            driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
-            title TEXT NOT NULL,
-            url TEXT NOT NULL,
-            tier TEXT NOT NULL CHECK (tier IN ({one_of(("",) + SOURCE_TIERS)})),
-            published TEXT NOT NULL
-        )""",
-        f"""CREATE TABLE driver_score_proposals (
-            id {serial},
-            driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
-            user_id TEXT NOT NULL,
-            user_name TEXT NOT NULL,
-            probability INTEGER CHECK (probability BETWEEN 1 AND 5),
-            gp1_pct_affected DOUBLE PRECISION CHECK (gp1_pct_affected > 0 AND gp1_pct_affected <= 1),
-            peak_year INTEGER,
-            diffusion_curve TEXT CHECK (diffusion_curve IN ({one_of(VALID_DIFFUSION_CURVES)})),
-            uncertainty INTEGER CHECK (uncertainty BETWEEN 0 AND 5),
-            category_exposure TEXT,
-            regional_exposure TEXT,
-            vc_epicentre TEXT CHECK (vc_epicentre IN ({one_of(VC_STAGES)})),
-            comment TEXT,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE (driver_id, user_id)
-        )""",
-        # These three exist in every database of the previous schema; the
-        # statements only matter for one that somehow lacks them.
-        f"""CREATE TABLE IF NOT EXISTS journey_content (
-            id {serial},
-            content TEXT NOT NULL,
-            updated_by TEXT DEFAULT '',
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )""",
-        f"""CREATE TABLE IF NOT EXISTS simulation_runs (
-            id {serial},
-            run_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            iterations INTEGER,
-            results TEXT
-        )""",
-        f"""CREATE TABLE IF NOT EXISTS audit_log (
-            id {serial},
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            action TEXT NOT NULL,
-            entity_type TEXT,
-            entity_id TEXT,
-            old_value TEXT,
-            new_value TEXT,
-            reason TEXT,
-            user_id TEXT DEFAULT 'system'
-        )""",
-        """CREATE TABLE IF NOT EXISTS schema_migrations (
-            version TEXT PRIMARY KEY,
-            applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )""",
-        "CREATE INDEX IF NOT EXISTS idx_drivers_force ON drivers(force)",
-        "CREATE INDEX IF NOT EXISTS idx_driver_score_proposals_driver ON driver_score_proposals(driver_id)",
-        "CREATE INDEX IF NOT EXISTS idx_simulation_runs_date ON simulation_runs(run_date)",
-        "CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp)",
-    ]
 
 
 def sha256(text) -> str:
@@ -679,6 +599,15 @@ def migrate(db: Database) -> dict:
     problems = [f"{d['row']['id']}: {line}" for d in drivers for line in d["problems"]]
     journey, journey_report, journey_problems = updated_journey(db)
     problems += journey_problems
+    for table, kept in KEPT_COLUMNS.items():
+        if table in tables:
+            columns = db.columns(table)
+            missing = [c for c in kept if c not in columns]
+            if missing:
+                problems.append(f"{table} lacks columns the driver schema has: {', '.join(missing)}")
+            unknown = [c for c in columns if c not in kept]
+            if unknown and table != "simulation_runs":   # a run's other columns are archived and dropped
+                problems.append(f"{table} has columns the driver schema does not know: {', '.join(unknown)}")
     if problems:
         raise NeedsCorrection(problems)
 
@@ -688,14 +617,17 @@ def migrate(db: Database) -> dict:
             keep = [c for c in db.columns(table) if "password" not in c.lower()]
             archive["tables"][table] = [{k: jsonable(v) for k, v in r.items()}
                                         for r in db.rows(f"SELECT {', '.join(keep)} FROM {table}")]
-    drop_columns = [c for c in db.columns("simulation_runs") if c not in SIMULATION_RUN_COLUMNS]
+    drop_columns = [c for c in db.columns("simulation_runs") if c not in KEPT_COLUMNS["simulation_runs"]]
     for column in drop_columns:
         archive["simulation_runs_columns"][column] = {
             str(r["id"]): jsonable(r["v"]) for r in db.rows(
                 f"SELECT id, {column} AS v FROM simulation_runs WHERE {column} IS NOT NULL")}
 
     # ── the driver tables ───────────────────────────────────────────────────
-    for statement in _ddl(db.postgres):
+    # The current schema, as a new database gets it. The three tables both
+    # schemas have already exist here, so their statements create nothing;
+    # hold_kept_tables brings them to these definitions.
+    for statement in schema(db.postgres):
         db.execute(statement)
 
     from_editor: dict = {}
@@ -794,8 +726,8 @@ def migrate(db: Database) -> dict:
     }
     report["orphans_skipped"] = orphans
 
-    # ── drop what nothing uses ──────────────────────────────────────────────
-    drop_run_columns(db, drop_columns)
+    # ── drop what nothing uses, hold the kept tables to the schema ──────────
+    report["kept_tables"] = hold_kept_tables(db, archive, drop_columns)
     dropped = [t for t in DROP_TABLES if t in tables]
     for table in dropped:
         db.execute(f"DROP TABLE {table}")
@@ -859,31 +791,60 @@ def migrate(db: Database) -> dict:
     return {"report": report, "archive": archive}
 
 
-def drop_run_columns(db: Database, columns: list) -> None:
-    """Drop the given columns of simulation_runs, keeping every row and id.
+def hold_kept_tables(db: Database, archive: dict, drop_columns: list) -> dict:
+    """Bring simulation_runs, journey_content and audit_log to the definitions
+    of the driver schema (step 3 of the module docstring); returns the report.
 
-    SQLite cannot drop a column that takes part in a foreign key (older
-    databases have config_snapshot_id REFERENCES config_snapshots), so there
-    the table is rebuilt with the kept columns; explicit ids carry the
-    autoincrement counter over.
+    SQLite can neither add NOT NULL to a column nor drop a default or a column
+    that takes part in a foreign key (older databases have config_snapshot_id
+    REFERENCES config_snapshots), so there each table is created again from
+    the current definition and its rows copied with their ids, and the
+    autoincrement counter keeps its place.
     """
-    if not columns:
-        return
+    p = db.p
+    removed = db.rows("SELECT * FROM simulation_runs WHERE iterations IS NULL OR results IS NULL ORDER BY id")
+    if removed:
+        archive["simulation_runs_removed"] = [{k: jsonable(v) for k, v in r.items()} for r in removed]
+        db.execute("DELETE FROM simulation_runs WHERE iterations IS NULL OR results IS NULL")
+    filled = {}
+    for (table, column), value in FILL_VALUES.items():
+        ids = [r["id"] for r in db.rows(f"SELECT id FROM {table} WHERE {column} IS NULL ORDER BY id")]
+        if ids:
+            db.execute(f"UPDATE {table} SET {column} = {p} WHERE {column} IS NULL", (value,))
+            filled[f"{table}.{column}"] = len(ids)
+            # the archive tells a filled value from one that was stored
+            archive.setdefault("missing_values_filled", {})[f"{table}.{column}"] = ids
     if db.postgres:
-        for column in columns:
+        for column in drop_columns:
             db.execute(f"ALTER TABLE simulation_runs DROP COLUMN {column}")
-        return
-    db.execute("""CREATE TABLE simulation_runs_rebuilt (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            run_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            iterations INTEGER,
-            results TEXT
-        )""")
-    db.execute("INSERT INTO simulation_runs_rebuilt (id, run_date, iterations, results) "
-               "SELECT id, run_date, iterations, results FROM simulation_runs ORDER BY id")
-    db.execute("DROP TABLE simulation_runs")
-    db.execute("ALTER TABLE simulation_runs_rebuilt RENAME TO simulation_runs")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_simulation_runs_date ON simulation_runs(run_date)")
+        db.execute("ALTER TABLE simulation_runs ALTER COLUMN iterations SET NOT NULL, "
+                   "ALTER COLUMN results SET NOT NULL")
+        db.execute("ALTER TABLE journey_content ALTER COLUMN updated_by SET NOT NULL, "
+                   "ALTER COLUMN updated_by DROP DEFAULT")
+        db.execute("ALTER TABLE audit_log ALTER COLUMN entity_type SET NOT NULL, "
+                   "ALTER COLUMN entity_id SET NOT NULL, ALTER COLUMN user_id SET NOT NULL, "
+                   "ALTER COLUMN user_id DROP DEFAULT")
+    else:
+        for table in KEPT_COLUMNS:
+            _rebuild_sqlite_table(db, table)
+    return {"runs_removed_without_results_or_iterations": [r["id"] for r in removed],
+            "missing_values_filled": filled}
+
+
+def _rebuild_sqlite_table(db: Database, table: str) -> None:
+    """Create a SQLite table again from the driver schema's definition, with its rows and ids."""
+    columns = ", ".join(KEPT_COLUMNS[table])
+    create = next(st for st in schema(False) if f"CREATE TABLE IF NOT EXISTS {table} (" in st)
+    counter = (db.rows("SELECT seq FROM sqlite_sequence WHERE name = ?", (table,))
+               if "sqlite_sequence" in db.tables() else [])
+    db.execute(create.replace(f"CREATE TABLE IF NOT EXISTS {table} (", f"CREATE TABLE {table}_rebuilt ("))
+    db.execute(f"INSERT INTO {table}_rebuilt ({columns}) SELECT {columns} FROM {table} ORDER BY id")
+    db.execute(f"DROP TABLE {table}")
+    db.execute(f"ALTER TABLE {table}_rebuilt RENAME TO {table}")
+    if counter:
+        db.execute("UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = ?", (counter[0]["seq"], table))
+    for index in (st for st in schema(False) if st.startswith("CREATE INDEX") and f" ON {table}(" in st):
+        db.execute(index)
 
 
 def updated_journey(db: Database) -> tuple:
@@ -1022,8 +983,9 @@ def main(argv: list | None = None) -> int:
     except NeedsCorrection as e:
         db.rollback()
         print(f"{db.where}: nothing changed; {e}")
-        print("Correct them in the previous release's dashboard (after the deploy, promote the previous "
-              "production deployment in Vercel first), then run the dry run again.")
+        print("Correct drivers and journey content in the previous release's dashboard (after the deploy, "
+              "promote the previous production deployment in Vercel first). For a column the driver schema "
+              "does not know, or one a kept table lacks, see README.md, step 2. Then run the dry run again.")
         return 1
     except Exception as e:  # noqa: BLE001 (rolled back and reported)
         db.rollback()

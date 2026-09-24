@@ -10,8 +10,9 @@ the current schema in one transaction. What it changes is listed in its
 docstring; in short:
 
 - every driver is checked first. The driver schema stores only drivers the
-  engine can simulate: every score present and on its scale, a peak year
-  after the onset, a value chain and at least one region with an exposure.
+  engine can simulate: a known force, direction, curve, confidence and
+  value-chain stage, every score present and on its scale, a peak year after
+  the onset and at least one region with an exposure.
   While a driver fails a check the migration changes nothing and lists every
   problem (see step 2 of the runbook). The newest Consumer Journey content is
   checked at the same time (the last point below);
@@ -30,6 +31,14 @@ docstring; in short:
   are dropped, after their rows are written to a local archive file. Nothing
   is dropped with `CASCADE`: if a table the migration does not know depends on
   one it drops, it stops and changes nothing;
+- the three tables both schemas have end on the driver schema's definitions:
+  every run has its iteration count and results, every journey version its
+  author and every audit entry its entity and actor. A run without results
+  or an iteration count cannot be served and is archived and removed. A
+  journey version or audit entry written without a value gets the previous
+  schema's default for the column where it had one (an empty author,
+  `system` as the actor) and an empty entity otherwise; the archive lists
+  the rows that got one;
 - the stored runs get the current key names (`meta.driver_count`,
   `meta.driver_fingerprint`, `meta.overlap_correction_source`) and lose
   `decompositions.dimensions`, which only listed the taxonomies; each driver
@@ -89,14 +98,30 @@ environment from `requirements-dev.txt` and a `.env` whose `POSTGRES_URL`
    emails).
 
    If a driver or the journey content fails a check, the dry run prints
-   `nothing changed` and one line per problem, exits with code 1 and changes
-   nothing. Correct each problem in production, in the dashboard that is
-   still deployed: a driver's scores in its editor, and a journey tile
-   marked as an AI suggestion, or one the API would refuse (a line
-   `journey content: tile ...` names the tile and what is wrong with it), in
-   the Consumer Journey editor. A force, a start year or a confidence, which
-   that dashboard cannot edit, is corrected with SQL. Then delete the
-   rehearsal branch and start this step again from a fresh one.
+   `nothing changed`, exits with code 1 and changes nothing. It lists every
+   problem of every driver and every journey tile still marked as an AI
+   suggestion, one line each. Of anything else wrong with the journey
+   content it names the first problem it finds, in a line that opens with
+   `journey content:` (for a tile, its id and what is wrong with it), so a
+   second one can show once the first is corrected. Correct each problem in
+   production, in the dashboard that is still deployed: a driver's scores in
+   its editor, and a journey tile in the Consumer Journey editor. A force, a
+   start year or a confidence, which that dashboard cannot edit, is
+   corrected with SQL. Then delete the rehearsal branch and start this step
+   again from a fresh one.
+
+   The dry run also refuses a column of `journey_content` or `audit_log`
+   that the driver schema does not know (no release has had one), since only
+   the owner can say whether its values matter. Copy them out and drop the
+   column in production, then start this step again (a kept table that lacks
+   one of its columns is refused too; every release has had them all, so
+   such a database was changed by hand and needs the owner's look first):
+
+   ```bash
+   export PRODUCTION='<the production branch connection string>'
+   psql "$PRODUCTION" -c "\copy (SELECT id, <column> FROM <table>) TO '<table>-<column>.csv' CSV HEADER"
+   psql "$PRODUCTION" -c "ALTER TABLE <table> DROP COLUMN <column>"
+   ```
 
 3. **Preview.** Run the dry run against Neon. It performs the whole migration
    inside a transaction, prints the report and rolls back:
@@ -130,6 +155,10 @@ environment from `requirements-dev.txt` and a `.env` whose `POSTGRES_URL`
      longer exists. They are not copied; the archive keeps them;
    - `runs`: how many stored runs got the current key names and a
      completed driver fingerprint;
+   - `kept_tables`: the stored runs removed because they had no results or
+     no iteration count (expect none; the archive keeps them), and per
+     column how many journey versions or audit entries got a value in place
+     of a missing one (the archive lists their ids);
    - `descriptions.edited_left_alone` and `journey.texts_edited_left_alone`:
      each entry is a text an admin changed, which the migration keeps as it
      is; `journey.codes_removed` lists, per tile, the codes that are not
@@ -158,11 +187,16 @@ environment from `requirements-dev.txt` and a `.env` whose `POSTGRES_URL`
    fails it rolls back by itself, exits with code 2 and the database is
    unchanged; see Rollback. It waits at most ten seconds for its locks: if a
    long request of the live service holds one, it stops the same way, and
-   running it again is safe. If it exits with code 1 instead, a driver or
-   the journey content was changed after the preview and needs correcting;
-   nothing changed. Promote the previous production deployment in Vercel,
-   correct the listed problems in its dashboard as in step 2, and start
-   again from step 3.
+   running it again is safe.
+
+   If it exits with code 1, nothing changed either, and the message says
+   why. When it lists drivers or journey content to correct, something was
+   changed after the preview: promote the previous production deployment in
+   Vercel, correct the listed problems in its dashboard as in step 2 and run
+   step 3 again; then promote the release's deployment again (Deployments,
+   the release's deployment, Promote to Production) and run this step
+   again. When it cannot open the database, check the connection string and
+   the network, and run this step again.
 
 6. **Check.** `https://prism-hcb.vercel.app/api/v1/health` answers
    `"status": "ok"` with `"driver_count": 51` and `"has_simulation": true`.
@@ -203,10 +237,10 @@ with the driver base, the first time a request needs the database.
 - **A problem shows after the migration committed:** go back to the state
   of step 1. Either restore the production branch from the backup branch in
   Neon and promote the previous production deployment in Vercel, or point
-  the Vercel project's database URL at the backup branch (`POSTGRES_URL`
-  where the project sets it, since it wins over `DATABASE_URL`) and redeploy
-  the previous release: a deployment keeps the settings it was built with.
-  The archive file of step 5 holds the dropped rows as well.
+  every database URL the Vercel project sets (`POSTGRES_URL` and
+  `DATABASE_URL`; the first wins where both are set) at the backup branch
+  and redeploy the previous release: a deployment keeps the settings it was
+  built with. The archive file of step 5 holds the dropped rows as well.
 
 ## When a shipped text changes
 
@@ -219,12 +253,33 @@ and the SHA-256 of the text it replaces joins the entry's `previous_sha256`.
 ships: a description on the driver base's, a journey text on
 `data/consumerJourney.ts`.
 
+## Retiring this migration
+
+`migrate.py` builds on the current code: it creates the schema of
+`prism/database.py` (`schema`) and imports the taxonomies, the driver checks
+and the journey tile shape, and its tests compare what it produces with a
+database the current code creates. It stays correct only while those match
+the schema it was written for. Once every database has run it, retire it
+before any change that would alter what it produces (another category, a new
+driver field, a new tile shape):
+
+- delete this folder and `tests/test_migration.py`;
+- keep `0001_driver_schema` in `SCHEMA_MIGRATIONS`, so a new database still
+  records it as done;
+- move `previous_names.txt` to `tests/previous_names.txt` and, in
+  `tests/test_repository.py`, point `_NAMES_FILE` at it and let
+  `MAY_NAME_THE_PREVIOUS_RELEASE` name that file alone, so the test keeps
+  refusing the previous names everywhere else.
+
+A database found later on the previous schema is migrated from the last
+commit that has this folder, then by the migrations after it.
+
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
-| 0 | migrated, or the database was already migrated |
-| 1 | refused, nothing changed: the database cannot be opened, it is not a database of the previous schema, `--postgres` is missing for a PostgreSQL target, or drivers or journey content need correcting (listed) |
+| 0 | migrated, previewed by a dry run, or the database was already migrated |
+| 1 | refused, nothing changed: the database cannot be opened, it is not a database of the previous schema, `--postgres` is missing for a PostgreSQL target, or drivers, journey content or columns need correcting (listed) |
 | 2 | failed and rolled back; the database is unchanged |
 
 ## Files

@@ -88,6 +88,9 @@ README.md; the documents in `docs/` explain everything below in full.
   `0001_driver_schema`: one transaction, a dry run, `--postgres` to touch
   PostgreSQL, an archive of everything dropped, a runbook, tests on SQLite
   and PostgreSQL, and an entry in `SCHEMA_MIGRATIONS` (`prism/database.py`).
+  A migration builds on the current code, so once every database has run it,
+  it is retired before any change that would alter what it produces; its
+  README says how.
 - **Never run anything against the production database** without the owner
   asking for it. The scripts and the migration read `POSTGRES_URL`, else
   `DATABASE_URL`, from the shell or from `.env`, which may be production; to
