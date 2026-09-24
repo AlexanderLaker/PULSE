@@ -1,11 +1,11 @@
 /**
  * The cell weights (lib/cellWeights.ts) and the generated record behind the
- * estimated HCB mix (lib/cellWeightProvenance.ts): the marginals, the
- * detection of the estimate, the per-category row shares the drill-down
- * shows, and the record's consistency with its own derivation.
+ * estimated HCB mix (lib/cellWeightProvenance.ts): the detection of the
+ * estimate, the per-category row shares the drill-down shows, and the
+ * record's consistency with its own derivation.
  */
 import { describe, it, expect } from 'vitest';
-import { ESTIMATE_SOURCE_PREFIX, cellMarginals, cellWeightsBasis, rowShares, type CellWeights } from '@/lib/cellWeights';
+import { ESTIMATE_SOURCE_PREFIX, cellWeightsBasis, matchesEstimate, rowShares, type CellWeights } from '@/lib/cellWeights';
 import {
   BLOCK_SPLIT, CATEGORY_MIX, ESTIMATE_MARGINALS, ESTIMATE_SOURCE, ESTIMATED_CELL_WEIGHTS,
   GRADE_LEGEND, MARGIN_INDEX, REGION_MIX,
@@ -19,43 +19,22 @@ const copyOfEstimate = (): CellWeights =>
 const grid = (share: number, cells: Record<string, Record<string, number>> = {}): CellWeights =>
   Object.fromEntries(CATS.map((c) => [c, Object.fromEntries(REGIONS.map((r) => [r, cells[c]?.[r] ?? share]))]));
 
-describe('cellMarginals', () => {
-  it('sums the rows (category shares) and the columns (region shares) over the taxonomy', () => {
-    const W = grid(0, {
-      'Hair: Color': { Europe: 0.2, 'North America': 0.1, 'High Growth': 0.1 },
-      'Hair: Care': { Europe: 0.3, 'North America': 0.1, Asia: 0.1, 'High Growth': 0.1 },
-    });
-    const m = cellMarginals(W);
-    expect(Object.keys(m.rowSums)).toEqual(CATS);
-    expect(Object.keys(m.colSums)).toEqual(REGIONS);
-    expect(m.rowSums['Hair: Color']).toBeCloseTo(0.4, 12);
-    expect(m.rowSums['Hair: Care']).toBeCloseTo(0.6, 12);
-    expect(m.rowSums['LHC: IC']).toBe(0);
-    expect(m.colSums.Europe).toBeCloseTo(0.5, 12);
-    expect(m.colSums.Asia).toBeCloseTo(0.1, 12);
-    expect(m.total).toBeCloseTo(1, 12);
-    expect(m.matchesEstimate).toBe(false);
-  });
-});
-
 describe('matchesEstimate', () => {
   it('recognises the estimated HCB mix', () => {
-    const m = cellMarginals(copyOfEstimate());
-    expect(m.matchesEstimate).toBe(true);
-    expect(m.total).toBeCloseTo(1, 9);
+    expect(matchesEstimate(copyOfEstimate())).toBe(true);
   });
 
   it('is false after a one-cell change and true inside the 1e-6 tolerance', () => {
     const changed = copyOfEstimate();
     changed['LHC: FCN'].Europe += 1e-5;
-    expect(cellMarginals(changed).matchesEstimate).toBe(false);
+    expect(matchesEstimate(changed)).toBe(false);
     const rounded = copyOfEstimate();
     rounded['LHC: FCN'].Europe += 1e-9;
-    expect(cellMarginals(rounded).matchesEstimate).toBe(true);
+    expect(matchesEstimate(rounded)).toBe(true);
   });
 
   it('is false for other figures, however evenly spread', () => {
-    expect(cellMarginals(grid(1 / 52)).matchesEstimate).toBe(false);
+    expect(matchesEstimate(grid(1 / 52))).toBe(false);
   });
 });
 
@@ -131,15 +110,16 @@ describe('the estimate record agrees with its own derivation', () => {
         total += base * w;
       }
     }
-    const m = cellMarginals(ESTIMATED_CELL_WEIGHTS);
     for (const category of ESTIMATE_CATS) {
       for (const region of REGIONS) {
         expect(Math.abs(raw[category][region] / total - ESTIMATED_CELL_WEIGHTS[category][region])).toBeLessThan(1e-8);
       }
-      expect(m.rowSums[category]).toBeCloseTo(ESTIMATE_MARGINALS.category[category as keyof typeof ESTIMATE_MARGINALS.category], 9);
+      const rowSum = REGIONS.reduce((sum, r) => sum + ESTIMATED_CELL_WEIGHTS[category][r], 0);
+      expect(rowSum).toBeCloseTo(ESTIMATE_MARGINALS.category[category as keyof typeof ESTIMATE_MARGINALS.category], 9);
     }
     for (const region of REGIONS) {
-      expect(m.colSums[region]).toBeCloseTo(ESTIMATE_MARGINALS.region[region as keyof typeof ESTIMATE_MARGINALS.region], 9);
+      const colSum = ESTIMATE_CATS.reduce((sum, c) => sum + ESTIMATED_CELL_WEIGHTS[c][region], 0);
+      expect(colSum).toBeCloseTo(ESTIMATE_MARGINALS.region[region as keyof typeof ESTIMATE_MARGINALS.region], 9);
     }
   });
 });

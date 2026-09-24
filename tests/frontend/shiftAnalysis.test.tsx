@@ -337,6 +337,18 @@ describe('About this model', () => {
     expect(consumer).toBeGreaterThanOrEqual(0);
     expect(environmental).toBeGreaterThan(consumer);
     expect(text).toContain('changing them is a code change followed by a new production run');
+    // "Reading the level" states the range and its example from the same values
+    expect(text).toContain('the structural pass-through, is 6.3% to 8.1% by force');
+    expect(text).toContain('moves that category by 1.3% to 1.6% at full materialisation, not 20%');
+  });
+
+  it('says where the pass-through appears while the configuration has not loaded', () => {
+    STORE.store = makeStore({ config: null });
+    const { container } = render(<ShiftAnalysis />);
+    openAbout();
+    const text = container.textContent ?? '';
+    expect(text).toContain('the structural pass-through of each force, is listed below once the model configuration has loaded');
+    expect(text).not.toContain('at full materialisation');
   });
 
   it('states the uncertainty tables the engine uses', () => {

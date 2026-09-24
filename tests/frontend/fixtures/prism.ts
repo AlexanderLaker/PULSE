@@ -69,15 +69,17 @@ export function makeDriver(overrides: Partial<Driver> = {}): Driver {
   };
 }
 
-/** A run over all 13 categories: category i ends at -2 % - 0.4 % x i. */
+/** A run over all 13 categories: category i ends at -2 % - 0.4 % x i. Its category and region
+ *  shares are the row and column sums of the cell weights it is given, as a run's are. */
 export function makeSimulation(overrides: Partial<SimulationResult> = {}): SimulationResult {
   const terminal = (i: number) => -0.02 - 0.004 * i;
   const shifts = Object.fromEntries(CATEGORY_NAMES.map((c, i) => [c, linearPath(terminal(i))]));
+  const cells = overrides.cell_weights_used ?? ESTIMATED_CELL_WEIGHTS;
   const categoryWeights = Object.fromEntries(CATEGORY_NAMES.map((c) => [
-    c, REGIONS.reduce((a, r) => a + ESTIMATED_CELL_WEIGHTS[c][r], 0),
+    c, REGIONS.reduce((a, r) => a + cells[c][r], 0),
   ]));
   const regionWeights = Object.fromEntries(REGIONS.map((r) => [
-    r, CATEGORY_NAMES.reduce((a, c) => a + ESTIMATED_CELL_WEIGHTS[c][r], 0),
+    r, CATEGORY_NAMES.reduce((a, c) => a + cells[c][r], 0),
   ]));
   const median = (c: string, y: number) => shifts[c][String(y)].median;
   const split = (dims: readonly string[]) => Object.fromEntries(YEARS.map((y) => [String(y), Object.fromEntries(
@@ -101,7 +103,7 @@ export function makeSimulation(overrides: Partial<SimulationResult> = {}): Simul
       category_path: Object.fromEntries(CATEGORY_NAMES.map((c) => [c, Object.fromEntries(YEARS.map((y) => [String(y), median(c, y)]))])),
       portfolio: linearPath(portfolioTerminal),
     },
-    cell_weights_used: ESTIMATED_CELL_WEIGHTS,
+    cell_weights_used: cells,
     category_weights_used: categoryWeights,
     region_weights_used: regionWeights,
     cell_weights_source: ESTIMATE_SOURCE,

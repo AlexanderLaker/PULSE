@@ -32,37 +32,14 @@ export function cellWeightsBasis(source: string | null | undefined): CellWeights
   return (source ?? '').trimStart().startsWith(ESTIMATE_SOURCE_PREFIX) ? 'estimate' : 'file';
 }
 
-export interface CellMarginals {
-  /** category -> its share (row sum). */
-  rowSums: Record<string, number>;
-  /** region -> its share (column sum). */
-  colSums: Record<string, number>;
-  total: number;
-  /** Every cell within 1e-6 of the estimated HCB mix. */
-  matchesEstimate: boolean;
-}
-
 /**
- * Row and column sums of a run's cell weights, over the taxonomy
- * (CATEGORY_NAMES x REGIONS). The API serves a run only with a share for
- * every cell (prism/api/runs.py).
+ * Whether a run's cell weights are the estimated HCB mix this dashboard
+ * documents: every cell of the taxonomy within 1e-6 of it. The API serves a
+ * run only with a share for every cell (prism/api/runs.py).
  */
-export function cellMarginals(cells: CellWeights): CellMarginals {
-  const rowSums: Record<string, number> = {};
-  const colSums: Record<string, number> = Object.fromEntries(REGIONS.map((r) => [r, 0]));
-  let total = 0;
-  let matchesEstimate = true;
-  for (const c of CATEGORY_NAMES) {
-    rowSums[c] = 0;
-    for (const r of REGIONS) {
-      const w = cells[c]![r]!;
-      rowSums[c] += w;
-      colSums[r]! += w;
-      total += w;
-      if (Math.abs(w - ESTIMATED_CELL_WEIGHTS[c]![r]!) >= 1e-6) matchesEstimate = false;
-    }
-  }
-  return { rowSums, colSums, total, matchesEstimate };
+export function matchesEstimate(cells: CellWeights): boolean {
+  return CATEGORY_NAMES.every((c) =>
+    REGIONS.every((r) => Math.abs(cells[c]![r]! - ESTIMATED_CELL_WEIGHTS[c]![r]!) < 1e-6));
 }
 
 /** A category's row divided by its own sum: the weights that rolled that

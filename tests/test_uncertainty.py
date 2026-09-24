@@ -49,6 +49,27 @@ class TestPriorMapping:
         assert ts_array("UNCERTAINTY_KAPPA") == [UNCERTAINTY_KAPPA[u] for u in range(6)]
         assert ts_array("UNCERTAINTY_PEAK_JITTER") == [UNCERTAINTY_PEAK_JITTER[u] for u in range(6)]
 
+    def test_the_dashboard_states_the_priors_the_engine_draws(self):
+        """The About this model table gives each score's prior at uncertainty score 3 with its mean
+        and 10th and 90th percentiles, and the probability tooltip each score's mean; both are typed
+        into the dashboard, so both are held to the engine's priors here."""
+        from scipy import stats
+        repo = Path(__file__).resolve().parent.parent
+        about = (repo / "components" / "dashboard" / "shift" / "AboutThisModel.tsx").read_text(encoding="utf-8")
+        table = re.search(r"const BETA_PRIORS: string\[\]\[\] = \[(.*?)\n\];", about, re.S).group(1)
+        rows = [re.findall(r"'([^']+)'", line) for line in table.strip().splitlines()]
+        expected = []
+        for p in range(1, 6):
+            a, b = beta_prior_for(p, 3)
+            prior = stats.beta(a, b)
+            expected.append([str(p), f"({a:g},{b:g})", f"{prior.mean():.3f}",
+                             f"{prior.ppf(0.1):.3f}", f"{prior.ppf(0.9):.3f}"])
+        assert rows == expected
+        assert f"materialises at mean {5 / 6:.2f}, not certainty" in about
+        tooltip = (repo / "components" / "dashboard" / "drivers" / "cards.tsx").read_text(encoding="utf-8")
+        means = ", ".join(f"{p}→{p / 6:.2f}" for p in range(1, 6))
+        assert f"is score/6, deliberately shrunk against overconfidence: {means}" in tooltip
+
     def test_jitter_table(self):
         assert [peak_jitter_for(u, True) for u in range(6)] == [0, 1, 1, 2, 3, 4]
         assert UNCERTAINTY_PEAK_JITTER[5] == 4

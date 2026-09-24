@@ -14,6 +14,7 @@ between the two functions below.
 """
 import json
 import logging
+import math
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -57,44 +58,55 @@ CONTRACTION_FILL = PatternFill(start_color=CONTRACTION_TINT, end_color=CONTRACTI
 NEUTRAL_FILL = PatternFill(start_color=SURFACE_LOW, end_color=SURFACE_LOW, fill_type="solid")
 BORDER = Border(*(Side(style="thin", color=RULE) for _ in range(4)))
 
-#: Notes printed on the Metadata sheet, in this order.
-READING_NOTES = (
-    ("Reading note",
-     "PRISM holds strategy constant: the simulation propagates external drivers only and leaves out "
-     "management response (price increases, innovation launches, mix shifts, competitive reaction). "
-     "A negative total is a headwind to today's business if nothing changes, not a forecast that the "
-     "pool will shrink."),
-    ("Scale",
-     "Per force, the pass-through is the force weight (1/6) times its attenuation (about 0.4 to 0.5), "
-     "roughly 7 percent. A near-certain driver touching 20 percent of a category's GP1 moves that "
-     "category by about 1.4 percent at full materialisation. Read the cells as a conservative, "
-     "comparable index and apply them as GP1 projected = GP1 x (1 + shift)."),
-    ("Regional shift",
-     "The shift is solved per category and region: a driver reaches a (category, region) cell weighted "
-     "by its category exposure times its regional exposure, so a regionally concentrated driver moves "
-     "only its regions' slice of the pool."),
-    ("Cell weights",
-     "Category and portfolio numbers roll the 52 category x region cells up with each cell's share of "
-     "HCB gross profit (sheet Cell Weights): a category is the share-weighted average of its regional "
-     "cells, the portfolio the share-weighted sum of all cells."),
-    ("Value-chain attribution",
-     "Each driver's contribution is assigned wholly to the value-chain stage experts located as its "
-     "epicentre. Propagation along the chain is not modelled."),
-    ("Uncertainty",
-     "P10 to P90 bands are Monte Carlo percentiles. The concentration of a driver's Beta prior follows "
-     f"its uncertainty score 0 to 5 ({', '.join(str(UNCERTAINTY_KAPPA[u]) for u in range(6))}), and so "
-     f"does its peak-year jitter ({', '.join(str(UNCERTAINTY_PEAK_JITTER[u]) for u in range(6))} years). "
-     "A driver's start year gates its onset."),
-    ("Score to prior",
-     "Probability scores 1 to 5 give Beta prior means of 0.17, 0.33, 0.50, 0.67 and 0.83 (score / 6): "
-     "a deliberate shrinkage, so a 5 means five in six, not certainty."),
-    ("Copula",
-     "Correlations are set on the latent Gaussian scale; the realised correlation of the probability "
-     "draws is slightly lower (about 0.28 at 0.30)."),
-    ("Confidentiality",
-     "This file holds percentage shifts and gross-profit shares only; no absolute financial figure "
-     "appears in it."),
-)
+def reading_notes(config: ModelConfig) -> tuple:
+    """The notes printed on the Metadata sheet, in this order, with every
+    figure taken from the configuration the run used."""
+    pass_through = sorted(config.force_weights[f] * config.per_force_attenuation[f] for f in FORCES)
+    low, high = pass_through[0], pass_through[-1]
+    attenuation = sorted(config.per_force_attenuation.values())
+    means = [f"{p / 6:.2f}" for p in range(1, 6)]
+    rho = config.within_force_rho
+    share = 0.2   # the GP1 share of the example
+    return (
+        ("Reading note",
+         "PRISM holds strategy constant: the simulation propagates external drivers only and leaves out "
+         "management response (price increases, innovation launches, mix shifts, competitive reaction). "
+         "A negative total is a headwind to today's business if nothing changes, not a forecast that the "
+         "pool will shrink."),
+        ("Scale",
+         f"Per force, the pass-through is the force weight times the force's attenuation "
+         f"({attenuation[0]:.2f} to {attenuation[-1]:.2f}), which comes to {low * 100:.1f} to "
+         f"{high * 100:.1f} percent. A driver drawn at probability 1 that could touch {share * 100:.0f} "
+         f"percent of a category's GP1 moves that category by {share * low * 100:.1f} to "
+         f"{share * high * 100:.1f} percent at full materialisation. Read the cells as a comparable index "
+         "of exposure and apply them as GP1 projected = GP1 x (1 + shift)."),
+        ("Regional shift",
+         "The shift is solved per category and region: a driver reaches a (category, region) cell weighted "
+         "by its category exposure times its regional exposure, so a regionally concentrated driver moves "
+         "only its regions' slice of the pool."),
+        ("Cell weights",
+         f"Category and portfolio numbers roll the {len(CATEGORIES) * len(REGIONS)} category x region cells "
+         "up with each cell's share of HCB gross profit (sheet Cell Weights): a category is the "
+         "share-weighted average of its regional cells, the portfolio the share-weighted sum of all cells."),
+        ("Value-chain attribution",
+         "Each driver's contribution is assigned wholly to the value-chain stage experts located as its "
+         "epicentre. Propagation along the chain is not modelled."),
+        ("Uncertainty",
+         "P10 to P90 bands are Monte Carlo percentiles. The concentration of a driver's Beta prior follows "
+         f"its uncertainty score 0 to 5 ({', '.join(str(UNCERTAINTY_KAPPA[u]) for u in range(6))}), and so "
+         f"does its peak-year jitter ({', '.join(str(UNCERTAINTY_PEAK_JITTER[u]) for u in range(6))} years). "
+         "A driver's start year gates its onset."),
+        ("Score to prior",
+         f"Probability scores 1 to 5 give Beta prior means of {', '.join(means[:-1])} and {means[-1]} "
+         "(score / 6): a deliberate shrinkage, so a 5 means five in six, not certainty."),
+        ("Copula",
+         "Correlations are set on the latent Gaussian scale; the realised rank correlation of the "
+         f"probability draws is slightly lower ({6 / math.pi * math.asin(rho / 2):.2f} at {rho:.2f} within "
+         "a force)."),
+        ("Confidentiality",
+         "This file holds percentage shifts and gross-profit shares only; no absolute financial figure "
+         "appears in it."),
+    )
 
 
 def write_workbook(output_path: str, result: dict, config: ModelConfig, *,
@@ -336,7 +348,7 @@ def _metadata(ws, result: dict, config: ModelConfig, run_id: Optional[int],
         ("Cell weights", str(result["cell_weights_source"])),
         ("Region shares", regions),
         (None, None),
-        *READING_NOTES,
+        *reading_notes(config),
     ]
     wrap = Alignment(wrap_text=True, vertical="top")
     for row, (label, value) in enumerate(rows, 1):

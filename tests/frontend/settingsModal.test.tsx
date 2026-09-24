@@ -105,6 +105,8 @@ describe('Model configuration: the parameters', () => {
     expect(parameter('Base year').getByText('2025')).toBeTruthy();
     expect(parameter('Peak-year jitter').getByText('Off')).toBeTruthy();
     expect(parameter('Within-force ρ').getByText('0.27')).toBeTruthy();
+    // the realised rank correlation of the draws, (6 / pi) asin(0.27 / 2)
+    expect(screen.getByText(/whose rank correlation is a little lower \(0\.26 for a latent 0\.27 within a force\)/)).toBeTruthy();
     expect(screen.getByText(/Source: overlap-correction-test, a structured-judgment overlap correction/)).toBeTruthy();
 
     const attenuation = region('Per-force attenuation and within-force overlap');

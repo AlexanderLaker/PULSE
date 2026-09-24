@@ -9,7 +9,9 @@ import usePrism from '@/hooks/usePrism';
 import SectionCard from '@/components/dashboard/SectionCard';
 import { S, MONO_FONT } from '@/lib/theme';
 import { BASE_YEAR, CATEGORY_NAMES, FORCES, NO_VALUE, REGIONS, categoryFullName } from '@/lib/format';
-import { cellMarginals, cellWeightsBasis } from '@/lib/cellWeights';
+import { cellWeightsBasis, matchesEstimate } from '@/lib/cellWeights';
+import { categoryShares } from '@/lib/shiftMatrix';
+import { UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import type { ForceName, ModelConfig, SimulationResult } from '@/types';
 import {
   CELL_LABEL, CELL_NUM, CELL_SUM, CELL_TH, LABEL_STYLE, Muted, ROW_LABEL, StatusBanner, SubBlock,
@@ -28,6 +30,11 @@ const fixed = (v: number | undefined, digits: number): string =>
 
 /** A share in percent with two decimals: several cells hold less than 0.1 %. */
 const pct2 = (share: number): string => (share * 100).toFixed(2);
+
+/** The rank correlation of two Gaussian-copula draws whose latent correlation
+ *  is rho: (6 / pi) asin(rho / 2), whatever their marginals (the QA workbook
+ *  states the same, prism/workbook.py). */
+const rankCorrelation = (rho: number): number => (6 / Math.PI) * Math.asin(rho / 2);
 
 /** Per-force values: one row per parameter, one column per force. */
 const ForceRowsTable: FC<{
@@ -112,7 +119,7 @@ const ParameterCards: FC<{ config: ModelConfig }> = ({ config }) => {
           <SubBlock
             label="Peak-year jitter"
             hint={jitter
-              ? "Each iteration moves every driver's peak year by up to the width its uncertainty score sets, 0 to 4 years."
+              ? `Each iteration moves every driver's peak year by up to the width its uncertainty score sets, ${Math.min(...UNCERTAINTY_PEAK_JITTER)} to ${Math.max(...UNCERTAINTY_PEAK_JITTER)} years.`
               : 'Every driver peaks in its scored year in every iteration.'}
           >
             <div style={VALUE_STYLE}>{jitter ? 'On' : 'Off'}</div>
@@ -123,7 +130,7 @@ const ParameterCards: FC<{ config: ModelConfig }> = ({ config }) => {
       <SectionCard size="regular"
         title="Copula dependence (Gaussian)"
         icon={SlidersHorizontal}
-        description="How driver correlations flow through the Monte Carlo. The correlations are latent-scale: they set the co-movement of the underlying Gaussian variables, not of the delivered Beta scores, so the realised score-to-score correlation is a little lower (about 0.28 for a latent 0.30). They lie between 0 and 1, so negative dependence cannot be expressed. The production run refuses a setting that is not positive definite on the loaded drivers rather than repairing it silently."
+        description={`How driver correlations flow through the Monte Carlo. The correlations are latent-scale: they set the co-movement of the underlying Gaussian variables, not of the Beta-distributed probability draws, whose rank correlation is a little lower (${fixed(rankCorrelation(config.within_force_rho), 2)} for a latent ${fixed(config.within_force_rho, 2)} within a force). They lie between 0 and 1, so negative dependence cannot be expressed. The production run refuses a setting that is not positive definite on the loaded drivers rather than repairing it silently.`}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={PARAM_GRID}>
@@ -183,12 +190,14 @@ const BasisBadge: FC<{ estimate: boolean }> = ({ estimate }) => (
 
 /** The served run's cell weights with their marginals and where they come from. */
 const RunCellWeights: FC<{ run: SimulationResult }> = ({ run }) => {
-  const m = cellMarginals(run.cell_weights_used);
+  // The run's own marginals: its category shares (row sums) and region shares (column sums).
+  const categoryShare = categoryShares(run.category_weights_used, CATEGORY_NAMES);
+  const total = categoryShare.reduce((sum, w) => sum + w, 0);
   // The run's own label says what the weights are; the graded derivation
   // below documents the current estimate, so it shows only when the run's
   // shares are that estimate.
   const estimate = cellWeightsBasis(run.cell_weights_source) === 'estimate';
-  const documented = estimate && m.matchesEstimate;
+  const documented = estimate && matchesEstimate(run.cell_weights_used);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -211,11 +220,11 @@ const RunCellWeights: FC<{ run: SimulationResult }> = ({ run }) => {
           </tr>
         </thead>
         <tbody>
-          {CATEGORY_NAMES.map((c) => (
+          {CATEGORY_NAMES.map((c, i) => (
             <tr key={c}>
               <th scope="row" style={{ ...CELL_LABEL, borderTop: `1px solid ${S.cardBorder}` }}>{categoryFullName(c)}</th>
               {REGIONS.map((r) => <td key={r} style={CELL_NUM}>{pct2(run.cell_weights_used[c]![r]!)}</td>)}
-              <td style={CELL_SUM}>{pct2(m.rowSums[c]!)}%</td>
+              <td style={CELL_SUM}>{pct2(categoryShare[i]!)}%</td>
             </tr>
           ))}
         </tbody>
@@ -224,8 +233,8 @@ const RunCellWeights: FC<{ run: SimulationResult }> = ({ run }) => {
             <th scope="row" style={{ ...CELL_LABEL, borderTop: `1px solid ${S.cardBorder}` }} title="Column sum: the region's share of the pool">
               Σ region
             </th>
-            {REGIONS.map((r) => <td key={r} style={CELL_SUM}>{pct2(m.colSums[r]!)}%</td>)}
-            <td style={{ ...CELL_SUM, fontWeight: 800 }}>{pct2(m.total)}%</td>
+            {REGIONS.map((r) => <td key={r} style={CELL_SUM}>{pct2(run.region_weights_used[r]!)}%</td>)}
+            <td style={{ ...CELL_SUM, fontWeight: 800 }}>{pct2(total)}%</td>
           </tr>
         </tfoot>
       </TableScroller>

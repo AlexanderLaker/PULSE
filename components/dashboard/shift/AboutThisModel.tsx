@@ -41,11 +41,17 @@ function passThrough(config: ModelConfig): Array<[ForceName, number]> {
     .sort((a, b) => b[1] - a[1]);
 }
 
+/** The GP1 share of the example in "Reading the level". */
+const EXAMPLE_SHARE = 0.2;
+
 export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: ModelConfig | null }> = ({
   simulation, config,
 }) => {
   const [open, setOpen] = useState(false);
   const run = simulation?.run_meta ?? null;
+  const forces = config ? passThrough(config) : null;
+  // The smallest and the largest pass-through (the list is sorted largest first).
+  const [ptLow, ptHigh] = forces ? [forces[forces.length - 1]![1], forces[0]![1]] : [0, 0];
   return (
     <footer className="mt-8">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
@@ -90,12 +96,19 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
             style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Reading the level</div>
           <p className="text-[12px] mb-2" style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}>
             Each driver&rsquo;s elicited &ldquo;share of GP1 it could touch&rdquo; is deliberately
-            scaled down before it reaches a category: a driver belongs to 1 of 6 forces
-            (&divide;6 averaging) and each force is attenuated (~0.4&ndash;0.5) so overlapping
-            drivers aren&rsquo;t double-counted. Net <strong>structural pass-through &asymp; 7%</strong>.
-            So a near-certain driver that could touch 20% of a category&rsquo;s GP1 moves that
-            category <strong>&asymp;1.4%</strong> at full materialisation, not 20%. Read cells as a
-            conservative, comparable index and apply them with the formula
+            scaled down before it reaches a category: by its force&rsquo;s weight, because the six
+            forces share the signal, and by the force&rsquo;s attenuation, so overlapping drivers
+            aren&rsquo;t double-counted.
+            {forces ? (
+              <>
+                {' '}The product, the <strong>structural pass-through</strong>, is {fmtPct(ptLow, 1)} to{' '}
+                {fmtPct(ptHigh, 1)} by force (listed below). So a driver drawn at probability 1 that could touch{' '}
+                {fmtPct(EXAMPLE_SHARE, 0)} of a category&rsquo;s GP1 moves that category by{' '}
+                <strong>{fmtPct(EXAMPLE_SHARE * ptLow, 1)} to {fmtPct(EXAMPLE_SHARE * ptHigh, 1)}</strong> at full
+                materialisation, not {fmtPct(EXAMPLE_SHARE, 0)}.
+              </>
+            ) : ' The product, the structural pass-through of each force, is listed below once the model configuration has loaded.'}
+            {' '}Read cells as a comparable index of exposure and apply them with the formula
             (GP1<sub>projected</sub> = GP1<sub>actual</sub> &times; (1 + shift)); don&rsquo;t read one cell
             as the raw elicited magnitude. The impact is applied per <strong>category &times; region</strong>:
             a driver only moves the categories and regions it is scored on, and the category
@@ -105,9 +118,9 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
             <div className="text-[11px] font-bold mb-1.5" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>
               Structural pass-through per force <span style={{ fontWeight: 400, color: S.mutedText }}>(force weight &times; attenuation; before probability, materialisation, exposure &amp; overlap)</span>
             </div>
-            {config && (
+            {forces && (
               <div className="flex flex-wrap gap-x-5 gap-y-1">
-                {passThrough(config).map(([f, v]) => (
+                {forces.map(([f, v]) => (
                   <span key={f} className="inline-flex items-baseline gap-1.5">
                     <span style={{ fontSize: 11.5, color: S.onSurfaceVariant }}>{f}</span>
                     <span style={{ fontSize: 11.5, fontWeight: 600, color: S.onSurface, fontFamily: MONO_FONT }}>{fmtPct(v, 1)}</span>

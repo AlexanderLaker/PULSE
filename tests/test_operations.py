@@ -175,6 +175,12 @@ class TestWorkbook:
         assert (meta["Iterations per chain"], meta["Chains"], meta["Pooled iterations"]) == (200, 2, 400)
         assert meta["Model version"] == result["model_version"]
         assert "Reading note" in meta and "Confidentiality" in meta
+        # the notes quote the configuration the run used, never a typed figure
+        from prism.config import FORCES
+        pass_through = sorted(mock_model_config.force_weights[f] * mock_model_config.per_force_attenuation[f]
+                              for f in FORCES)
+        assert f"comes to {pass_through[0] * 100:.1f} to {pass_through[-1] * 100:.1f} percent" in meta["Scale"]
+        assert f"at {mock_model_config.within_force_rho:.2f} within a force" in meta["Copula"]
 
         read = read_workbook(str(path), mock_model_config.path_years[-1])
         assert read["id"] == 7 and read["pooled_iterations"] == 400 and read["workbook"] == "run.xlsx"
