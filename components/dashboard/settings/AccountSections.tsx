@@ -8,7 +8,7 @@ import { useUser, useClerk, useSession } from '@clerk/nextjs';
 import SectionCard from '@/components/dashboard/SectionCard';
 import { S } from '@/lib/theme';
 import { NO_VALUE, fmtDate, fmtDateTime } from '@/lib/format';
-import { clearViewerCookie, resumeViewerCookie } from '@/lib/apiClient';
+import { endSession } from '@/lib/session';
 import type { Role } from '@/types';
 import {
   DESTRUCTIVE_BUTTON, errorText, Field, INPUT_STYLE, Muted, PRIMARY_BUTTON, READONLY_INPUT_STYLE,
@@ -248,10 +248,8 @@ export const SessionsSection: FC = () => {
     setStatus(null);
     try {
       await Promise.all(others.map((s) => s.revoke()));
-      await clearViewerCookie();
-      await signOut({ redirectUrl: '/sign-in' });
+      await endSession(() => signOut({ redirectUrl: '/sign-in' }));
     } catch (err) {
-      resumeViewerCookie();   // still signed in: the page may read again
       setStatus({ kind: 'error', message: errorText(err, 'Failed to sign out.') });
       setSigningOutAll(false);
     }

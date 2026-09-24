@@ -152,7 +152,10 @@ signed-in user (`lib/prismJwt.ts`, verified in `prism/api/auth.py`):
   asks for a new cookie once and repeats the request (`lib/apiClient.ts`).
   The cookie is not tied to the Clerk session, so the dashboard expires it
   (`DELETE /api/prism-cookie`) before signing out and when the session ends,
-  and in place of a cookie it cannot renew.
+  and in place of a cookie it cannot renew. Signing out first sends the
+  expert proposal edits still held back or on their way and waits up to five
+  seconds for them, while the cookie still authorises them
+  (`lib/session.ts`).
 - **Admin writes.** A driver edit or a journey save goes to a dashboard route
   (`/api/drivers/{id}`, `/api/journey`). The route checks the user's role in
   `user_roles`, then forwards the request to the API (on `PRISM_API_ORIGIN`
@@ -216,10 +219,12 @@ the taxonomies), `shiftMatrix.ts` (the category-weighted totals; a lint step
 keeps them from being reimplemented in a component), `cellWeights.ts`,
 `valueChain.ts`, `uncertainty.ts` (what an uncertainty score does in the
 engine), `driverAttribution.ts` (the per-driver decomposition behind the
-drill-down and the impact filter) and `theme.ts` (the design tokens, which
-Tailwind reads too); the server side has `db.ts`, `roles.ts`, `audit.ts` (the
-role-change entries of the audit log), `prismJwt.ts` and `adminWrite.ts`. The
-types in `types/` mirror the API's JSON.
+drill-down and the impact filter), `proposalSaves.ts` (the expert proposals'
+save queue, one per driver), `session.ts` (signing out) and `theme.ts` (the
+design tokens, which Tailwind reads too); the server side has `db.ts`,
+`roles.ts`, `audit.ts` (the role-change entries of the audit log),
+`prismJwt.ts` and `adminWrite.ts`. The types in `types/` mirror the API's
+JSON.
 
 The Consumer Journey content ships with the dashboard
 (`data/consumerJourney.ts`, which also defines its shape); once an admin saves

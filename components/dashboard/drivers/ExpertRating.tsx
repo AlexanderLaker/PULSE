@@ -8,6 +8,7 @@ import {
   Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper, Info, PenLine, MessageSquare,
 } from 'lucide-react';
 import { saveMyProposal } from '@/lib/apiClient';
+import { queueProposalSave, registerPendingSave } from '@/lib/proposalSaves';
 import { HORIZON, NO_VALUE, firstPeakYear, fmtPct } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import type { Driver, DriverProposal } from '@/types';
@@ -19,7 +20,7 @@ import {
 } from './scales';
 import { BaselineRef, FIELD_HELP, FieldLabel, ProposalsUnavailable, SourceItem } from './cards';
 import { ANALYSIS_FOOTNOTE, PrismAnalysisReading } from './PrismAnalysis';
-import { queueProposalSave, useDriverProposals } from './useDriverProposals';
+import { useDriverProposals } from './useDriverProposals';
 
 
 /** A year field for the Expert Rating: the proposal takes the value only while
@@ -87,11 +88,22 @@ export const ExpertRatingPanel: FC<{ driver: Driver; onMyChange: (driverId: stri
   useEffect(() => {
     if (hydrated) onMyChange(driver.id, draftRef.current);
   }, [hydrated, onMyChange, driver.id]);
-  // A pending autosave is sent, not dropped, when the panel unmounts:
-  // collapsing the row inside the 0.6 s debounce would otherwise lose an edit
-  // already on screen. `pendingSave` marks a save the debounce has not sent
-  // yet, so none goes out twice.
+  // `pendingSave` marks an edit the 0.6 s debounce has not sent yet, so none
+  // goes out twice. Such an edit is sent, not dropped, when the panel
+  // unmounts (collapsing the row inside the debounce would otherwise lose an
+  // edit already on screen) and when the user signs out (lib/session.ts sends
+  // every held-back edit before it expires the viewer cookie).
   const pendingSave = useRef(false);
+  const sendPending = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    pendingSave.current = false;
+    const save = sendNow();
+    save.then(
+      () => { if (lastSave.current === save && !pendingSave.current) setStatus('saved'); },
+      () => { if (lastSave.current === save) setStatus('error'); },
+    );
+  }, [sendNow]);
+  useEffect(() => registerPendingSave(() => { if (pendingSave.current) sendPending(); }), [sendPending]);
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
     if (pendingSave.current) {
@@ -105,15 +117,8 @@ export const ExpertRatingPanel: FC<{ driver: Driver; onMyChange: (driverId: stri
     setStatus('saving');
     pendingSave.current = true;
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      pendingSave.current = false;
-      const save = sendNow();
-      save.then(
-        () => { if (lastSave.current === save && !pendingSave.current) setStatus('saved'); },
-        () => { if (lastSave.current === save) setStatus('error'); },
-      );
-    }, 600);
-  }, [sendNow]);
+    timer.current = setTimeout(sendPending, 600);
+  }, [sendPending]);
   const patch = useCallback((p: Partial<DriverProposal>) => {
     const next = { ...draftRef.current, ...p };
     draftRef.current = next;

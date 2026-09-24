@@ -11,8 +11,9 @@
  *     proposal has loaded (a save from a blank draft would overwrite it); its
  *     saves go out one at a time with the newest draft; a field clicked again
  *     is cleared (sent as null); a half-typed year, or one not after the
- *     driver's onset, is never sent. A panel
- *     opened again waits for a save still on its way before it loads.
+ *     driver's onset, is never sent. A panel opened again waits for a save
+ *     still on its way before it loads, and an edit held back is sent as soon
+ *     as the session ends.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor, act, within } from '@testing-library/react';
@@ -33,6 +34,7 @@ vi.mock('@/lib/apiClient', async (importOriginal) => ({
 import Drivers from '@/components/dashboard/Drivers';
 import { ExpertRatingPanel } from '@/components/dashboard/drivers/ExpertRating';
 import { SourceItem, sourceHost } from '@/components/dashboard/drivers/cards';
+import { settleProposalSaves } from '@/lib/proposalSaves';
 
 // framer-motion restores the scroll position after measuring an expanded panel.
 window.scrollTo = (() => {}) as typeof window.scrollTo;
@@ -364,6 +366,21 @@ describe('the Expert Rating panel', () => {
     await act(async () => { finishFirst(); });
     await waitFor(() => expect(API.saveMyProposal).toHaveBeenCalledTimes(2));
     expect(API.saveMyProposal.mock.calls[1]![1]).toMatchObject({ probability: 5 });
+    expect(await screen.findByText('✓ All changes saved')).toBeTruthy();
+  });
+
+  it('sends an edit it is holding back as soon as the session ends, and only once', async () => {
+    // lib/session.ts settles the proposal saves before it expires the viewer cookie.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    openExpertRating();
+    await screen.findByRole('radiogroup', { name: /^Probability/ });
+    fireEvent.click(probabilityDot(4));   // held back by the autosave delay
+    expect(API.saveMyProposal).not.toHaveBeenCalled();
+    await act(async () => { await settleProposalSaves(); });
+    expect(API.saveMyProposal).toHaveBeenCalledTimes(1);
+    expect(API.saveMyProposal.mock.calls[0]![1]).toMatchObject({ probability: 4 });
+    await act(async () => { vi.advanceTimersByTime(700); });
+    expect(API.saveMyProposal).toHaveBeenCalledTimes(1);
     expect(await screen.findByText('✓ All changes saved')).toBeTruthy();
   });
 

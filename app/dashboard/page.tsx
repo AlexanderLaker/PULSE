@@ -21,9 +21,10 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { MotionConfig } from 'framer-motion';
-import { LogOut, Settings, Menu, X } from 'lucide-react';
+import { AlertTriangle, LogOut, Settings, Menu, X } from 'lucide-react';
 import { useUser, useClerk, useSession } from '@clerk/nextjs';
 import * as api from '@/lib/apiClient';
+import { endSession } from '@/lib/session';
 import ShiftAnalysis from '@/components/dashboard/ShiftAnalysis';
 import Drivers, { type DriverSearch } from '@/components/dashboard/Drivers';
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
@@ -103,6 +104,9 @@ export default function DashboardPage() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  // Why the last sign-out failed, without closing punctuation; the user is
+  // still signed in.
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   // The search the Drivers tab applies when another view opens it on a driver;
   // each opening counts, even for the same driver twice.
   const [driversSearch, setDriversSearch] = useState<DriverSearch | null>(null);
@@ -167,15 +171,13 @@ export default function DashboardPage() {
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
+    setLogoutError(null);
     try {
-      // The API cookie first: it is not tied to the Clerk session.
-      await api.clearViewerCookie();
       // Straight to /sign-in: Clerk's default ("/") would only bounce there through proxy.ts.
-      await signOut({ redirectUrl: '/sign-in' });
+      await endSession(() => signOut({ redirectUrl: '/sign-in' }));
     } catch (error) {
-      console.error('Logout failed:', error);
-      // Still signed in: the page may read again.
-      api.resumeViewerCookie();
+      console.error('Sign-out failed:', error);
+      setLogoutError(((error as Error)?.message || 'Clerk did not answer').replace(/[\s.]+$/, ''));
       setIsLoggingOut(false);
     }
   };
@@ -351,6 +353,18 @@ export default function DashboardPage() {
       </nav>
 
       <ServiceNotice />
+
+      {logoutError && (
+        <div role="alert" style={{ backgroundColor: S.amberContainer, color: S.onAmberContainer }}>
+          <div className="max-w-[1440px] mx-auto px-4 md:px-8 py-2.5 flex items-start gap-2.5 text-[13px]" style={{ lineHeight: 1.5 }}>
+            <AlertTriangle size={15} strokeWidth={2.4} style={{ flexShrink: 0, marginTop: 2 }} />
+            <span>
+              <strong style={{ fontFamily: HEADLINE_FONT }}>Signing out failed</strong> ({logoutError}). You are
+              still signed in; try again.
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="relative">
         {tabPane('home', <HomeGate active={activeTab === 'home'} onNavigate={openTab} />)}
