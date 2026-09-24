@@ -157,7 +157,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
     return () => window.removeEventListener('keydown', onKey);
   }, [selected, editing, paneActive, stepSelection]);
 
-  // ── Admin edits: local until "Save to server" ──
+  // ── Admin edits: local until "Save for everyone" ──
   // A save whose outcome is unknown, or one refused because someone saved
   // meanwhile, needs the stored version loaded before the next save; an edit
   // leaves that notice and the hold on saving in place. An edit made while a
@@ -525,7 +525,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
             <div className="flex items-center gap-2">
               <Edit3 size={14} strokeWidth={2.5} style={{ color: S.onSurfaceVariant }} />
               <span className="text-[12px]" style={{ color: S.onSurfaceVariant, fontFamily: BODY_FONT }}>
-                Editing on: tile edits update this view. <strong style={{ fontFamily: HEADLINE_FONT }}>Save to server</strong> saves the journey content for all users.
+                Editing on: tile edits update this view; <strong style={{ fontFamily: HEADLINE_FONT }}>Save for everyone</strong> stores them for all users.
               </span>
             </div>
             <div className="flex items-center gap-3">
@@ -563,7 +563,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                 }}
               >
                 <Save size={13} strokeWidth={2.5} />
-                {saveState === 'saving' ? 'Saving…' : 'Save to server'}
+                {saveState === 'saving' ? 'Saving…' : 'Save for everyone'}
               </button>
             </div>
           </div>

@@ -13,9 +13,9 @@ import type { ImpactFilter, Lens } from './matrixModel';
 
 export const LENS_META: Record<Lens, { label: string; description: string; Icon: LucideIcon }> = {
   time:   { label: 'Time Path',   description: `MC median shifts ${FIRST_YEAR}→${HORIZON}, cumulative vs ${BASE_YEAR}`, Icon: Calendar },
-  force:  { label: 'Force attribution',       description: 'Distributes each category shift across forces by exposure: attribution, not an independent simulation', Icon: Zap },
-  vc:     { label: 'Value chain epicentre attribution', description: 'Assigns each driver\'s contribution wholly to the single stage where its impact centres (its epicentre); propagation up or down the chain is not modelled. Attribution, not an independent simulation', Icon: Layers },
-  region: { label: 'Region attribution',      description: 'Distributes each category shift across regions by exposure: attribution, not an independent simulation', Icon: Globe2 },
+  force:  { label: 'Force attribution',       description: 'Splits each category\'s median across the forces by the size of their drivers\' effects (expected effect × exposure × force weight), not by their direction: every force takes a share in the median\'s direction. Attribution, not an independent simulation', Icon: Zap },
+  vc:     { label: 'Value-chain epicentre attribution', description: 'Splits each category\'s median by the size of the drivers\' effects and gives each driver\'s share wholly to the stage where its impact centres (its epicentre); effects are not passed up or down the chain. Attribution, not an independent simulation', Icon: Layers },
+  region: { label: 'Region attribution',      description: 'Splits each category\'s median across the regions by the size of the drivers\' effects there (expected effect × exposure × regional exposure × the region\'s share of the category\'s gross profit), not by their direction. Attribution, not an independent simulation', Icon: Globe2 },
 };
 
 export const IMPACT_META: Record<ImpactFilter, { label: string; description: string; Icon: LucideIcon }> = {

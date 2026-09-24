@@ -51,7 +51,7 @@ describe('HomeGate', () => {
     const doors = screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'));
     expect(doors).toEqual([
       'Drivers, the input. 3 drivers: the evidence. Shortcut key 1.',
-      'Consumer Journey, the lens. Pool impact, stage by stage. Shortcut key 2.',
+      'Consumer Journey, the context. Consumer moments and the drivers behind them. Shortcut key 2.',
       "Profit Pool Shift Analysis, the output. Every category's shift to 2035. Shortcut key 3.",
       'Profit Pool Explorer (Beta), the market. The pools, sized and sourced. Shortcut key 4.',
     ]);

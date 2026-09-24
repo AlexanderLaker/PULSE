@@ -310,7 +310,7 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
           </SectionCard>
 
           <SectionCard
-            title="GP1 % Affected: Economic Anchoring"
+            title="GP1 % affected"
             icon={BarChart3}
             footnote={
               <>
@@ -399,13 +399,13 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
           </SectionCard>
 
           <SectionCard
-            title="Materialisation Timing"
+            title="Materialisation timing"
             icon={Clock}
             footnote="When does this driver reach full impact, and how does it build over time?"
           >
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <div>
-                <FieldLabel>Peak Year</FieldLabel>
+                <FieldLabel>Peak year</FieldLabel>
                 {isEditing ? (
                   <input
                     type="text"
@@ -445,7 +445,7 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
                 </div>
               </div>
               <div>
-                <FieldLabel>Diffusion Curve</FieldLabel>
+                <FieldLabel>Diffusion curve</FieldLabel>
                 {isEditing ? (
                   <select
                     aria-label="Diffusion curve"
@@ -634,14 +634,14 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
 
         {/* Right column: the exposure grids, Category, Region, Value Chain */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <SectionCard title="Category Exposure" icon={Layers}>
+          <SectionCard title="Category exposure" icon={Layers}>
             {isEditing ? (
               <EditableCategoryGrid exposures={draft.category_exposure} onChange={(m) => edit({ category_exposure: m })} />
             ) : (
               <CategoryExposureGrid exposures={driver.category_exposure} />
             )}
           </SectionCard>
-          <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer}>
+          <SectionCard title="Regional exposure" icon={MapPin} accent={S.onSecondaryContainer}>
             {isEditing ? (
               <EditableRegionGrid exposures={draft.regional_exposure} onChange={(m) => edit({ regional_exposure: m })} />
             ) : (
@@ -649,7 +649,7 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
             )}
           </SectionCard>
           <SectionCard
-            title="Value Chain Epicentre" icon={Cpu} accent={S.onTertiaryContainer} info={FIELD_HELP.vc}
+            title="Value-chain epicentre" icon={Cpu} accent={S.onTertiaryContainer} info={FIELD_HELP.vc}
             right={
               <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: S.primary }}>
                 {vcStageLabel(vcStage)}

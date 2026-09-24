@@ -30,7 +30,9 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="PRISM API",
         version=__version__,
-        description="Read access to the persisted PRISM run, the drivers and the journey content.",
+        description="The persisted PRISM run, the drivers with their expert proposals, the model configuration "
+                    "and the Consumer Journey content; admin edits of the drivers and the journey arrive through "
+                    "the dashboard's server routes.",
     )
 
     @app.exception_handler(MigrationPendingError)

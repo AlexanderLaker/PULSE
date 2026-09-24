@@ -1,7 +1,7 @@
 /**
  * Review & Endorse, for admins: one driver's expert aggregate against its
  * baseline, field by field. The admin chooses per field between the current
- * value, the baseline, the expert mean and a manual value, and endorsing
+ * value, the baseline, the expert aggregate and a manual value, and endorsing
  * writes the chosen values through the validated, audited driver edit.
  */
 import React, { useMemo, useState, type FC } from 'react';
@@ -30,23 +30,23 @@ const MiniBar: FC<{ v?: number; color: string }> = ({ v, color }) => (
   </div>
 );
 
-// ── Baseline over expert mean: the baseline row (ink) on top, the expert
-//    mean (green) below, with who scored what on hover ──
+// ── Baseline over the expert aggregate: the baseline row (ink) on top, the
+//    expert aggregate (violet) below, with who scored what on hover ──
 const CompareStack: FC<{ baseline: React.ReactNode; expert: React.ReactNode; who?: string }> = ({ baseline, expert, who }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
     <div className="flex items-center gap-2.5">
-      <span style={{ fontSize: 11, fontWeight: 800, color: S.onSurface, width: 30, flexShrink: 0, letterSpacing: '0.04em' }}>Base</span>
+      <span style={{ fontSize: 11, fontWeight: 800, color: S.onSurface, width: 42, flexShrink: 0, letterSpacing: '0.04em' }}>Base</span>
       {baseline}
     </div>
     <div className="flex items-center gap-2.5" title={who} style={{ cursor: who ? 'help' : undefined }}>
-      <span style={{ fontSize: 11, fontWeight: 800, color: REVIEWED_COLOR, width: 30, flexShrink: 0, letterSpacing: '0.04em' }}>ø</span>
+      <span style={{ fontSize: 11, fontWeight: 800, color: EXPERT_COLOR, width: 42, flexShrink: 0, letterSpacing: '0.04em' }}>Expert</span>
       {expert}
     </div>
   </div>
 );
 
 // ── One exposure cell: its label, the baseline dots (ink) over the expert
-//    mean (green), and the manual override ──
+//    aggregate (violet), and the manual override ──
 /** An exposure cell of the Review panel: its key and label, the baseline
  *  score, the current score and the experts' aggregate. */
 interface ExposureRow { key: string; label: string; baseV: number; curV: number; expert?: MeanAggregate }
@@ -62,8 +62,9 @@ const ExposureCompareCell: FC<{ label: string; baseVal: number; expert?: MeanAgg
       <ReadDots value={baseVal} color={S.onSurface} />
     </div>
     <div className="flex items-center gap-2">
-      <span style={{ fontSize: 11, fontWeight: 800, color: REVIEWED_COLOR, width: 38, flexShrink: 0, textAlign: 'right' }}>ø</span>
-      <ReadDots value={expert?.avg} color={REVIEWED_COLOR} />
+      {/* Tightened tracking so "Expert" fits the 38px label gutter at 11px. */}
+      <span style={{ fontSize: 11, letterSpacing: '-0.02em', fontWeight: 800, color: EXPERT_COLOR, width: 38, flexShrink: 0, textAlign: 'right' }}>Expert</span>
+      <ReadDots value={expert?.avg} color={EXPERT_COLOR} />
     </div>
     <div className="flex items-center gap-2" style={{ paddingTop: 5, borderTop: `1px solid ${S.surfaceLow}` }}>
       {/* Tightened tracking so "Manual" fits the 38px label gutter at 11px. */}
@@ -73,14 +74,14 @@ const ExposureCompareCell: FC<{ label: string; baseVal: number; expert?: MeanAgg
   </div>
 );
 
-// ── Per-field endorse choice: keep the current value, the baseline, the expert mean or a manual value ──
+// ── Per-field endorse choice: keep the current value, the baseline, the expert aggregate or a manual value ──
 type EndorseSource = 'current' | 'baseline' | 'expert' | 'manual';
 const ENDORSE_OPTIONS: Array<[EndorseSource, string]> = [
-  ['current', 'Keep'], ['baseline', 'Baseline'], ['expert', 'Expert ø'], ['manual', 'Manual'],
+  ['current', 'Keep'], ['baseline', 'Baseline'], ['expert', 'Expert'], ['manual', 'Manual'],
 ];
 /** What an exposure grid endorses, by its choice. */
 const EXPOSURE_RESULT: Record<EndorseSource, string> = {
-  current: 'Keep the current scores', baseline: 'Baseline', expert: 'Expert ø where scored, current elsewhere',
+  current: 'Keep the current scores', baseline: 'Baseline', expert: 'Expert aggregate where scored, current elsewhere',
   manual: 'Manual (custom)',
 };
 
@@ -91,7 +92,7 @@ const manInput: React.CSSProperties = {
 const Decide: FC<{
   cur: EndorseSource;
   onPick: (s: EndorseSource) => void;
-  /** Whether an expert scored the field; without one "Expert ø" is off. */
+  /** Whether an expert scored the field; without one "Expert" is off. */
   expertOk: boolean;
   manual?: React.ReactNode;
   result?: React.ReactNode;
@@ -103,7 +104,7 @@ const Decide: FC<{
         const on = cur === k;
         const disabled = k === 'expert' && !expertOk;
         const bg = on
-          ? (k === 'current' ? S.onSurfaceVariant : k === 'baseline' ? S.onSurface : k === 'expert' ? REVIEWED_COLOR : S.primary)
+          ? (k === 'current' ? S.onSurfaceVariant : k === 'baseline' ? S.onSurface : k === 'expert' ? EXPERT_COLOR : S.primary)
           : S.surface;
         return (
           <button key={k} type="button" disabled={disabled} onClick={() => onPick(k)} aria-pressed={on}
@@ -294,7 +295,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
   // The stage the driver has now; endorsing it writes nothing.
   const currentVcStage = driver.vc_epicentre;
   const endorsedVcStage = endorsedVc ?? vcMajority?.stage ?? currentVcStage;
-  const grpLabel: React.CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: S.onSurfaceVariant, margin: '2px 0 8px' };
+  const grpLabel: React.CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: S.onSurfaceVariant, margin: '2px 0 8px' };
 
   const whoFor = (field: 'probability' | 'gp1_pct_affected' | 'peak_year' | 'diffusion_curve' | 'uncertainty'): string | undefined => {
     const rows = scorers.filter((s) => s[field] != null);
@@ -310,8 +311,8 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
     }
     return Object.keys(out).length ? out : undefined;
   };
-  // Per-field endorse choice. A field defaults to the expert mean when an
-  // expert scored it; a field nobody scored keeps its current value (an
+  // Per-field endorse choice. A field defaults to the expert aggregate when
+  // an expert scored it; a field nobody scored keeps its current value (an
   // admin's earlier edit stands). The admin can switch each field to the
   // baseline or enter a manual value.
   const hasCatE = !!(agg?.category_exposure && Object.keys(agg.category_exposure).length);
@@ -324,9 +325,9 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
   const chooseVc = (stage: string) => { setDone(false); setEndorsedVc(stage); };
   const setAll = (s: EndorseSource) => {
     setDone(false);
-    // "Set all to Manual" seeds the scalar inputs with the expert mean, else
-    // the current value, so each field starts from a sensible value; exposure
-    // cells default the same way through manCell.
+    // "Set all to Manual" seeds the scalar inputs with the expert aggregate,
+    // else the current value, so each field starts from a sensible value;
+    // exposure cells default the same way through manCell.
     if (s === 'manual') {
       const numStr = (v: number | null | undefined) => (v == null ? '' : String(v));
       setMan({
@@ -393,7 +394,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
     return v != null && v > 0 ? Math.min(1, v) : undefined;
   };
   // A whole year from the year after the onset to the horizon; anything
-  // else (an expert mean at or before the onset) is left out, so the driver
+  // else (an expert median at or before the onset) is left out, so the driver
   // keeps its timing.
   const firstPeak = firstPeakYear(driver.start_year);
   const resolvePeak = (): number | undefined => {
@@ -476,7 +477,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
         </span>
         <span className="inline-flex items-center gap-3" style={{ fontSize: 11, fontWeight: 700 }}>
           <span className="inline-flex items-center gap-1.5" style={{ color: S.onSurface }}><span style={{ width: 9, height: 9, borderRadius: 9, backgroundColor: S.onSurface }} /> Baseline</span>
-          <span className="inline-flex items-center gap-1.5" style={{ color: REVIEWED_COLOR }}><span style={{ width: 9, height: 9, borderRadius: 9, backgroundColor: REVIEWED_COLOR }} /> Expert ø</span>
+          <span className="inline-flex items-center gap-1.5" style={{ color: EXPERT_COLOR }}><span style={{ width: 9, height: 9, borderRadius: 9, backgroundColor: EXPERT_COLOR }} /> Expert aggregate</span>
         </span>
       </div>
 
@@ -494,7 +495,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
       ) : (
         <>
           {/* Laid out like the Expert Rating panel; every field shows the
-              baseline (ink) over the expert mean (green). */}
+              baseline (ink) over the expert aggregate (violet). */}
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(0,1fr)', gap: 20 }}>
             {/* Left: context, the core scores and timing */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -507,16 +508,16 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
               <SectionCard title="Probability" icon={Zap} footnote="1 = Very Unlikely · 3 = Possible · 5 = Almost Certain.">
                 <CompareStack who={whoFor('probability')}
                   baseline={<><ColorDots value={bP} color={S.onSurface} /><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, color: S.onSurfaceVariant }}>{bP}</span></>}
-                  expert={<><ColorDots value={eP != null ? Math.round(eP) : 0} color={REVIEWED_COLOR} /><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, color: REVIEWED_COLOR }}>{eP != null ? eP.toFixed(1) : NO_VALUE}</span>{eP != null ? <DeltaChip value={eP - bP} /> : null}</>} />
+                  expert={<><ColorDots value={eP != null ? Math.round(eP) : 0} color={EXPERT_COLOR} /><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, color: EXPERT_COLOR }}>{eP != null ? eP.toFixed(1) : NO_VALUE}</span>{eP != null ? <DeltaChip value={eP - bP} /> : null}</>} />
                 <Decide cur={srcOf('probability', eP != null)} onPick={(s) => setS('probability', s)} expertOk={eP != null}
                   manual={<input type="number" min={1} max={5} value={man.probability ?? ''} onChange={(e) => setM('probability', e.target.value)} placeholder="1–5" style={manInput} />}
                   result={resultOf('probability', eP != null, resolved.probability ?? NO_VALUE, driver.probability)} />
               </SectionCard>
 
-              <SectionCard title="Impact: GP1 % exposed" icon={BarChart3} footnote="Share of category GP1 this driver can move at full materialisation.">
+              <SectionCard title="GP1 % affected" icon={BarChart3} footnote="Share of category GP1 this driver can move at full materialisation.">
                 <CompareStack who={whoFor('gp1_pct_affected')}
                   baseline={<MiniBar v={bG} color={S.onSurface} />}
-                  expert={<><MiniBar v={eG} color={REVIEWED_COLOR} />{eG != null ? <DeltaChip value={(eG - bG) * 100} unit="pp" digits={0} /> : null}</>} />
+                  expert={<><MiniBar v={eG} color={EXPERT_COLOR} />{eG != null ? <DeltaChip value={(eG - bG) * 100} unit="pp" digits={0} /> : null}</>} />
                 <Decide cur={srcOf('gp1', eG != null)} onPick={(s) => setS('gp1', s)} expertOk={eG != null}
                   manual={<span className="inline-flex items-center gap-1"><input type="number" min={1} max={100} value={man.gp1 ?? ''} onChange={(e) => setM('gp1', e.target.value)} placeholder="%" style={manInput} /><span style={{ fontSize: 12, color: S.mutedText }}>%</span></span>}
                   result={resultOf('gp1', eG != null, fmtPct(resolved.gp1, 0), fmtPct(driver.gp1_pct_affected, 0))} />
@@ -525,19 +526,19 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
               <SectionCard title="Materialisation timing" icon={Clock}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div>
-                    <FieldLabel>Peak Year</FieldLabel>
+                    <FieldLabel>Peak year</FieldLabel>
                     <CompareStack who={whoFor('peak_year')}
                       baseline={<Val>{bPk}</Val>}
-                      expert={<><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{ePk != null ? Math.round(ePk) : NO_VALUE}</span>{ePk != null ? <DeltaChip value={ePk - bPk} unit="y" digits={0} /> : null}</>} />
+                      expert={<><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: EXPERT_COLOR }}>{ePk != null ? Math.round(ePk) : NO_VALUE}</span>{ePk != null ? <DeltaChip value={ePk - bPk} unit="y" digits={0} /> : null}</>} />
                     <Decide cur={srcOf('peak', ePk != null)} onPick={(s) => setS('peak', s)} expertOk={ePk != null}
                       manual={<input type="number" min={firstPeak} max={HORIZON} value={man.peak ?? ''} onChange={(e) => setM('peak', e.target.value)} placeholder="year" style={{ ...manInput, width: 80 }} />}
                       result={resultOf('peak', ePk != null, resolved.peak ?? NO_VALUE, driver.peak_year)} />
                   </div>
                   <div>
-                    <FieldLabel>Diffusion Curve</FieldLabel>
+                    <FieldLabel>Diffusion curve</FieldLabel>
                     <CompareStack who={whoFor('diffusion_curve')}
                       baseline={<span className="inline-flex items-center gap-2"><DiffusionGlyph curve={bCv} color={S.onSurface} /><Val>{curveLabel(bCv)}</Val></span>}
-                      expert={<span className="inline-flex items-center gap-2">{eCv ? <DiffusionGlyph curve={eCv} color={REVIEWED_COLOR} /> : null}<span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{eCv ? curveLabel(eCv) : NO_VALUE}</span>{eCv ? <ChangeChip changed={eCv !== bCv} /> : null}</span>} />
+                      expert={<span className="inline-flex items-center gap-2">{eCv ? <DiffusionGlyph curve={eCv} color={EXPERT_COLOR} /> : null}<span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: EXPERT_COLOR }}>{eCv ? curveLabel(eCv) : NO_VALUE}</span>{eCv ? <ChangeChip changed={eCv !== bCv} /> : null}</span>} />
                     <Decide cur={srcOf('curve', !!eCv)} onPick={(s) => setS('curve', s)} expertOk={!!eCv}
                       manual={<select value={man.curve ?? ''} onChange={(e) => setM('curve', e.target.value)} style={{ ...manInput, width: 'auto' }}><option value="">{NO_VALUE}</option>{Object.entries(DIFFUSION_LABELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>}
                       result={resultOf('curve', !!eCv, resolved.curve ? curveLabel(resolved.curve) : NO_VALUE,
@@ -546,10 +547,10 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
                 </div>
               </SectionCard>
 
-              <SectionCard title="Uncertainty" icon={Zap} footnote="0 = fixed · 3 = half or double · 5 = sign open. The expert scores are summarised by their median.">
+              <SectionCard title="Uncertainty" icon={Zap} footnote="0 = fixed by law or contract · 3 = size could be half or double · 5 = the sign could differ. The expert scores are summarised by their median.">
                 <CompareStack who={whoFor('uncertainty')}
                   baseline={<Val>{uncLabel(bU)}</Val>}
-                  expert={<><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{eU != null ? uncLabel(Math.round(eU)) : NO_VALUE}</span>{eU != null ? <DeltaChip value={Math.round(eU) - bU} digits={0} /> : null}</>} />
+                  expert={<><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: EXPERT_COLOR }}>{eU != null ? uncLabel(Math.round(eU)) : NO_VALUE}</span>{eU != null ? <DeltaChip value={Math.round(eU) - bU} digits={0} /> : null}</>} />
                 <Decide cur={srcOf('uncertainty', eU != null)} onPick={(s) => setS('uncertainty', s)} expertOk={eU != null}
                   manual={<input type="number" min={0} max={5} value={man.uncertainty ?? ''} onChange={(e) => setM('uncertainty', e.target.value)} placeholder="0–5" style={manInput} />}
                   result={resultOf('uncertainty', eU != null, resolved.uncertainty != null ? uncLabel(resolved.uncertainty) : NO_VALUE,
@@ -559,19 +560,19 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
 
             {/* Right: the exposure grids, baseline over expert mean in every cell */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <SectionCard title="Category Exposure" icon={Layers}>
-                <div style={grpLabel}>HAIR</div>
+              <SectionCard title="Category exposure" icon={Layers}>
+                <div style={grpLabel}>Hair</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(174px, 1fr))', gap: 10 }}>
                   {catCells.filter((c) => c.group === 'Hair').map((c) => exposureCell('category', c))}
                 </div>
-                <div style={{ ...grpLabel, marginTop: 14 }}>LAUNDRY &amp; HOME CARE</div>
+                <div style={{ ...grpLabel, marginTop: 14 }}>Laundry &amp; Home Care</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(174px, 1fr))', gap: 10 }}>
                   {catCells.filter((c) => c.group === 'LHC').map((c) => exposureCell('category', c))}
                 </div>
                 <Decide cur={srcOf('category', hasCatE)} onPick={(s) => setS('category', s)} expertOk={hasCatE}
                   result={EXPOSURE_RESULT[srcOf('category', hasCatE)]} />
               </SectionCard>
-              <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer}>
+              <SectionCard title="Regional exposure" icon={MapPin} accent={S.onSecondaryContainer}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(174px, 1fr))', gap: 10 }}>
                   {regCells.map((c) => exposureCell('region', c))}
                 </div>
@@ -579,7 +580,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
                   result={EXPOSURE_RESULT[srcOf('region', hasRegE)]} />
               </SectionCard>
               <SectionCard
-                title="Value Chain Epicentre" icon={Cpu} accent={S.onTertiaryContainer} info={FIELD_HELP.vc}
+                title="Value-chain epicentre" icon={Cpu} accent={S.onTertiaryContainer} info={FIELD_HELP.vc}
                 right={
                   <span title="Stages are categories: votes are counted, never averaged" style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, backgroundColor: S.amberContainer, color: S.onAmberContainer, whiteSpace: 'nowrap', cursor: 'help' }}>
                     Baseline {shortStage(baseVcStage)}
@@ -634,8 +635,8 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
                 Keep current
               </button>
               <button type="button" onClick={() => setAll('expert')}
-                style={{ border: `1px solid ${S.cardBorder}`, cursor: 'pointer', fontFamily: HEADLINE_FONT, fontSize: 11.5, fontWeight: 700, padding: '6px 13px', borderRadius: 999, background: S.surface, color: REVIEWED_COLOR }}>
-                Experts ø
+                style={{ border: `1px solid ${S.cardBorder}`, cursor: 'pointer', fontFamily: HEADLINE_FONT, fontSize: 11.5, fontWeight: 700, padding: '6px 13px', borderRadius: 999, background: S.surface, color: EXPERT_COLOR }}>
+                Expert aggregate
               </button>
               <button type="button" onClick={() => setAll('baseline')}
                 style={{ border: `1px solid ${S.cardBorder}`, cursor: 'pointer', fontFamily: HEADLINE_FONT, fontSize: 11.5, fontWeight: 700, padding: '6px 13px', borderRadius: 999, background: S.surface, color: S.onSurface }}>

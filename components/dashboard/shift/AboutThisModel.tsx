@@ -14,11 +14,11 @@ import { RunDetails } from './RunDetails';
 
 /** The glossary: a term and what it means here. */
 const GLOSSARY: Array<[string, string]> = [
-  ['GP1', 'Gross Profit 1 (contribution after cost of goods): the profit layer whose shifts the model projects.'],
+  ['GP1', 'Gross profit 1: net sales less the direct cost of goods, the profit layer whose shifts the model projects.'],
   ['MC median', 'The middle outcome of all simulated Monte Carlo paths: the central estimate shown in every cell.'],
   ['P10 to P90', 'The range covering 80% of simulated outcomes: 10% of runs land below P10, 10% above P90.'],
   ['Category codes', 'LHC = Laundry & Home Care. FCN Fabric Clean · FCA Fabric Care · FFI Fabric Finishers · LAD Laundry Additives · HDW Hand Dishwash · ADW Auto Dishwash · HSC Hard-Surface Cleaner · TOI Toilet Care · IC Insect Control.'],
-  ['Attenuation', 'Dampening factor applied to overlapping drivers so co-occurring effects are not double-counted.'],
+  ['Attenuation', "The factor that scales each force's summed contribution by how much of its signal the other forces already carry, so a mechanism two forces share is not counted twice. Drivers that overlap within a force are dampened separately."],
   ['Cumulative shift', `Each cell is the compounded level vs ${BASE_YEAR} at that year, not a year-on-year change.`],
 ];
 
@@ -129,7 +129,7 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
               </div>
             )}
             <div className="text-[11px] mt-1.5" style={{ color: S.mutedText, lineHeight: 1.5 }}>
-              These are the values production runs use; changing them is a code change followed by a new production run. Timing: P10 to P90 bands are magnitude uncertainty from the Monte&nbsp;Carlo, with each driver&rsquo;s spread set by its uncertainty score; a per-iteration peak-year jitter of up to &plusmn;{Math.max(...UNCERTAINTY_PEAK_JITTER)} years, also set by that score, gives velocity bands their timing spread. Confidence describes the evidence and is shown with the driver; it does not drive the bands.
+              These are the values production runs use; changing them is a code change followed by a new production run. Timing: P10 to P90 bands come from the Monte&nbsp;Carlo and carry magnitude and timing uncertainty: each driver&rsquo;s uncertainty score sets the spread of its probability draw and a per-iteration peak-year jitter of up to &plusmn;{Math.max(...UNCERTAINTY_PEAK_JITTER)} years. Confidence describes the evidence and is shown with the driver; it does not drive the bands.
             </div>
           </div>
           {/* What a 1–5 probability score means as a Beta prior: the scale
@@ -178,8 +178,8 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
           {/* A three-line plain read first, so the curious reader gets the gist before the technical prose. */}
           <ul className="text-[12px] mb-3" style={{ color: S.onSurfaceVariant, lineHeight: 1.55, fontFamily: BODY_FONT, margin: '0 0 12px', paddingLeft: 18 }}>
             <li style={{ marginBottom: 3 }}>Each cell is the cumulative % shift vs {BASE_YEAR} at that year: a compounded level, not a year-on-year change.</li>
-            <li style={{ marginBottom: 3 }}>The matrix totals are category-weighted averages of the category medians, not sums; the portfolio figure above the matrix is the median of the portfolio shift itself, so the two can differ slightly.</li>
-            <li>The model holds Henkel and competitor strategy constant: it propagates external drivers only.</li>
+            <li style={{ marginBottom: 3 }}>The matrix totals are category-weighted averages, not sums; the portfolio figure above the matrix is the median of the portfolio shift itself, so the two can differ slightly.</li>
+            <li>The model holds responses constant, Henkel&rsquo;s and competitors&rsquo;: it propagates the listed drivers only.</li>
           </ul>
           <p className="text-[12px]" style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}>
             <span style={{ fontWeight: 600, color: S.onSurfaceVariant }}>Methodology:</span>{' '}
@@ -199,16 +199,19 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
             category&rsquo;s regional shifts up with that category&rsquo;s row of the cell weights, so
             a regionally concentrated driver moves only its regions&rsquo; slice of the pool; each
             category&rsquo;s drill-down shows its regional shifts. The Force, Value Chain and Region
-            lenses split each category&rsquo;s median of each year: by force with the force weights,
-            by region with the cell weights, and by value-chain stage wholly to the stage where
-            experts placed each driver&rsquo;s epicentre (with responses held constant, the model
-            carries no propagation along the chain). A lens&rsquo;s row total is the
+            lenses split each category&rsquo;s median of each year by the size of the drivers&rsquo;
+            effects, not by their direction: by force with the force weights, by region with the
+            regional exposures and the cell weights, and by value-chain stage wholly to the stage
+            where experts placed each driver&rsquo;s epicentre (effects are not passed up or down the
+            chain). Every part of a lens takes the median&rsquo;s direction; the drill-down&rsquo;s
+            contributing drivers carry their own signs. A lens&rsquo;s row total is the
             category&rsquo;s median, the same in all four lenses. <strong>Column and grand totals
-            are category-weighted averages</strong> of the category medians, with the run&rsquo;s
-            category shares (the row sums of its cell weights), so a year&rsquo;s grand total is the
-            same in every lens. The portfolio figure above the matrix is another number: the median
-            of the portfolio shift computed in every draw, with its P10 to P90 band. An average of
-            medians is not the median of the average, so the two can differ slightly.
+            are category-weighted averages</strong> of the cells above them, with the run&rsquo;s
+            category shares (the row sums of its cell weights); a year&rsquo;s grand total averages
+            the category medians, so it is the same in every lens. The portfolio figure above the
+            matrix is another number: the median of the portfolio shift computed in every draw, with
+            its P10 to P90 band. An average of medians is not the median of the average, so the two
+            can differ slightly.
           </p>
         </div>
       )}

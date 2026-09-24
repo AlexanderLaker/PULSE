@@ -56,7 +56,7 @@ export const KpiTile: FC<{
             boxShadow: SHADOW.popover,
           }}
         >
-          P10 {fmtShift(band.p10, 1)} … P90 {fmtShift(band.p90, 1)}
+          P10 {fmtShift(band.p10, 1)} to P90 {fmtShift(band.p90, 1)}
           <span style={{ color: S.onSurfaceVariant }}> · {bandNote}</span>
         </div>
       )}

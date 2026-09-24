@@ -46,8 +46,8 @@ export const RunNotices: FC<{ simulation: SimulationResult; serviceVersion: stri
   if (serviceVersion && serviceVersion !== version) {
     notes.push(isNewer(version, serviceVersion)
       ? `This run was computed by engine ${version}, which the service does not run yet (it runs `
-        + `${serviceVersion}). What the dashboard takes from the service's configuration follows once `
-        + `${version} is deployed.`
+        + `${serviceVersion}). The model settings shown with it come from the service and match this run `
+        + `once ${version} is deployed.`
       : `This run was computed by engine ${version}; the service runs ${serviceVersion}. `
         + 'The numbers follow the current engine after the next production run.');
   }

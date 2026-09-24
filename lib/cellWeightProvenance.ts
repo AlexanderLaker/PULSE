@@ -373,7 +373,7 @@ export const REGION_MIX: Record<string, GradedRegionMix> = {
       "High Growth": 0.31
     },
     "grade": "E",
-    "note": "the most Europe-and-growth-market weighted home-care line HCB has: Bref WC is core in Germany, CEE, Turkiye and MEA, and HCB has essentially no US toilet shelf (that is Lysol and Clorox)"
+    "note": "the most Europe-and-growth-market weighted home-care line HCB has: Bref WC is core in Germany, CEE, Türkiye and MEA, and HCB has essentially no US toilet shelf (that is Lysol and Clorox)"
   },
   "LHC: IC": {
     "mix": {

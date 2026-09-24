@@ -27,10 +27,10 @@ export function sourceHost(url: string): string | null {
 
 // ─── Per-field help, shown by the info tips on the section cards ─
 export const FIELD_HELP = {
-  probability: 'Likelihood that this driver materialises as described. Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain. The 1–5 score sets a Beta prior whose MEAN is score/6, deliberately shrunk against overconfidence: 1→0.17, 2→0.33, 3→0.50, 4→0.67, 5→0.83 (a "5" means five in six, not certainty). The band width comes from the Beta concentration α+β, which the Uncertainty score sets, sampled by the Monte Carlo.',
-  uncertainty: `How much the SIZE and TIMING of the effect could differ from the modelled values, given its direction: one score per driver. It is not probability (how likely the effect is at all) and not Confidence (how well the present state is evidenced). 0 = fixed by law or contract; 1 = size within about ±25 %, timing dated; 2 = well-evidenced mechanism, size within about ±50 %, timing 1–2 years; 3 = size could be half or double, or the onset depends on an undated trigger; 4 = size could be near zero or more than double; 5 = the sign could differ across scenarios or the effect may not materialise inside the horizon. The engine turns it into the Beta-prior concentration (${UNCERTAINTY_KAPPA.join('/')}; the mean stays probability/6) and the peak-year jitter (${UNCERTAINTY_PEAK_JITTER.join('/')} years).`,
-  gp1: 'The share of a category’s GP1 (gross profit after cost of goods) this driver can realistically move at full materialisation. Multiplied by the probability’s mean (probability / 6) and the direction, it gives the driver’s expected effect.',
-  timing: `When the driver reaches full impact (Peak Year) and the shape of how it builds towards that peak over ${FIRST_YEAR}–${HORIZON} (Diffusion Curve).`,
+  probability: 'Likelihood that this driver materialises as described. Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain. The 1–5 score sets a Beta prior whose mean is score/6, deliberately shrunk against overconfidence: 1→0.17, 2→0.33, 3→0.50, 4→0.67, 5→0.83 (a "5" means five in six, not certainty). The band width comes from the Beta concentration α+β, which the Uncertainty score sets, sampled by the Monte Carlo.',
+  uncertainty: `How much the size and timing of the effect could differ from the modelled values, given its direction: one score per driver. It is not probability (how likely the effect is at all) and not Confidence (how well the present state is evidenced). 0 = fixed by law or contract; 1 = size within about ±25%, timing dated or within a year; 2 = well-evidenced mechanism, size within about ±50%, timing 1–2 years; 3 = size could be half or double, or the onset depends on an undated trigger; 4 = size could be near zero or more than double; 5 = the sign could differ across scenarios, or the effect may not materialise at all. The engine turns it into the Beta-prior concentration (${UNCERTAINTY_KAPPA.join('/')}; the mean stays probability/6) and the peak-year jitter (${UNCERTAINTY_PEAK_JITTER.join('/')} years).`,
+  gp1: 'The share of a category’s GP1 (gross profit: net sales less the direct cost of goods) this driver can realistically move at full materialisation. Multiplied by the probability’s mean (probability / 6) and the direction, it gives the driver’s expected effect.',
+  timing: `When the driver reaches full impact (the peak year) and the shape of how it builds towards that peak over ${FIRST_YEAR}–${HORIZON} (the diffusion curve).`,
   category: 'How hard this driver hits each Hair and Laundry & Home Care category, on a 0–5 scale.',
   regional: 'How strongly this driver plays out across regions (Europe, North America, Asia, High Growth), on a 0–5 scale.',
   vc: 'The stage of the value chain, from raw materials through to the consumer, where this driver’s impact centres (its epicentre). One stage per driver: the value-chain attribution assigns the driver’s whole contribution to this stage. It does not change the shift.',
@@ -157,7 +157,7 @@ function baselineDifferences(d: Driver, base: DriverScores): string[] {
   compare('Uncertainty', uncLabel(d.uncertainty), uncLabel(base.uncertainty));
   compareCells('Category exposure', CATEGORIES.map((c) => [c.name, c.short] as const), d.category_exposure, base.category_exposure);
   compareCells('Regional exposure', REGIONS.map((r) => [r, r] as const), d.regional_exposure, base.regional_exposure);
-  compare('Value chain epicentre', d.vc_epicentre, base.vc_epicentre);
+  compare('Value-chain epicentre', d.vc_epicentre, base.vc_epicentre);
   return lines;
 }
 

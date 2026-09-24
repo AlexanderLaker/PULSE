@@ -43,7 +43,7 @@ interface SectionDef {
 
 const SECTIONS: SectionDef[] = [
   { id: 'profile',  label: 'Profile',             subtitle: 'Your identity and display name',                icon: User,              group: 'account' },
-  { id: 'password', label: 'Password',            subtitle: 'Rotate your credentials',                       icon: KeyRound,          group: 'account' },
+  { id: 'password', label: 'Password',            subtitle: 'Change your password',                          icon: KeyRound,          group: 'account' },
   { id: 'sessions', label: 'Active sessions',     subtitle: 'Devices and browsers with an active session',   icon: Monitor,           group: 'account' },
   { id: 'model',    label: 'Model configuration', subtitle: "The model's parameters and the served run's cell weights", icon: SlidersHorizontal, group: 'model' },
   { id: 'users',    label: 'User management',     subtitle: 'Team access and roles',                         icon: UsersIcon,         group: 'admin' },

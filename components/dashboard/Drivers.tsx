@@ -235,7 +235,7 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
                 lineHeight: 1.1,
               }}
             >
-              The Forces Shaping FMCG
+              What Moves HCB&rsquo;s Profit Pools
             </h1>
             <p
               className="mt-2 max-w-2xl text-[15px]"
@@ -344,7 +344,7 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
             <SortHeader label="Direction"      sortKey="direction"   currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
             <SortHeader label="Probability"    sortKey="probability" currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
             <span className="inline-flex items-center justify-end w-full">
-              <SortHeader label="GP1 % Affected" sortKey="gp1"         currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
+              <SortHeader label="GP1 % affected" sortKey="gp1"         currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
               <Gp1InfoTip />
             </span>
             <SortHeader label="Expected effect" sortKey="effect"     currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
@@ -450,7 +450,7 @@ const Gp1InfoTip: FC = () => {
   const [open, setOpen] = useState(false);
   return (
     <span className="relative inline-flex items-center">
-      <button type="button" aria-label="What does GP1 % Affected mean?"
+      <button type="button" aria-label="What does GP1 % affected mean?"
         onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}
         onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
         style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -464,7 +464,7 @@ const Gp1InfoTip: FC = () => {
           fontFamily: BODY_FONT, fontSize: 11.5, lineHeight: 1.5, fontWeight: 500, textTransform: 'none',
           letterSpacing: 0, textAlign: 'left', boxShadow: SHADOW.tip,
           pointerEvents: 'none', whiteSpace: 'normal' }}>
-          <b>GP1 % Affected.</b> {FIELD_HELP.gp1}
+          <b>GP1 % affected.</b> {FIELD_HELP.gp1}
         </span>
       )}
     </span>

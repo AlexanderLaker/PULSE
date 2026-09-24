@@ -455,7 +455,7 @@ export const Matrix: FC<MatrixProps> = ({
             </div>
             {band && (
               <div style={{ opacity: 0.55, fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>
-                Band = magnitude uncertainty of the listed drivers only.
+                Band = magnitude and timing uncertainty of the listed drivers only.
               </div>
             )}
             {!band && noBandsNote && (

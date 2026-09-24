@@ -151,7 +151,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cell-weights", metavar="FILE", default=None,
                         help="finance cell weights (see above); without it the run uses the estimated HCB mix")
     parser.add_argument("--allow-sqlite", action="store_true",
-                        help="run against the local SQLite file when no database is configured (tests only)")
+                        help="run against the local SQLite file when no database is configured (local "
+                             "development and tests)")
     parser.add_argument("--allow-nonpsd", action="store_true",
                         help="run even if the correlation matrix is not positive definite on this driver mix; "
                              "the engine then repairs it and records an integrity event")

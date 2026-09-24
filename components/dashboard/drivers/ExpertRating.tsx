@@ -180,13 +180,13 @@ export const ExpertRatingPanel: FC<{ driver: Driver; onMyChange: (driverId: stri
             </div>
           </SectionCard>
 
-          <SectionCard title="Impact: GP1 % exposed" icon={BarChart3} info={FIELD_HELP.gp1} footnote="Share of category GP1 this driver can move at full materialisation.">
+          <SectionCard title="GP1 % affected" icon={BarChart3} info={FIELD_HELP.gp1} footnote="Share of category GP1 this driver can move at full materialisation.">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <input type="range" min={1} max={100} step={1} value={gp1Int ?? 1}
                 onChange={(e) => patch({ gp1_pct_affected: parseInt(e.target.value, 10) / 100 })}
                 title={`Baseline ${fmtPct(base.gp1_pct_affected, 0)}`} style={{ flex: 1, cursor: 'help' }} />
               <input type="number" min={1} max={100} step={1} value={gp1Int ?? ''} placeholder={NO_VALUE}
-                aria-label="GP1 percent exposed"
+                aria-label="GP1 % affected, in percent"
                 onChange={(e) => {
                   // A share of 0 moves nothing, so an empty field or 0 clears the score.
                   const n = parseInt(e.target.value, 10);
@@ -202,7 +202,7 @@ export const ExpertRatingPanel: FC<{ driver: Driver; onMyChange: (driverId: stri
           <SectionCard title="Materialisation timing" icon={Clock} info={FIELD_HELP.timing}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
-                <FieldLabel>Peak Year</FieldLabel>
+                <FieldLabel>Peak year</FieldLabel>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <ProposalYearInput value={draft.peak_year} min={firstPeakYear(driver.start_year)} onChange={(v) => patch({ peak_year: v })}
                     title={`Baseline ${base.peak_year}`} />
@@ -210,14 +210,14 @@ export const ExpertRatingPanel: FC<{ driver: Driver; onMyChange: (driverId: stri
                 </div>
               </div>
               <div>
-                <FieldLabel>Diffusion Curve</FieldLabel>
+                <FieldLabel>Diffusion curve</FieldLabel>
                 <DiffusionPicker value={draft.diffusion_curve} baseline={base.diffusion_curve} distribution={dist}
                   onChange={(c) => patch({ diffusion_curve: c })} onClear={() => patch({ diffusion_curve: null })} />
               </div>
             </div>
           </SectionCard>
 
-          <SectionCard title="Uncertainty" icon={Zap} info={FIELD_HELP.uncertainty} footnote="0 = fixed · 3 = half or double · 5 = sign open. Sets the band width and the timing jitter of this driver; the mean stays where probability puts it.">
+          <SectionCard title="Uncertainty" icon={Zap} info={FIELD_HELP.uncertainty} footnote="0 = fixed by law or contract · 3 = size could be half or double · 5 = the sign could differ. Sets the band width and the timing jitter of this driver; the mean stays where probability puts it.">
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
               <UncertaintyPicker value={draft.uncertainty} baseline={base.uncertainty}
                 onChange={(v) => patch({ uncertainty: v })} onClear={() => patch({ uncertainty: null })} />
@@ -235,16 +235,16 @@ export const ExpertRatingPanel: FC<{ driver: Driver; onMyChange: (driverId: stri
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <SectionCard title="Category Exposure" icon={Layers} info={FIELD_HELP.category} footnote="Grey = unscored. A cell you leave blank is not part of your proposal; click a selected dot again to clear it.">
+          <SectionCard title="Category exposure" icon={Layers} info={FIELD_HELP.category} footnote="Grey = unscored. A cell you leave blank is not part of your proposal; click a selected dot again to clear it.">
             <EditableCategoryGrid clearable exposures={draft.category_exposure ?? {}}
               onChange={(e) => patch({ category_exposure: Object.keys(e).length ? e : null })} baseline={base.category_exposure} />
           </SectionCard>
-          <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer} info={FIELD_HELP.regional}>
+          <SectionCard title="Regional exposure" icon={MapPin} accent={S.onSecondaryContainer} info={FIELD_HELP.regional}>
             <EditableRegionGrid clearable exposures={draft.regional_exposure ?? {}}
               onChange={(e) => patch({ regional_exposure: Object.keys(e).length ? e : null })} baseline={base.regional_exposure} />
           </SectionCard>
           <SectionCard
-            title="Value Chain Epicentre" icon={Cpu} accent={S.onTertiaryContainer} info={FIELD_HELP.vc}
+            title="Value-chain epicentre" icon={Cpu} accent={S.onTertiaryContainer} info={FIELD_HELP.vc}
             right={
               <span className="inline-flex items-center gap-2">
                 <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: myVcStage != null ? S.primary : S.mutedText }}>

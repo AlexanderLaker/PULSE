@@ -102,7 +102,7 @@ export const BaselineMark: FC<{ size?: number }> = ({ size = 9 }) => (
  *  only: the collapsed rows carry no value-chain cell. A diamond marks the
  *  baseline stage where it differs. */
 export const EpicentreRail: FC<{ stage: string; baseline: string }> = ({ stage, baseline }) => {
-  const title = `Value chain epicentre: ${vcStageLabel(stage)}${baseline !== stage ? ` · baseline: ${baseline}` : ''}`;
+  const title = `Value-chain epicentre: ${vcStageLabel(stage)}${baseline !== stage ? ` · baseline: ${baseline}` : ''}`;
   return (
     <div title={title} aria-label={title} style={{ cursor: 'help' }}>
       <div style={{ position: 'relative', height: 40 }}>
@@ -188,7 +188,7 @@ export const EpicentreSlider: FC<{
         onChange={(e) => onChange(VC_STAGES[parseInt(e.target.value, 10)])}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        aria-label="Value chain epicentre"
+        aria-label="Value-chain epicentre"
         aria-valuetext={vcStageLabel(value)}
         style={{ position: 'absolute', left: 0, right: 0, top: 8, width: '100%', height: 28, opacity: 0, cursor: 'grab', margin: 0 }}
       />

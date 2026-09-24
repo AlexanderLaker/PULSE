@@ -110,7 +110,7 @@ describe('Shift Matrix lenses', () => {
     STORE.store = makeStore();
     render(<ShiftAnalysis />);
     const timeTotal = screen.getByTitle(/^2035, column total: /).getAttribute('title')!.replace(/^2035, column total: /, '');
-    for (const lens of ['Force attribution', 'Value chain epicentre attribution', 'Region attribution']) {
+    for (const lens of ['Force attribution', 'Value-chain epicentre attribution', 'Region attribution']) {
       fireEvent.click(screen.getByRole('button', { name: lens }));
       expect(screen.getByText('Total 2035')).toBeTruthy();
       expect(screen.getByTitle(/^Grand total: /).getAttribute('title')).toBe(`Grand total: ${timeTotal}`);
@@ -162,7 +162,7 @@ describe('Shift Matrix lenses', () => {
     expect(aside.textContent).toContain('Force attribution · 2034');
     expect(aside.textContent).toContain('Regional shift · 2034');
     expect(aside.textContent).toContain('North America');
-    expect(aside.textContent).toContain('adds up to the row’s median in 2034');
+    expect(aside.textContent).toContain('splits the row’s median in 2034 by the size of each force’s drivers, not their direction');
   });
 
   it('opens the drill-down at the horizon on the Time Path, whatever year the stepper was left on', () => {

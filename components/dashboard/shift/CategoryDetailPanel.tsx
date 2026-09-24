@@ -564,9 +564,11 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
               style={{ display: 'inline', verticalAlign: -1, marginRight: 4 }}
             />
             Shifts are cumulative against {BASE_YEAR}, from the Monte Carlo engine. The force
-            attribution adds up to the row&rsquo;s median in {year}.
+            attribution splits the row&rsquo;s median in {year} by the size of each force&rsquo;s
+            drivers, not their direction, so a force whose drivers push both ways still shows a share
+            in the median&rsquo;s direction; the contributing drivers carry their signs.
             {contributors.length > 0
-              && ' Contributing drivers: the same decomposition as the PRISM Analysis on the Drivers page (force weight × attenuation × overlap correction × expected materialisation × category and regional exposure, rolled up with the run’s cell weights), scaled here so they add up to the row’s terminal-year median (where that would reverse them or more than double them, they stay at the means); the ranking agrees with the readings. A bar is the driver’s part of the row’s gross movement, headwinds and tailwinds counted by size, and the bars add up to 100%; the readings quote shares of the net shift, which are larger where tailwinds offset headwinds.'}
+              && ' Contributing drivers: the same decomposition as the PRISM Analysis on the Drivers page (expected effect × force weight × attenuation × overlap correction × expected materialisation × category and regional exposure, rolled up with the run’s cell weights), scaled here so they add up to the row’s terminal-year median (where that would reverse them, halve them or more than double them, they stay at the means); the ranking agrees with the readings. A bar is the driver’s part of the row’s gross movement, headwinds and tailwinds counted by size, and the bars add up to 100%; the readings quote shares of the net shift, which are larger where tailwinds offset headwinds.'}
           </footer>
         </div>
       </motion.aside>

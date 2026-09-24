@@ -108,7 +108,7 @@ export default function RootLayout({
         },
       }}
     >
-      <html lang="en" className={`${inter.variable} ${manrope.variable} ${jetbrainsMono.variable}`}>
+      <html lang="en-GB" className={`${inter.variable} ${manrope.variable} ${jetbrainsMono.variable}`}>
         {/* The body's font, background and text colour are set in globals.css. */}
         <body>{children}</body>
       </html>

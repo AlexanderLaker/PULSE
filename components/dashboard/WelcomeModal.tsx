@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import useOverlay from '@/hooks/useOverlay';
+import { HORIZON } from '@/lib/format';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 
 interface WelcomeModalProps {
@@ -346,8 +347,9 @@ const Step2Views: FC = () => (
     >
       Three views, in the order shown in the header.{' '}
       <strong style={{ color: S.onBg }}>Start with Drivers:</strong>{' '}
-      the model computes from their scores and nothing else. The Profit Pool
-      Explorer, a beta, sits apart from the model.
+      the model computes from their scores and its own configuration, which
+      includes an estimated gross-profit mix (from public reporting, not Henkel
+      P&amp;L). The Profit Pool Explorer, a beta, sits apart from the model.
     </p>
 
     <SectionLabel>Input</SectionLabel>
@@ -371,8 +373,8 @@ const Step2Views: FC = () => (
       number="3"
       icon={TrendingUp}
       title="Profit Pool Shift Analysis"
-      body="Shows where value is migrating, sliced by time path, force, region and value-chain stage."
-      note="Values reflect the isolated driver impact on HCB's current business, excluding price moves, innovations or competitor actions."
+      body={`Shows how the drivers shift each category's gross profit to ${HORIZON}, by time path, force, region and value-chain stage.`}
+      note="Values are the drivers' effect on HCB's current business if nobody responds: no price moves, innovation or competitive reaction by Henkel or anyone else. Read them as exposure, not as a forecast."
     />
   </div>
 );

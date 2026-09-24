@@ -91,7 +91,7 @@ const RETRY_BUTTON: CSSProperties = {
   gap: 8,
   padding: '12px 24px',
   backgroundColor: S.primary,
-  color: S.surface,
+  color: S.onPrimary,
   border: 'none',
   borderRadius: 10,
   fontSize: 15,
@@ -130,7 +130,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           <h1 style={HEADING}>Something went wrong</h1>
 
           <p style={DESCRIPTION}>
-            We encountered an unexpected error. Please try again or contact support if the problem persists.
+            The page hit an unexpected error. Try again; if it happens again, tell the PRISM team what you were doing.
           </p>
 
           {process.env.NODE_ENV === 'development' && this.state.error && (

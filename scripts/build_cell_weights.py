@@ -102,7 +102,7 @@ REGION_MIX = {
                       "Bref surface and Biff are European and growth-market brands"),
     "LHC: TOI":      ({"Europe": 0.60, "North America": 0.04, "Asia": 0.05, "High Growth": 0.31}, "E",
                       "the most Europe-and-growth-market weighted home-care line HCB has: Bref WC is core "
-                      "in Germany, CEE, Turkiye and MEA, and HCB has essentially no US toilet shelf "
+                      "in Germany, CEE, Türkiye and MEA, and HCB has essentially no US toilet shelf "
                       "(that is Lysol and Clorox)"),
     "LHC: IC":       ({"Europe": 0.35, "North America": 0.05, "Asia": 0.10, "High Growth": 0.50}, "G",
                       "insect control follows climate, so it sits in the growth markets"),

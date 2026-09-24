@@ -176,7 +176,7 @@ describe('ConsumerJourney: stored content and the admin save', () => {
   it('saves the whole tile map for an admin, naming the version it was edited from', async () => {
     render(<ConsumerJourney isAdmin />);
     await startEditing();
-    fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save for everyone' }));
     expect(await screen.findByText('Saved')).toBeTruthy();
     expect(API.saveJourneyContent).toHaveBeenCalledTimes(1);
     const [sent, baseVersion] = API.saveJourneyContent.mock.calls[0]! as [JourneyContent, number];
@@ -185,7 +185,7 @@ describe('ConsumerJourney: stored content and the admin save', () => {
     expect(sent.hair.length).toBeGreaterThan(0);
     expect(baseVersion).toBe(0);   // the bundled content
     // the next save starts from the version this one created
-    fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save for everyone' }));
     await waitFor(() => expect(API.saveJourneyContent).toHaveBeenCalledTimes(2));
     expect(API.saveJourneyContent.mock.calls[1]![1]).toBe(1);
   });
@@ -194,7 +194,7 @@ describe('ConsumerJourney: stored content and the admin save', () => {
     API.saveJourneyContent.mockRejectedValue(new ApiError(403, 'Admin role required'));
     render(<ConsumerJourney isAdmin />);
     await startEditing();
-    fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save for everyone' }));
     expect(await screen.findByText('Admin required: your account cannot save journey content.')).toBeTruthy();
   });
 
@@ -202,7 +202,7 @@ describe('ConsumerJourney: stored content and the admin save', () => {
     API.saveJourneyContent.mockRejectedValue(new ApiError(409, 'saved by someone else'));
     render(<ConsumerJourney isAdmin />);
     await startEditing();
-    fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save for everyone' }));
     expect(await screen.findByText(/Someone else saved the journey after you opened it/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Load the saved version' }));
     await waitFor(() => expect(API.getJourneyContent).toHaveBeenCalledTimes(2));
@@ -212,24 +212,24 @@ describe('ConsumerJourney: stored content and the admin save', () => {
     API.saveJourneyContent.mockRejectedValue(new ApiError(0, 'The request timed out after 20 s', true));
     render(<ConsumerJourney isAdmin />);
     await startEditing();
-    fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save for everyone' }));
     expect(await screen.findByText(/got no answer and may still have been stored/)).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Save to server' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Save for everyone' }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Load the saved version' }));
     await waitFor(() => expect(API.getJourneyContent).toHaveBeenCalledTimes(2));
     await waitFor(() =>
-      expect((screen.getByRole('button', { name: 'Save to server' }) as HTMLButtonElement).disabled).toBe(false));
+      expect((screen.getByRole('button', { name: 'Save for everyone' }) as HTMLButtonElement).disabled).toBe(false));
   });
 
   it('keeps asking for the saved version when a tile is edited after a save that timed out', async () => {
     API.saveJourneyContent.mockRejectedValue(new ApiError(0, 'The request timed out after 20 s', true));
     render(<ConsumerJourney isAdmin />);
     await startEditing();
-    fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save for everyone' }));
     expect(await screen.findByText(/got no answer and may still have been stored/)).toBeTruthy();
     fireEvent.click(screen.getAllByRole('button', { name: /^Add a tailwind tile to / })[0]!);
     expect(screen.getByText(/got no answer and may still have been stored/)).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Save to server' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Save for everyone' }) as HTMLButtonElement).disabled).toBe(true);
     expect(API.saveJourneyContent).toHaveBeenCalledTimes(1);
   });
 
@@ -238,13 +238,13 @@ describe('ConsumerJourney: stored content and the admin save', () => {
     API.saveJourneyContent.mockReturnValueOnce(new Promise((resolve) => { land = resolve; }));
     render(<ConsumerJourney isAdmin />);
     await startEditing();
-    fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save for everyone' }));
     fireEvent.click(screen.getAllByRole('button', { name: /^Add a tailwind tile to / })[0]!);   // while it saves
     expect((screen.getByRole('button', { name: 'Saving…' }) as HTMLButtonElement).disabled).toBe(true);
     land({ status: 'saved', version: 4, tiles: 300 });
     expect(await screen.findByText(/Saved, except the edits made while it was saving/)).toBeTruthy();
     expect(screen.queryByText('Saved')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save for everyone' }));
     await waitFor(() => expect(API.saveJourneyContent).toHaveBeenCalledTimes(2));
     expect(API.saveJourneyContent.mock.calls[1]![1]).toBe(4);
   });
@@ -262,7 +262,7 @@ describe('ConsumerJourney: stored content and the admin save', () => {
     render(<ConsumerJourney isAdmin />);
     expect(await screen.findByText('Stored tile')).toBeTruthy();
     await startEditing();
-    fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save for everyone' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Load the saved version' }));
     expect(await screen.findByText(/these are the texts shipped with PRISM/)).toBeTruthy();
     expect(screen.queryByText('Stored tile')).toBeNull();
@@ -274,7 +274,7 @@ describe('ConsumerJourney: stored content and the admin save', () => {
     render(<ConsumerJourney isAdmin />);
     await startEditing();
     expect(await screen.findByText(/saving is off so it cannot be overwritten/)).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Save to server' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Save for everyone' }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getAllByRole('button', { name: 'Try again' }).length).toBeGreaterThan(0);
   });
 

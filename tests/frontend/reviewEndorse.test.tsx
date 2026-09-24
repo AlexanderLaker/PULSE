@@ -93,7 +93,7 @@ describe('Review & Endorse', () => {
     await openReview(reviewedDriver());
     await endorse();
     expect(await screen.findByText('✓ Endorsed')).toBeTruthy();
-    const gp1 = screen.getByRole('group', { name: 'Impact: GP1 % exposed' });
+    const gp1 = screen.getByRole('group', { name: 'GP1 % affected' });
     fireEvent.click(within(gp1).getByRole('button', { name: 'Baseline' }));
     expect(screen.queryByText('✓ Endorsed')).toBeNull();
   });
@@ -136,7 +136,7 @@ describe('Review & Endorse', () => {
   it('writes the baseline only where the admin chooses it', async () => {
     await openReview(reviewedDriver());
     await waitFor(() => expect(screen.getByText(/2 experts scored/)).toBeTruthy());
-    const gp1 = screen.getByRole('group', { name: 'Impact: GP1 % exposed' });
+    const gp1 = screen.getByRole('group', { name: 'GP1 % affected' });
     fireEvent.click(within(gp1).getByRole('button', { name: 'Baseline' }));
     const [, update] = await endorse();
     expect(update.gp1_pct_affected).toBe(0.22);

@@ -1,7 +1,7 @@
 /**
- * The entry view: "Profit Pool Model" over four doors, one per production
- * tab in tab order, telling the system's story once across the top: the
- * input, the lens, the output, the market. The gate only points the way: no
+ * The entry view: "Profit Pool Model" over four doors, one per tab in tab
+ * order, telling the system's story once across the top: the input, the
+ * context, the output, the market. The gate only points the way: no
  * figures, no run metadata, no footer.
  *
  * What the artwork shows:
@@ -442,9 +442,9 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
         </Door>
 
         <Door
-          eyebrow="The lens" title="Consumer Journey" caption="Pool impact, stage by stage."
+          eyebrow="The context" title="Consumer Journey" caption="Consumer moments and the drivers behind them."
           keyHint="2" wash={WASH.journey} delay={0.16} reduced={reduced}
-          ariaLabel="Consumer Journey, the lens. Pool impact, stage by stage. Shortcut key 2."
+          ariaLabel="Consumer Journey, the context. Consumer moments and the drivers behind them. Shortcut key 2."
           onOpen={() => onNavigate('consumer-journey')}
         >
           <JourneyArt />

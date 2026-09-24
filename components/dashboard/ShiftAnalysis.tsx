@@ -33,7 +33,7 @@
  * configuration or the drivers there is none, and the filter and the
  * drill-down say which of the two is missing.
  *
- * Above the matrix a KPI strip shows the portfolio band and the most resilient
+ * Above the matrix a KPI strip shows the portfolio band and the least exposed
  * and most exposed categories; a row or a category tile opens the drill-down
  * (CategoryDetailPanel). Without a run the page says why, from the service's
  * own diagnosis. The "About this model" footer carries the run's provenance
@@ -125,8 +125,8 @@ const ShiftAnalysis: FC<{
     return { ...model, data, colTotals: columnTotals(data, model.columns, categoryWeights), cellDetails: undefined };
   }, [simulation, lens, selectedYear, categoryWeights, filter, attributionResult]);
 
-  // The KPI strip: the joint portfolio band at the horizon, and the most
-  // resilient and most exposed categories with their own bands.
+  // The KPI strip: the joint portfolio band at the horizon, and the least and
+  // the most exposed categories with their own bands.
   const headline = useMemo(() => {
     if (!simulation) return null;
     const terminal = CATEGORIES.flatMap((c) => {
@@ -134,7 +134,7 @@ const ShiftAnalysis: FC<{
       return band ? [{ name: c.name, band }] : [];
     });
     const categoryTiles = terminal.length ? [
-      { label: 'Most resilient category', ...terminal.reduce((a, b) => (b.band.median > a.band.median ? b : a)) },
+      { label: 'Least exposed category', ...terminal.reduce((a, b) => (b.band.median > a.band.median ? b : a)) },
       { label: 'Most exposed category', ...terminal.reduce((a, b) => (b.band.median < a.band.median ? b : a)) },
     ] : [];
     return { portfolio: simulation.totals.portfolio[String(HORIZON)], categoryTiles };
