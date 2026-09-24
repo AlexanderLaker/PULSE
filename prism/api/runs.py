@@ -4,8 +4,8 @@ A run is written by scripts/run_production.py as one results bundle. This
 module checks that the newest run carries every part of that contract and
 shapes it for GET /api/v1/simulation.
 """
+from collections.abc import Iterable
 from datetime import timezone
-from typing import Iterable, Optional
 
 from prism.config import CATEGORIES, DEFAULT_PATH_YEARS, FORCES, REGIONS, VC_STAGES
 from prism.input_drift import changed_drivers, driver_fingerprint, incomplete_entries
@@ -102,7 +102,7 @@ def missing_keys(results) -> list:
     return missing
 
 
-def run_status(run: Optional[dict]) -> dict:
+def run_status(run: dict | None) -> dict:
     """Whether a run can be served: reason is "ok", "no_rows" or "malformed"."""
     if run is None:
         return {"has": False, "reason": "no_rows", "error": None, "latest_run_id": None}

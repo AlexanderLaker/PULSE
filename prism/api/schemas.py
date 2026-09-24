@@ -1,5 +1,5 @@
 """Request bodies of the write endpoints."""
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StrictInt, model_validator
 
@@ -66,18 +66,18 @@ class DriverUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     revision: StrictInt = Field(..., ge=1)
-    description: Optional[str] = Field(None, max_length=20000)
-    direction: Optional[Direction] = None
-    probability: Optional[StrictInt] = Field(None, ge=1, le=5)
-    gp1_pct_affected: Optional[Share] = Field(None, gt=0.0, le=1.0)
-    peak_year: Optional[StrictInt] = Field(None, ge=FIRST_PEAK, le=LAST_PEAK)
-    diffusion_curve: Optional[Curve] = None
-    uncertainty: Optional[StrictInt] = Field(None, ge=0, le=5)
-    confidence: Optional[Confidence] = None
-    category_exposure: Optional[dict] = None
-    regional_exposure: Optional[dict] = None
-    vc_epicentre: Optional[Stage] = None
-    sources: Optional[list[SourceRef]] = None
+    description: str | None = Field(None, max_length=20000)
+    direction: Direction | None = None
+    probability: StrictInt | None = Field(None, ge=1, le=5)
+    gp1_pct_affected: Share | None = Field(None, gt=0.0, le=1.0)
+    peak_year: StrictInt | None = Field(None, ge=FIRST_PEAK, le=LAST_PEAK)
+    diffusion_curve: Curve | None = None
+    uncertainty: StrictInt | None = Field(None, ge=0, le=5)
+    confidence: Confidence | None = None
+    category_exposure: dict | None = None
+    regional_exposure: dict | None = None
+    vc_epicentre: Stage | None = None
+    sources: list[SourceRef] | None = None
 
 
 class ProposalUpdate(BaseModel):
@@ -89,12 +89,12 @@ class ProposalUpdate(BaseModel):
     """
     model_config = ConfigDict(extra="forbid")
 
-    probability: Optional[StrictInt] = Field(None, ge=1, le=5)
-    gp1_pct_affected: Optional[Share] = Field(None, gt=0.0, le=1.0)
-    peak_year: Optional[StrictInt] = Field(None, ge=FIRST_PEAK, le=LAST_PEAK)
-    diffusion_curve: Optional[Curve] = None
-    uncertainty: Optional[StrictInt] = Field(None, ge=0, le=5)
-    category_exposure: Optional[dict] = None
-    regional_exposure: Optional[dict] = None
-    vc_epicentre: Optional[Stage] = None
-    comment: Optional[str] = None
+    probability: StrictInt | None = Field(None, ge=1, le=5)
+    gp1_pct_affected: Share | None = Field(None, gt=0.0, le=1.0)
+    peak_year: StrictInt | None = Field(None, ge=FIRST_PEAK, le=LAST_PEAK)
+    diffusion_curve: Curve | None = None
+    uncertainty: StrictInt | None = Field(None, ge=0, le=5)
+    category_exposure: dict | None = None
+    regional_exposure: dict | None = None
+    vc_epicentre: Stage | None = None
+    comment: str | None = None

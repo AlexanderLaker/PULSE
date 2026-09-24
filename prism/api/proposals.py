@@ -16,18 +16,18 @@ Aggregation across experts:
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from prism.drivers import EXPOSURE_FIELDS
 
 SCALAR_MEAN_FIELDS = ("probability", "gp1_pct_affected")
 
 
-def _non_null(values: List[Any]) -> List[Any]:
+def _non_null(values: list[Any]) -> list[Any]:
     return [v for v in values if v is not None]
 
 
-def _median(values: List[float]) -> Optional[float]:
+def _median(values: list[float]) -> float | None:
     """Median of non-null numeric values (linear, like statistics.median).
 
     Returns None for an empty list. Even-length lists average the two
@@ -46,21 +46,21 @@ def _median(values: List[float]) -> Optional[float]:
     return int(m) if float(m).is_integer() else round(m, 2)
 
 
-def _mean2(values: List[float]) -> Optional[Dict[str, Any]]:
+def _mean2(values: list[float]) -> dict[str, Any] | None:
     nums = [float(v) for v in _non_null(values)]
     if not nums:
         return None
     return {"avg": round(sum(nums) / len(nums), 2), "count": len(nums)}
 
 
-def _mode_distribution(values: List[Any]) -> Optional[Dict[str, Any]]:
+def _mode_distribution(values: list[Any]) -> dict[str, Any] | None:
     """The votes on a categorical field (diffusion_curve, vc_epicentre): the
     distribution and its majority, the value with more votes than any other.
     A tie has no majority (mode None): the choice stays with the admin."""
     vals = _non_null(values)
     if not vals:
         return None
-    dist: Dict[str, int] = {}
+    dist: dict[str, int] = {}
     for v in vals:
         dist[str(v)] = dist.get(str(v), 0) + 1
     top = max(dist.values())
@@ -68,15 +68,15 @@ def _mode_distribution(values: List[Any]) -> Optional[Dict[str, Any]]:
     return {"mode": leaders[0] if len(leaders) == 1 else None, "distribution": dist, "count": len(vals)}
 
 
-def _aggregate_exposure(rows: List[Dict[str, Any]], field: str) -> Dict[str, Dict[str, Any]]:
+def _aggregate_exposure(rows: list[dict[str, Any]], field: str) -> dict[str, dict[str, Any]]:
     """Per-cell aggregate across users for one exposure map field.
 
     Returns {cell: {"avg": <2dp>, "count": <n>}}, the cell a category or a
     region, for every cell any user scored (non-null). Cells nobody scored are
     omitted.
     """
-    sums: Dict[str, float] = {}
-    counts: Dict[str, int] = {}
+    sums: dict[str, float] = {}
+    counts: dict[str, int] = {}
     for r in rows:
         for k, v in (r.get(field) or {}).items():
             sums[k] = sums.get(k, 0.0) + float(v)
@@ -87,7 +87,7 @@ def _aggregate_exposure(rows: List[Dict[str, Any]], field: str) -> Dict[str, Dic
     }
 
 
-def _uncertainty_agg(rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def _uncertainty_agg(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
     """Median of the scored uncertainties, rounded half up to a whole score 0-5."""
     vals = _non_null([r.get("uncertainty") for r in rows])
     if not vals:
@@ -95,9 +95,9 @@ def _uncertainty_agg(rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     return {"median": int(_median(vals) + 0.5), "count": len(vals)}
 
 
-def aggregate_proposals(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+def aggregate_proposals(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """Build the `aggregate` block from a list of proposal-row dicts."""
-    agg: Dict[str, Any] = {}
+    agg: dict[str, Any] = {}
     for f in SCALAR_MEAN_FIELDS:
         agg[f] = _mean2([r.get(f) for r in rows])
 
@@ -115,12 +115,12 @@ def aggregate_proposals(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     return agg
 
 
-def _own_row(rows: List[Dict[str, Any]], user_id: Optional[str]) -> Optional[Dict[str, Any]]:
+def _own_row(rows: list[dict[str, Any]], user_id: str | None) -> dict[str, Any] | None:
     """The caller's own proposal among the rows, or None."""
     return next((r for r in rows if user_id is not None and r.get("user_id") == user_id), None)
 
 
-def _my_block(my_row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def _my_block(my_row: dict[str, Any] | None) -> dict[str, Any] | None:
     """The caller's own proposal as a flat headline dict (or None)."""
     if not my_row:
         return None
@@ -137,7 +137,7 @@ def _my_block(my_row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     }
 
 
-def _scorer_block(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _scorer_block(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Who scored what: the headline fields, the value-chain epicentre and the
     comment, so the review panel can show each expert's vote by name."""
     out = []
@@ -158,9 +158,9 @@ def _scorer_block(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 def build_proposals_response(
     driver_id: str,
-    rows: List[Dict[str, Any]],
-    user_id: Optional[str],
-) -> Dict[str, Any]:
+    rows: list[dict[str, Any]],
+    user_id: str | None,
+) -> dict[str, Any]:
     """Body of GET and PUT /api/v1/drivers/{id}/proposals.
 
     ``rows`` are all proposals for the driver; ``user_id`` picks the caller's
@@ -175,9 +175,9 @@ def build_proposals_response(
 
 
 def build_proposal_summary(
-    rows: List[Dict[str, Any]],
-    user_id: Optional[str],
-) -> Dict[str, Any]:
+    rows: list[dict[str, Any]],
+    user_id: str | None,
+) -> dict[str, Any]:
     """Compact per-driver summary attached to GET /api/v1/drivers: what the
     driver table shows. {count, probability, gp1_pct_affected, my}: the number
     of experts, the two headline means with their counts (or None) and the

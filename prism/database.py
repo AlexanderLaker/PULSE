@@ -17,11 +17,12 @@ import logging
 import os
 import re
 import time
+from collections.abc import Callable, Collection, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Collection, Dict, List, Optional, Sequence
+from typing import Any
 
 from prism.config import CATEGORIES, FORCES, REGIONS, VALID_DIFFUSION_CURVES, VC_STAGES
 from prism.drivers import (CONFIDENCE_LEVELS, DIRECTIONS, EXPOSURE_FIELDS, MODEL_FIELDS, SCALAR_SCORE_FIELDS,
@@ -68,7 +69,7 @@ class DatabaseUnavailableError(ConnectionError):
 class StaleRevisionError(RuntimeError):
     """A driver changed after the editor loaded it; the edit was not written."""
 
-    def __init__(self, driver_id: str, expected: int, current: Optional[int]):
+    def __init__(self, driver_id: str, expected: int, current: int | None):
         self.driver_id, self.expected, self.current = driver_id, expected, current
         super().__init__(f"driver {driver_id} is at revision {current}, not {expected}")
 
@@ -312,7 +313,7 @@ def schema_tables() -> set:
             for m in [re.match(r"\s*CREATE TABLE IF NOT EXISTS (\w+)", statement)] if m}
 
 
-def pending_migration(cursor) -> Optional[str]:
+def pending_migration(cursor) -> str | None:
     """The first migration the connected database still needs, or None.
 
     A database lists the migrations it has had in schema_migrations. One that
@@ -403,7 +404,7 @@ def describe_error(e: BaseException) -> str:
     return f"database error ({type(cause).__name__})"
 
 
-def diagnose_connection() -> Dict[str, Any]:
+def diagnose_connection() -> dict[str, Any]:
     """What this process sees of the database, for /api/v1/diagnostics.
 
     Never raises: a failure is reported in ``error`` as describe_error()
@@ -411,7 +412,7 @@ def diagnose_connection() -> Dict[str, Any]:
     "reachable but empty". The answer is anonymous, so it names nothing about
     the database itself: no host, no user, no credential.
     """
-    out: Dict[str, Any] = {
+    out: dict[str, Any] = {
         "db_reachable": False,
         "simulation_run_count": 0,
         "latest_run_id": None,
@@ -452,9 +453,9 @@ class AuditEntry:
     entity_type: str
     entity_id: str
     user_id: str
-    old_value: Optional[str] = None
-    new_value: Optional[str] = None
-    reason: Optional[str] = None
+    old_value: str | None = None
+    new_value: str | None = None
+    reason: str | None = None
 
 
 def insert_audit(cursor, entries: Sequence[AuditEntry]) -> None:
@@ -528,7 +529,7 @@ _CHILD_WRITERS = {
 }
 
 
-def insert_drivers(drivers: List[Driver]) -> None:
+def insert_drivers(drivers: list[Driver]) -> None:
     """Store the drivers of a new database, each with its exposures and sources.
 
     Raises InvalidDriversError, and writes nothing, if a driver could not be
@@ -596,7 +597,7 @@ def _begin_snapshot(cursor) -> None:
     cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY" if USE_POSTGRES else "BEGIN")
 
 
-def load_drivers() -> List[Driver]:
+def load_drivers() -> list[Driver]:
     """All drivers with their exposures and sources, ordered by id.
 
     The order is part of the reproducibility contract: the copula pairs draws
@@ -610,14 +611,14 @@ def load_drivers() -> List[Driver]:
         _begin_snapshot(cursor)
         cursor.execute("SELECT * FROM drivers ORDER BY id")
         rows = [_row(r) for r in cursor.fetchall()]
-        exposures: Dict[str, Dict[str, dict]] = {r["id"]: {"category": {}, "region": {}} for r in rows}
+        exposures: dict[str, dict[str, dict]] = {r["id"]: {"category": {}, "region": {}} for r in rows}
         for table, key, column in (("driver_category_exposure", "category", "category"),
                                    ("driver_regional_exposure", "region", "region")):
             cursor.execute(f"SELECT driver_id, {column} AS k, exposure_score FROM {table}")
             for r in cursor.fetchall():
                 r = _row(r)
                 exposures[r["driver_id"]][key][r["k"]] = int(r["exposure_score"])
-        sources: Dict[str, list] = {r["id"]: [] for r in rows}
+        sources: dict[str, list] = {r["id"]: [] for r in rows}
         cursor.execute("SELECT driver_id, title, url, tier, published FROM driver_sources ORDER BY id")
         for r in cursor.fetchall():
             r = _row(r)
@@ -688,7 +689,7 @@ def _as_datetime(val):
     return datetime.fromisoformat(val) if isinstance(val, str) else val
 
 
-def load_latest_run() -> Optional[Dict[str, Any]]:
+def load_latest_run() -> dict[str, Any] | None:
     """The newest persisted run with its decoded results, or None. Stored text
     that is not JSON stays text, which prism/api/runs.py reports as a run that
     lacks everything."""
@@ -708,7 +709,7 @@ def load_latest_run() -> Optional[Dict[str, Any]]:
             "results": results}
 
 
-def latest_run_summary() -> Optional[Dict[str, Any]]:
+def latest_run_summary() -> dict[str, Any] | None:
     """Id and date of the newest run, without loading its results."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -726,7 +727,7 @@ def latest_run_summary() -> Optional[Dict[str, Any]]:
 # content's version. A save names the version it was edited from, so two
 # admins editing at once cannot silently overwrite each other.
 
-def load_journey_content() -> Dict[str, Any]:
+def load_journey_content() -> dict[str, Any]:
     """{"version": id of the newest row, "content": its tile map}; version 0 and
     content None while nothing is stored (the dashboard's bundled content applies)."""
     with get_db_connection() as conn:
@@ -740,7 +741,7 @@ def load_journey_content() -> Dict[str, Any]:
 
 
 def save_journey_content(content: dict, updated_by: str, base_version: int,
-                         audit: Optional[Callable[[int], AuditEntry]] = None) -> int:
+                         audit: Callable[[int], AuditEntry] | None = None) -> int:
     """Store a new version of the journey content ({lhc, hair}); returns its version.
 
     ``base_version`` is the version the editor loaded (0 for the bundled
@@ -797,7 +798,7 @@ def _proposal(raw) -> dict:
     }
 
 
-def load_driver_proposals(driver_id: str) -> List[Dict[str, Any]]:
+def load_driver_proposals(driver_id: str) -> list[dict[str, Any]]:
     """Every expert proposal for one driver, oldest first."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -806,9 +807,9 @@ def load_driver_proposals(driver_id: str) -> List[Dict[str, Any]]:
         return [_proposal(r) for r in cursor.fetchall()]
 
 
-def load_all_driver_proposals() -> Dict[str, List[Dict[str, Any]]]:
+def load_all_driver_proposals() -> dict[str, list[dict[str, Any]]]:
     """Every proposal grouped by driver id, in one query."""
-    out: Dict[str, List[Dict[str, Any]]] = {}
+    out: dict[str, list[dict[str, Any]]] = {}
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(f"SELECT driver_id, {_PROPOSAL_COLUMNS} FROM driver_score_proposals "
@@ -819,8 +820,8 @@ def load_all_driver_proposals() -> Dict[str, List[Dict[str, Any]]]:
     return out
 
 
-def upsert_driver_proposal(driver_id: str, user_id: str, fields: Dict[str, Any],
-                           user_name: str = "") -> Dict[str, Any]:
+def upsert_driver_proposal(driver_id: str, user_id: str, fields: dict[str, Any],
+                           user_name: str = "") -> dict[str, Any]:
     """Merge a partial proposal into this expert's row and return the merged row.
 
     Only the keys present in ``fields`` change; everything else on an existing

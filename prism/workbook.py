@@ -18,7 +18,6 @@ import math
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
 
 import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -110,7 +109,7 @@ def reading_notes(config: ModelConfig) -> tuple:
 
 
 def write_workbook(output_path: str, result: dict, config: ModelConfig, *,
-                   run_id: Optional[int] = None, driver_count: Optional[int] = None) -> None:
+                   run_id: int | None = None, driver_count: int | None = None) -> None:
     """Write the QA workbook for an engine result (MonteCarloEngine.run)."""
     wb = openpyxl.Workbook()
     _shift_matrix(wb.active, result, config)
@@ -326,8 +325,8 @@ def _velocity(ws, result: dict, config: ModelConfig) -> None:
     ws.column_dimensions["B"].width = 14
 
 
-def _metadata(ws, result: dict, config: ModelConfig, run_id: Optional[int],
-              driver_count: Optional[int]) -> None:
+def _metadata(ws, result: dict, config: ModelConfig, run_id: int | None,
+              driver_count: int | None) -> None:
     """Label in column A, value in column B: the run's identity, then the reading notes."""
     attenuation = ", ".join(f"{f} {config.per_force_attenuation[f]:.3f}" for f in FORCES)
     regions = ", ".join(f"{r} {w * 100:.1f}%" for r, w in result["region_weights_used"].items())

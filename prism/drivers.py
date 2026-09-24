@@ -3,8 +3,9 @@
 import copy
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Optional
 
+from prism.config import (CATEGORIES, FORCES, REGIONS, VALID_DIFFUSION_CURVES, VC_STAGES, beta_prior_for,
+                          first_peak_year)
 from prism.numbers import finite_number, whole_in_range
 
 #: The scores experts can propose; a driver's baseline records the same fields.
@@ -50,33 +51,33 @@ class Driver:
     force: str                        # one of config.FORCES
     name: str = ""
     description: str = ""
-    direction: Optional[str] = None   # "Expansion" | "Contraction"
-    probability: Optional[int] = None  # 1-5; the Beta prior's mean is probability / 6
+    direction: str | None = None   # "Expansion" | "Contraction"
+    probability: int | None = None  # 1-5; the Beta prior's mean is probability / 6
     # Onset: no effect up to and including this year, or the base year when that is later.
-    start_year: Optional[int] = None
+    start_year: int | None = None
     category_exposure: dict = field(default_factory=dict)  # {category: 0-5}, every category
     regional_exposure: dict = field(default_factory=dict)  # {region: 0-5}, every region
-    vc_epicentre: Optional[str] = None  # the value-chain stage where the impact centres (config.VC_STAGES)
+    vc_epicentre: str | None = None  # the value-chain stage where the impact centres (config.VC_STAGES)
     sources: list = field(default_factory=list)           # [{title, url, tier, published}]
     # High, Medium or Low: how well the present state is evidenced (display only).
-    confidence: Optional[str] = None
+    confidence: str | None = None
     # Share of the category's gross profit the driver can move at full
     # materialisation, in (0, 1]. There is no default: a driver without it
     # cannot be simulated.
-    gp1_pct_affected: Optional[float] = None
+    gp1_pct_affected: float | None = None
     # Year by which the full effect has materialised: after the onset.
-    peak_year: Optional[int] = None
-    diffusion_curve: Optional[str] = None  # one of config.VALID_DIFFUSION_CURVES
-    uncertainty: Optional[int] = None  # 0-5, see config.UNCERTAINTY_KAPPA
+    peak_year: int | None = None
+    diffusion_curve: str | None = None  # one of config.VALID_DIFFUSION_CURVES
+    uncertainty: int | None = None  # 0-5, see config.UNCERTAINTY_KAPPA
     # The scores the driver was seeded with (see scores()): the reference the
     # Drivers page compares expert proposals and later edits against.
-    baseline: Optional[dict] = None
+    baseline: dict | None = None
     scores_edited: bool = False       # an admin has changed a MODEL_FIELDS value since seeding
     # The stored row's revision when the driver was loaded (0 before it is
     # stored); an admin edit must name it, so a concurrent edit is refused.
     revision: int = 0
-    probability_prior: Optional[tuple] = field(init=False, default=None)
-    expected_effect: Optional[float] = field(init=False, default=None)
+    probability_prior: tuple | None = field(init=False, default=None)
+    expected_effect: float | None = field(init=False, default=None)
 
     def __post_init__(self):
         self.recompute()
@@ -91,7 +92,6 @@ class Driver:
         for the effect), they are None: such a driver can still be built and
         checked (simulation_problems), but it has no prior and no effect.
         """
-        from prism.config import beta_prior_for
         try:
             self.probability_prior = beta_prior_for(self.probability, self.uncertainty)
         except (TypeError, ValueError):
@@ -125,7 +125,6 @@ def simulation_problems(drivers) -> list:
     region, under the taxonomy's names only. Duplicate ids are refused as
     well.
     """
-    from prism.config import CATEGORIES, FORCES, REGIONS, VALID_DIFFUSION_CURVES, VC_STAGES, first_peak_year
     problems = [f"driver id {i!r} appears {n} times" for i, n in Counter(d.id for d in drivers).items() if n > 1]
     for d in drivers:
         where = f"driver {d.id}"
@@ -182,7 +181,7 @@ class DriverSet:
     def driver_count(self) -> int:
         return len(self.drivers)
 
-    def get_driver_by_id(self, driver_id: str) -> Optional[Driver]:
+    def get_driver_by_id(self, driver_id: str) -> Driver | None:
         for d in self.drivers:
             if d.id == driver_id:
                 return d

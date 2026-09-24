@@ -23,8 +23,8 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import prism.env_loader  # noqa: E402,F401  (loads .env)
-from prism.database import describe_error  # noqa: E402
+import prism.env_loader  # noqa: F401  (loads .env)
+from prism.database import describe_error
 
 try:
     import psycopg2

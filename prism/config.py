@@ -252,7 +252,7 @@ def build_driver_correlation_matrix(driver_forces, within_force_rho, force_corre
     and the spectral check in config_validation both build the matrix here, so
     they cannot disagree.
     """
-    import numpy as np
+    import numpy as np   # here, not at the top: the API imports this module and has no numpy
     n = len(driver_forces)
     if n == 0:
         return np.eye(0)

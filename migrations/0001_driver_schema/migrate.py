@@ -143,7 +143,7 @@ from prism.config import (BASE_YEAR, CATEGORIES, DEFAULT_PATH_YEARS, REGIONS,  #
                           VALID_DIFFUSION_CURVES, VC_STAGES)
 from prism.database import describe_error, schema  # noqa: E402
 from prism.drivers import (CONFIDENCE_LEVELS, SCORE_FIELDS, SOURCE_TIERS,  # noqa: E402
-                           SOURCE_URL_PATTERN)
+                           SOURCE_URL_PATTERN, Driver, simulation_problems)
 from prism.input_drift import FINGERPRINT_KEYS  # noqa: E402
 from prism.journey import (DRIVER_CODES, JOURNEYS, OPTIONAL_TILE_KEYS, POOL_IMPACT_KEYS,  # noqa: E402
                            PROVENANCE_KEYS, SIDES, STAGE_KEYS, TILE_KEYS, content_problem, unknown_keys)
@@ -349,6 +349,8 @@ class Database:
         url = None if sqlite_file else (os.environ.get("POSTGRES_URL") or os.environ.get("DATABASE_URL"))
         self.postgres = bool(url)
         if self.postgres:
+            # Here, not at the top: a SQLite target needs no PostgreSQL driver
+            # (prism/database.py imports it only for PostgreSQL too).
             import psycopg2
             import psycopg2.extras
             self.conn = psycopg2.connect(url, **({} if "sslmode=" in url else {"sslmode": "require"}))
@@ -476,7 +478,7 @@ def baseline_of(ai_suggestion, scores: dict) -> tuple:
     return baseline, "suggestion", filled
 
 
-def read_previous_drivers(db: "Database", tables: set) -> list:
+def read_previous_drivers(db: Database, tables: set) -> list:
     """Every driver of the previous schema as the driver schema will store it.
 
     One dict per trends row: the row, its value-chain stage, its exposure
@@ -485,7 +487,6 @@ def read_previous_drivers(db: "Database", tables: set) -> list:
     driver schema stores only drivers the engine can simulate, so a driver
     with a problem stops the migration until it is corrected.
     """
-    from prism.drivers import Driver, simulation_problems
     owned = "trend_id IN (SELECT id FROM trends)"
     children: dict = {"trend_vc_exposure": {}, "trend_category_exposure": {}, "trend_regional_exposure": {}}
     for table, key in (("trend_vc_exposure", "vc_step"), ("trend_category_exposure", "category"),

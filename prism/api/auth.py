@@ -18,7 +18,6 @@ import json
 import os
 import time
 from base64 import urlsafe_b64decode
-from typing import Optional
 
 from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -31,7 +30,7 @@ _bearer = HTTPBearer(auto_error=False)
 MIN_SECRET_LENGTH = 32
 
 
-def _jwt_secret() -> Optional[str]:
+def _jwt_secret() -> str | None:
     """The signing secret, or None when it is missing or shorter than MIN_SECRET_LENGTH."""
     secret = os.environ.get("PRISM_JWT_SECRET", "")
     return secret if len(secret) >= MIN_SECRET_LENGTH else None
@@ -41,7 +40,7 @@ def _b64decode(s: str) -> bytes:
     return urlsafe_b64decode(s + "=" * (-len(s) % 4))
 
 
-def verify_jwt(token: str) -> Optional[dict]:
+def verify_jwt(token: str) -> dict | None:
     """The payload of a valid, unexpired HS256 token, else None.
 
     Without a usable secret every token is rejected rather than accepted.
@@ -66,9 +65,9 @@ def verify_jwt(token: str) -> Optional[dict]:
 
 
 def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
-    prism_token: Optional[str] = Cookie(None, alias="prism-token"),
-) -> Optional[dict]:
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    prism_token: str | None = Cookie(None, alias="prism-token"),
+) -> dict | None:
     """The verified token payload; None when no token was sent, 401 when it is invalid.
 
     A Bearer header takes precedence over the cookie.
@@ -83,7 +82,7 @@ def get_current_user(
     return payload
 
 
-def require_auth(user: Optional[dict] = Depends(get_current_user)) -> dict:
+def require_auth(user: dict | None = Depends(get_current_user)) -> dict:
     """Any signed-in user."""
     if not user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Authentication required",
@@ -98,7 +97,7 @@ def require_admin(user: dict = Depends(require_auth)) -> dict:
     return user
 
 
-def identity_from_user(user: Optional[dict]) -> tuple:
+def identity_from_user(user: dict | None) -> tuple:
     """(user_id, display name, role) from a verified token payload.
 
     This is the only source of identity for the audit log and the expert

@@ -13,7 +13,6 @@ dashboard shows and what the category drill-down computes with.
 """
 import logging
 import threading
-from typing import Optional
 
 from prism import database
 from prism.config import ModelConfig
@@ -64,7 +63,7 @@ def driver_set() -> DriverSet:
         return _cache["drivers"]
 
 
-def latest_run() -> Optional[dict]:
+def latest_run() -> dict | None:
     """The newest persisted run ({id, run_date, iterations, results}), or None."""
     with _lock:
         ensure_schema()

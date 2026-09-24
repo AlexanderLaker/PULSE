@@ -20,7 +20,6 @@ imports this module.
 """
 
 import logging
-from typing import Optional
 
 import numpy as np
 import scipy as _scipy
@@ -159,7 +158,7 @@ class MonteCarloEngine:
         Wn[present, :] = W[present, :] / rows[present, np.newaxis]
         return Wn
 
-    def _zero_share_event(self) -> Optional[dict]:
+    def _zero_share_event(self) -> dict | None:
         """The warning for the categories with no gross-profit share in any
         region, whose shift is then the equal-weight average of their cells;
         None when there are none."""
@@ -592,7 +591,7 @@ class MonteCarloEngine:
             }
         return out
 
-    def run(self, driver_set: DriverSet, iterations: int, chains: int = 1, seeds: Optional[list] = None) -> dict:
+    def run(self, driver_set: DriverSet, iterations: int, chains: int = 1, seeds: list | None = None) -> dict:
         """Run ``chains`` independently seeded chains of ``iterations`` each and pool them.
 
         The result carries ``shift_matrix`` (per category: percentile ``path``

@@ -62,9 +62,10 @@ from prism.config_validation import correlation_lambda_min, validate_model_confi
 from prism.database import (POSTGRES_URL, USE_POSTGRES, MigrationPendingError, describe_error,  # noqa: E402
                             init_db, load_drivers, load_latest_run, save_simulation_run)
 from prism.drivers import DriverSet, simulation_problems  # noqa: E402
-from prism.input_drift import compare_with_run, driver_fingerprint, not_compared_event  # noqa: E402
 from prism.engine import MonteCarloEngine  # noqa: E402
+from prism.input_drift import compare_with_run, driver_fingerprint, not_compared_event  # noqa: E402
 from prism.numbers import finite_number  # noqa: E402
+from prism.seed_drivers import DRIVERS as BASE_DRIVERS  # noqa: E402
 from prism.workbook import write_workbook  # noqa: E402
 
 log = logging.getLogger("run_production")
@@ -193,10 +194,9 @@ def main(argv: list[str] | None = None) -> int:
                   "needs a fix in the database, with the driver's revision raised by one so the service "
                   "reloads it.")
         return 6
-    from prism.seed_drivers import DRIVERS as SEED
-    if len(drivers) != len(SEED):
+    if len(drivers) != len(BASE_DRIVERS):
         log.warning("The database holds %d drivers, the driver base %d; the input-drift event will show the "
-                    "difference.", len(drivers), len(SEED))
+                    "difference.", len(drivers), len(BASE_DRIVERS))
     driver_set = DriverSet(drivers=drivers)
 
     config = ModelConfig()

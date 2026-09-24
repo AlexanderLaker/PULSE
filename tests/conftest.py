@@ -12,10 +12,10 @@ if os.environ.get("PRISM_TEST_ALLOW_POSTGRES") != "1":
         import tempfile
         os.environ["PRISM_DB_PATH"] = os.path.join(tempfile.mkdtemp(prefix="prism-tests-"), "prism.db")
 
-import pytest  # noqa: E402
+import pytest
 
-from prism.config import CATEGORIES, REGIONS, ModelConfig  # noqa: E402
-from prism.drivers import Driver, DriverSet  # noqa: E402
+from prism.config import CATEGORIES, REGIONS, ModelConfig
+from prism.drivers import Driver, DriverSet
 
 
 def regions(europe: int, north_america: int, asia: int, high_growth: int) -> dict:

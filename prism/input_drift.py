@@ -12,8 +12,6 @@ that drift never goes unnoticed.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 #: Fingerprint fields beyond probability, GP1 share and direction: a driver
 #: moved to another force, its exposures, value-chain epicentre, onset, peak
 #: year, curve or uncertainty.
@@ -88,10 +86,10 @@ def _force_balance(fp: dict) -> dict:
 
 def compute_input_drift_event(
     current_fp: dict,
-    previous_fp: Optional[dict],
+    previous_fp: dict | None,
     previous_run_id=None,
     previous_run_date=None,
-) -> Optional[dict]:
+) -> dict | None:
     """Compare two fingerprints and describe the difference as an integrity event.
 
     Returns None when there is nothing to compare against (the first run).
@@ -189,7 +187,7 @@ def not_compared_event(reason: str, previous_run_id=None, previous_run_date=None
     }
 
 
-def compare_with_run(current_fp: dict, latest_run: Optional[dict]) -> Optional[dict]:
+def compare_with_run(current_fp: dict, latest_run: dict | None) -> dict | None:
     """The input-drift event of a new run against the newest stored run
     (database.load_latest_run): None before the first run, a warning when
     that run's fingerprint is missing or incomplete."""

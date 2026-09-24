@@ -8,7 +8,6 @@ it writes.
 """
 import json
 import re
-from typing import Optional
 
 from prism.config import display_code
 from prism.seed_drivers import DRIVERS
@@ -39,7 +38,7 @@ def unknown_keys(item: dict, allowed: tuple) -> list:
     return sorted(set(item) - set(allowed))
 
 
-def tile_problem(tile: dict) -> Optional[str]:
+def tile_problem(tile: dict) -> str | None:
     """What in a tile the dashboard could not render, or None: its type,
     intensity, provenance, driver note, Strategist Read, pool impact and any
     key a tile does not have. Its id, name and codes are checked by
@@ -69,7 +68,7 @@ def tile_problem(tile: dict) -> Optional[str]:
     return None
 
 
-def content_problem(content: dict) -> Optional[str]:
+def content_problem(content: dict) -> str | None:
     """Why a tile map cannot be stored, or None.
 
     The shape is what the dashboard renders: exactly the two journeys, each a
