@@ -7,9 +7,10 @@
  *      the basis line, and keeps a text without labels as plain prose.
  *   2. An expanded driver shows the labels as headings, the basis line and
  *      the footnote; in the admin editor the reading stays read-only text.
- *   3. The committed readings (data/drivers/driver_analysis.json) have that
- *      structure for all 51 drivers (tests/test_driver_analysis.py holds
- *      their content to the rules).
+ *   3. The committed readings (prism/analysis_texts.py, rendered from the
+ *      templates in data/drivers/driver_analysis.json) have that structure
+ *      for all 51 drivers (tests/test_driver_analysis.py holds their content
+ *      to the rules).
  *   4. An unedited driver carries no provenance chip; an edited one carries
  *      the Edited chip, whose tooltip lists each changed input with its
  *      baseline value.
@@ -45,17 +46,21 @@ import { basisMedian, splitAnalysis } from '@/components/dashboard/drivers/Prism
 window.scrollTo = (() => {}) as typeof window.scrollTo;
 
 const REPO = path.resolve(__dirname, '..', '..');
-const ANALYSIS = JSON.parse(fs.readFileSync(
-  path.join(REPO, 'data', 'drivers', 'driver_analysis.json'), 'utf8'));
 const RECORD = JSON.parse(fs.readFileSync(
   path.join(REPO, 'data', 'drivers', 'driver_attribution.json'), 'utf8'));
+/** The readings the API serves, by driver id: each line of prism/analysis_texts.py holds one as a JSON string. */
+const TEXTS: Record<string, string> = Object.fromEntries(
+  [...fs.readFileSync(path.join(REPO, 'prism', 'analysis_texts.py'), 'utf8')
+    .matchAll(/^ {4}"(\w+)": (".*"),$/gm)].map((m) => [m[1], JSON.parse(m[2]) as string]));
+const CODE_TO_ID: Record<string, string> = Object.fromEntries(
+  Object.entries(RECORD.drivers as Record<string, { code: string }>).map(([id, d]) => [d.code, id]));
 const LABELS = ['Weight in the answer', 'Where it lands', 'When it lands', 'What the band hinges on'];
 // The headline the basis line names, read from the record (never a typed number).
 const HEADLINE = (RECORD.reference_run.portfolio_terminal.median * 100).toFixed(1);
 const BASIS_PIN = `reconciled to a 2035 portfolio median of ${HEADLINE} percent`;
 const FOOTNOTE = 'Attribution at the score means, reconciled to the portfolio median in the basis line; a reading authored on those figures.';
 
-const READING = ANALYSIS.drivers['C-01'].text as string;
+const READING = TEXTS[CODE_TO_ID['C-01']];
 const ROW_NAME = /Private label structural penetration/;
 
 afterEach(() => cleanup());
@@ -119,16 +124,13 @@ describe('Drivers page: the PRISM Analysis card', () => {
 });
 
 describe('the committed readings', () => {
-  const codes = Object.keys(ANALYSIS.drivers);
-
-  it('cover the 51 drivers with the four labels, the basis line and a rendered text per template', () => {
-    expect(codes.length).toBe(51);
-    for (const code of codes) {
-      const { template, text } = ANALYSIS.drivers[code];
-      expect(typeof template, code).toBe('string');
+  it('cover the 51 drivers with the four labels and the basis line, every placeholder filled', () => {
+    expect(Object.keys(TEXTS).sort()).toEqual(Object.values(CODE_TO_ID).sort());
+    expect(Object.keys(TEXTS).length).toBe(51);
+    for (const [id, text] of Object.entries(TEXTS)) {
       const parts = splitAnalysis(text);
-      expect(parts.map((p) => p.label), code).toEqual([...LABELS, 'Figures']);
-      expect(text, code).not.toMatch(/\{\w+\}/);
+      expect(parts.map((p) => p.label), id).toEqual([...LABELS, 'Figures']);
+      expect(text, id).not.toMatch(/\{\w+\}/);
     }
   });
 });
@@ -237,6 +239,8 @@ describe('Drivers page: the admin editor', () => {
 describe('the basis line against the served run', () => {
   it('reads the median a reading was reconciled to', () => {
     expect(basisMedian(READING)).toEqual({ year: '2035', percent: Number(HEADLINE) });
+    expect(basisMedian('reconciled to a 2035 portfolio median of +1.2 percent (3 x 50,000 iterations, seed 42).'))
+      .toEqual({ year: '2035', percent: 1.2 });
     expect(basisMedian('no basis here')).toBeNull();
   });
 

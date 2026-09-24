@@ -7,8 +7,7 @@
 
 Files
   data/drivers/driver_attribution.json   the figures (generated)
-  data/drivers/driver_analysis.json      one hand-written template per driver and the text
-                                         rendered from it (generated), side by side for review
+  data/drivers/driver_analysis.json      one hand-written template per driver (the input)
   prism/analysis_texts.py                the rendered texts by driver id, which the API
                                          serves with each driver (generated)
   tests/frontend/fixtures/driverAttribution.fixture.json
@@ -75,14 +74,8 @@ def _dump_json(path: str, obj: dict) -> None:
 
 
 def texts_module(record: dict, texts: dict) -> str:
-    """prism/analysis_texts.py: every driver's rendered text, in driver id order.
-
-    Every driver of the record needs its reading: the API serves one with
-    each driver, so a driver without a template stops the build.
-    """
-    missing = sorted(d["code"] for i, d in record["drivers"].items() if i not in texts)
-    if missing:
-        raise SystemExit(f"{os.path.relpath(ANALYSIS_PATH, REPO)}: no template for {', '.join(missing)}")
+    """prism/analysis_texts.py: every driver's rendered text, in driver id order
+    (render_all has made sure every driver of the record has one)."""
     lines = [
         '"""The PRISM Analysis of every driver, by driver id.',
         "",
@@ -130,8 +123,11 @@ def main(argv: list[str] | None = None) -> int:
     persisted = read_workbook(args.workbook, TERMINAL_YEAR) if args.workbook else (committed or {}).get("persisted_run")
     record = attribution.build_record(config, drivers, reference, persisted)
     fixture = attribution.build_fixture(config, drivers, attribution.decompose(config, drivers))
-    analysis = _load_json(ANALYSIS_PATH) if os.path.exists(ANALYSIS_PATH) else {"drivers": {}}
-    texts = render_all(record, analysis) if analysis.get("drivers") else {}
+    try:
+        texts = render_all(record, _load_json(ANALYSIS_PATH))
+    except (KeyError, ValueError) as e:
+        print(f"REFUSING: the PRISM Analysis cannot be rendered: {e}")
+        return 1
 
     if args.check:
         problems = []
@@ -147,10 +143,6 @@ def main(argv: list[str] | None = None) -> int:
         if persisted:
             for line in attribution.reference_reproduces(reference, persisted):
                 problems.append(f"the reference run does not reproduce production run {persisted['id']}: {line}")
-        for code, entry in analysis.get("drivers", {}).items():
-            driver_id = next((i for i, d in record["drivers"].items() if d["code"] == code), None)
-            if driver_id and entry.get("text") != texts.get(driver_id):
-                problems.append(f"{code}: rendered text differs from the committed one (regenerate)")
         committed_texts = open(TEXTS_PATH, encoding="utf-8").read() if os.path.exists(TEXTS_PATH) else None
         if committed_texts != texts_module(record, texts):
             problems.append(f"{os.path.relpath(TEXTS_PATH, REPO)} differs from the rendered texts (regenerate)")
@@ -183,14 +175,9 @@ def main(argv: list[str] | None = None) -> int:
     _dump_json(FIXTURE_PATH, fixture)
     print(f"wrote {os.path.relpath(FIXTURE_PATH, REPO)} (parity fixture for lib/driverAttribution.ts)")
     module = texts_module(record, texts)
-    for code, entry in analysis["drivers"].items():
-        driver_id = next(i for i, d in record["drivers"].items() if d["code"] == code)
-        entry["text"] = texts[driver_id]
-    _dump_json(ANALYSIS_PATH, analysis)
     with open(TEXTS_PATH, "w", encoding="utf-8") as fh:
         fh.write(module)
-    print(f"wrote {os.path.relpath(ANALYSIS_PATH, REPO)} and {os.path.relpath(TEXTS_PATH, REPO)} "
-          f"({len(texts)} rendered texts)")
+    print(f"wrote {os.path.relpath(TEXTS_PATH, REPO)} ({len(texts)} rendered texts)")
     return 0
 
 

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import re
 
-from prism.config import ESTIMATE_SOURCE_PREFIX
+from prism.config import DEFAULT_PATH_YEARS, ESTIMATE_SOURCE_PREFIX
 
 #: The paragraph labels, in order, and the basis line's; the Drivers page's
 #: card sets each labelled paragraph under its label (PrismAnalysis.tsx holds
@@ -75,7 +75,7 @@ def pct(x: float, nd: int = 0) -> str:
 
 
 def cell_label(cat: str, region: str) -> str:
-    return f"{CATEGORY_SHORT.get(cat, cat)} {region}"
+    return f"{CATEGORY_SHORT[cat]} {region}"
 
 
 def basis_line(rec: dict) -> str:
@@ -93,13 +93,20 @@ def basis_line(rec: dict) -> str:
                          f"is built on other cell weights ({source[:60]}...)")
     median = float(ref["portfolio_terminal"]["median"]) * 100
     recipe = f"{ref['chains']} x {ref['iterations']:,} iterations, seed {ref['seed']}"
-    return (f"{BASIS_LABEL}: model attribution on the estimated HCB gross-profit mix, reconciled to a 2035 "
-            f"portfolio median of {median:+.1f} percent ({recipe}). Read as exposure if nobody acts, not as a "
-            f"forecast.")
+    return (f"{BASIS_LABEL}: model attribution on the estimated HCB gross-profit mix, reconciled to a "
+            f"{DEFAULT_PATH_YEARS[-1]} portfolio median of {median:+.1f} percent ({recipe}). Read as exposure if "
+            f"nobody acts, not as a forecast.")
 
 
 def render_fields(rec: dict, drv: dict) -> dict:
-    """The placeholders a template may use. Every value is a string."""
+    """The placeholders a template may use. Every value is a string.
+
+    A driver that moves no cell of the gross-profit mix (every exposure or
+    every share of its cells zero) has nothing to read, so it raises
+    ValueError rather than rendering figures of nothing.
+    """
+    if drv["max_share_cell"] is None:
+        raise ValueError(f"{drv['code']} moves no cell of the gross-profit mix, so it has no reading")
     years = list(drv["portfolio_pp"].keys())
     last = years[-1]
     pp = drv["portfolio_pp"][last]
@@ -195,19 +202,18 @@ def render_fields(rec: dict, drv: dict) -> dict:
     f["curve"] = CURVE_NAMES[sc["diffusion_curve"]]
     # The cell, over all 52, where the driver is the largest share of the
     # cell's own shift (the six cells above are the largest by points).
-    m = drv.get("max_share_cell")
-    if m:
-        f["max_cell"] = cell_label(m["category"], m["region"])
-        f["max_cell_share"] = pct(m["share_of_cell"])
-        f["max_cell_pp"] = fmt_pp(m["pp"])
+    m = drv["max_share_cell"]
+    f["max_cell"] = cell_label(m["category"], m["region"])
+    f["max_cell_share"] = pct(m["share_of_cell"])
+    f["max_cell_pp"] = fmt_pp(m["pp"])
     cats_sorted = sorted(drv["category_pp"].items(), key=lambda kv: -abs(kv[1]))
     for i, (cat, v) in enumerate(cats_sorted[:4], start=1):
-        f[f"cat{i}"] = CATEGORY_SHORT.get(cat, cat)
+        f[f"cat{i}"] = CATEGORY_SHORT[cat]
         f[f"cat{i}_pp"] = fmt_pp(v)
         f[f"cat{i}_share"] = pct(drv["category_share"][cat])
     share_sorted = sorted(drv["category_share"].items(), key=lambda kv: -abs(kv[1]))
     for i, (cat, v) in enumerate(share_sorted[:3], start=1):
-        f[f"catshare{i}"] = CATEGORY_SHORT.get(cat, cat)
+        f[f"catshare{i}"] = CATEGORY_SHORT[cat]
         f[f"catshare{i}_share"] = pct(v)
         f[f"catshare{i}_pp"] = fmt_pp(drv["category_pp"][cat])
     return f

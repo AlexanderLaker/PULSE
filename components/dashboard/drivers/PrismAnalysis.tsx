@@ -32,9 +32,10 @@ export function splitAnalysis(text: string): { label: string | null; body: strin
     });
 }
 
-/** The portfolio median a reading's basis line was reconciled to: {year, percent}; null without one. */
+/** The portfolio median a reading's basis line was reconciled to: {year, percent}; null without one.
+ *  The line carries the median's sign either way ("-5.6", "+1.2"; prism/readings.py basis_line). */
 export function basisMedian(text: string): { year: string; percent: number } | null {
-  const m = /(\d{4}) portfolio median of (-?\d+(?:\.\d+)?) percent/.exec(text);
+  const m = /(\d{4}) portfolio median of ([+-]?\d+(?:\.\d+)?) percent/.exec(text);
   return m ? { year: m[1]!, percent: Number(m[2]) } : null;
 }
 

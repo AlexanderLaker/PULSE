@@ -74,6 +74,13 @@ def analysis() -> dict:
 
 
 @pytest.fixture(scope="module")
+def readings(record) -> dict:
+    """{display code: the rendered text the API serves} (prism/analysis_texts.py)."""
+    from prism.analysis_texts import TEXTS
+    return {d["code"]: TEXTS[driver_id] for driver_id, d in record["drivers"].items()}
+
+
+@pytest.fixture(scope="module")
 def drivers():
     from prism.driver_base import base_drivers
     return base_drivers()
@@ -242,16 +249,14 @@ class TestCommittedArtefacts:
         assert sum(tot["pool_region_shares"].values()) == pytest.approx(1.0, abs=1e-3)
 
     def test_the_served_texts_are_the_rendered_ones(self, render, record, analysis):
-        """prism/analysis_texts.py, which the API serves, holds every driver's rendered text."""
+        """prism/analysis_texts.py, which the API serves, holds every driver's template rendered on the record,
+        and the templates file holds only the templates."""
         from prism.analysis_texts import TEXTS
-        rendered = render.render_all(record, analysis)
         by_code = {d["code"]: driver_id for driver_id, d in record["drivers"].items()}
         assert set(analysis["drivers"]) == set(by_code)
+        assert all(set(entry) == {"template"} for entry in analysis["drivers"].values())
         assert set(TEXTS) == {d.id for d in seed_drivers.DRIVERS} == set(by_code.values())
-        for code, entry in analysis["drivers"].items():
-            driver_id = by_code[code]
-            assert entry["text"] == rendered[driver_id], code
-            assert TEXTS[driver_id] == entry["text"], code
+        assert TEXTS == render.render_all(record, analysis)
 
     def test_every_placeholder_is_a_field_and_the_key_ones_are_used(self, render, record, analysis):
         by_code = {d["code"]: d for d in record["drivers"].values()}
@@ -352,6 +357,27 @@ class TestCommittedArtefacts:
         p.write_text(served, encoding="utf-8")
         assert script.main(["--check"]) == 0
 
+    def test_a_reading_that_cannot_be_rendered_stops_the_build_and_the_check(
+            self, script, tmp_path, monkeypatch, capsys):
+        """render_fields refuses a driver that moves no cell of the mix by name; the builder prints the
+        refusal and writes nothing, with or without --check."""
+        outputs = {}
+        for name in ("ATTRIBUTION_PATH", "TEXTS_PATH", "FIXTURE_PATH"):
+            original = Path(getattr(script, name))
+            copy_path = tmp_path / original.name
+            copy_path.write_bytes(original.read_bytes())
+            monkeypatch.setattr(script, name, str(copy_path))
+            outputs[copy_path] = copy_path.read_bytes()
+
+        def refuse(record, analysis):
+            raise ValueError("C-01 moves no cell of the gross-profit mix, so it has no reading")
+        monkeypatch.setattr(script, "render_all", refuse)
+        for argv in ([], ["--check"]):
+            assert script.main(argv) == 1
+            assert ("REFUSING: the PRISM Analysis cannot be rendered: C-01 moves no cell"
+                    in capsys.readouterr().out)
+        assert all(path.read_bytes() == content for path, content in outputs.items())
+
     def test_a_build_refuses_a_production_run_the_reference_does_not_reproduce(
             self, script, tmp_path, monkeypatch, capsys):
         """A record whose reference run misses the recorded production run would
@@ -385,6 +411,15 @@ class TestCommittedArtefacts:
             render.render_text(broken, broken["drivers"][next(iter(broken["drivers"]))], "Weight in the answer: {net}.")
         assert failure.value.args == ("pool_region_shares",)
 
+    def test_a_driver_that_moves_no_cell_is_refused_by_name(self, render, record):
+        """A driver whose exposures or cells all carry no share has no cell with
+        the largest share; its reading is refused with a message, which the
+        builder prints as a refusal, rather than failing on a missing figure."""
+        drv = copy.deepcopy(next(iter(record["drivers"].values())))
+        drv["max_share_cell"] = None
+        with pytest.raises(ValueError, match=f"{drv['code']} moves no cell of the gross-profit mix"):
+            render.render_fields(record, drv)
+
     def test_the_reference_run_reproduces_the_persisted_production_run(self, build, record):
         """The readings describe the run the dashboard shows: the record
         carries that run's id and its 13 terminal-year category quantiles,
@@ -416,32 +451,30 @@ class TestReadings:
         assert tuple(re.findall(r"'([^']+)'", labels)) == render.LABELS == LABELS
         assert re.search(r"const ANALYSIS_BASIS_LABEL = '([^']+)';", card).group(1) == render.BASIS_LABEL
 
-    def test_structure(self, render, analysis, record):
-        for code, entry in analysis["drivers"].items():
-            parts = split_paragraphs(entry["text"])
+    def test_structure(self, render, readings, record):
+        for code, text in readings.items():
+            parts = split_paragraphs(text)
             assert [p[0] for p in parts] == [*LABELS, render.BASIS_LABEL], code
-            words = len(entry["text"].split())
+            words = len(text.split())
             assert 200 <= words <= 600, (code, words)
-            assert render.basis_line(record) in entry["text"], code
+            assert render.basis_line(record) in text, code
 
     @pytest.mark.parametrize("pattern, what", FORBIDDEN, ids=[w for _, w in FORBIDDEN])
-    def test_forbidden_content(self, analysis, pattern, what):
-        offenders = [(code, m.group(0)) for code, e in analysis["drivers"].items()
-                     for m in pattern.finditer(e["text"])]
+    def test_forbidden_content(self, readings, pattern, what):
+        offenders = [(code, m.group(0)) for code, text in readings.items() for m in pattern.finditer(text)]
         assert offenders == [], what
 
-    def test_headwinds_and_tailwinds_are_worded_by_direction(self, analysis, record):
-        for code, entry in analysis["drivers"].items():
+    def test_headwinds_and_tailwinds_are_worded_by_direction(self, readings, record):
+        for code, text in readings.items():
             drv = next(d for d in record["drivers"].values() if d["code"] == code)
-            first = entry["text"].split("\n\n")[0]
+            first = text.split("\n\n")[0]
             if drv["direction"] == "Contraction":
                 assert "carries" in first or "carry" in first, code
             else:
                 assert "offset" in first, code
 
-    def test_a_reading_names_its_cells_and_watch_items(self, analysis):
-        for code, entry in analysis["drivers"].items():
-            text = entry["text"]
+    def test_a_reading_names_its_cells_and_watch_items(self, readings):
+        for code, text in readings.items():
             assert re.search(r"\bpercent of the pool\b", text), code
             band = text.split("What the band hinges on:")[1]
             assert re.search(r"observable|to watch|to follow", band, re.I), code

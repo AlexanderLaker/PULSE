@@ -14,9 +14,11 @@ them drifts silently from its source.
 - Four generators write these files: `generate_seed.py`,
   `compute_overlap_correction.py`, `build_cell_weights.py` and
   `build_driver_analysis.py`. A generated source file says so in its header,
-  a generated JSON record in its `generated_by` field (the PRISM Analysis file,
-  which holds the hand-written templates next to the rendered texts, in its
-  `about` field), and none is edited by hand.
+  a generated JSON record in its `generated_by` field, and none is edited by
+  hand. The inputs stay separate from what is generated from them: the PRISM
+  Analysis templates, for instance, are written by hand in
+  `data/drivers/driver_analysis.json`, and the texts rendered from them exist
+  only in `prism/analysis_texts.py`.
 - Each generator has `--check`, which regenerates in memory and fails on any
   difference; CI runs all four.
 - What the code needs from a generated record reaches it through a Python
