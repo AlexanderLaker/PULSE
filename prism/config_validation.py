@@ -17,8 +17,6 @@ from prism.config import (CATEGORIES, FORCES, REGIONS, RUN_CHAINS_RANGE, RUN_ITE
 from prism.numbers import finite_number
 
 SUM_TOLERANCE = 0.01
-#: The base years a configuration may name.
-BASE_YEAR_RANGE = (2020, 2030)
 
 
 def _key_problems(name: str, provided, required) -> list:
@@ -82,11 +80,8 @@ def model_config_problems(config: ModelConfig) -> list:
     """Every problem with the parameters the engine consumes; empty when there is none."""
     problems = _bounded_map_problems("per_force_attenuation", config.per_force_attenuation, FORCES, 0.0, 1.0)
     problems += _bounded_map_problems("within_force_overlap", config.within_force_overlap, FORCES, 0.0, 0.5)
-    problems += [f"{name} must not be empty" for name in ("attenuation_source", "cell_weights_source")
+    problems += [f"{name} must not be empty" for name in ("overlap_correction_source", "cell_weights_source")
                  if not str(getattr(config, name)).strip()]
-    low, high = BASE_YEAR_RANGE
-    if not isinstance(config.base_year, int) or not low <= config.base_year <= high:
-        problems.append(f"base_year must be between {low} and {high} (got {config.base_year})")
     years = list(config.path_years)
     if len(years) < 2 or years != sorted(years) or len(set(years)) != len(years):
         problems.append(f"path_years must be at least two ascending, distinct years (got {years})")

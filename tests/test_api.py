@@ -553,7 +553,7 @@ class TestConfig:
         assert body["force_overlap_matrix"] == DEFAULT_FORCE_OVERLAP_MATRIX
         # a run's size and its cell weights belong to the run, which reports them
         assert not {"iterations", "cell_weights", "cell_weights_source"} & set(body)
-        assert body["path_years"] == list(range(2026, 2036)) and body["base_year"] == 2025
+        assert body["path_years"] == list(range(2026, 2036)) and "base_year" not in body
         assert api.put("/api/v1/config", headers=bearer("admin"), json={}).status_code == 405
 
 

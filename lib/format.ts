@@ -109,7 +109,7 @@ export function shortCat(name: string): string {
   return categoryOf(name).short;
 }
 
-/** prism/config.py DEFAULT_BASE_YEAR: the year every shift is measured against. */
+/** prism/config.py BASE_YEAR: the year every shift is measured against. */
 export const BASE_YEAR = 2025;
 
 /** The path years (prism/config.py DEFAULT_PATH_YEARS): the ten-year horizon. */

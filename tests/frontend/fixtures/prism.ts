@@ -121,7 +121,7 @@ export function makeSimulation(overrides: Partial<SimulationResult> = {}): Simul
     run_meta: {
       run_id: 99, run_date: '2026-09-13T23:04:39+00:00', iterations: 50000, seed: 42, chain_seeds: [42, 1000045, 2000048],
       chains: 3, model_version: '2.12.0', engine_name: 'beta_copula', numerics_backend: 'scipy 1.17.1 · numpy 2.4.6',
-      driver_count: 51, attenuation_source: 'overlap-correction-2026-09',
+      driver_count: 51, overlap_correction_source: 'overlap-correction-2026-09',
     },
     inputs_since_run: { changed: [], added: [], removed: [] },
     ...overrides,
@@ -159,9 +159,8 @@ export function makeConfig(overrides: Partial<ModelConfig> = {}): ModelConfig {
     force_overlap_matrix: FORCE_OVERLAP,
     force_correlation_matrix: FORCE_CORRELATION,
     within_force_rho: 0.3,
-    attenuation_source: 'overlap-correction-2026-09',
+    overlap_correction_source: 'overlap-correction-2026-09',
     peak_year_jitter: true,
-    base_year: 2025,
     path_years: YEARS,
     ...overrides,
   };

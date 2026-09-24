@@ -27,7 +27,7 @@ import scipy as _scipy
 from scipy.linalg import cholesky
 from scipy.stats import beta as _beta_dist, norm as _norm_dist
 
-from prism.config import (CATEGORIES, FORCES, REGIONS, VC_STAGES, ModelConfig,
+from prism.config import (BASE_YEAR, CATEGORIES, FORCES, REGIONS, VC_STAGES, ModelConfig,
                           build_driver_correlation_matrix, compute_materialization_schedule, peak_jitter_for)
 from prism.drivers import DriverSet, InvalidDriversError, simulation_problems
 
@@ -125,7 +125,7 @@ class MonteCarloEngine:
         missing = [f for f in FORCES if f not in per_force]
         if missing:
             raise KeyError(f"per_force_attenuation missing forces: {missing}. All six forces required: {FORCES}")
-        logger.debug("Per-force attenuation (source=%s): %s", self.config.attenuation_source,
+        logger.debug("Per-force attenuation (source=%s): %s", self.config.overlap_correction_source,
                     ", ".join(f"{f}={per_force[f]:.3f}" for f in FORCES))
         return per_force
 
@@ -337,11 +337,10 @@ class MonteCarloEngine:
         path_years = self.config.path_years
         sched_table = np.ones((n_drivers, n_off, n_years))
         for j, driver in enumerate(drivers):
-            onset = max(int(self.config.base_year), int(driver.start_year))
+            onset = max(BASE_YEAR, int(driver.start_year))
             for k, off in enumerate(offsets):
                 pk = max(int(driver.peak_year) + off, onset + 1)
-                sched = compute_materialization_schedule(pk, driver.diffusion_curve, driver.start_year,
-                                                         path_years, self.config.base_year)
+                sched = compute_materialization_schedule(pk, driver.diffusion_curve, driver.start_year, path_years)
                 for y_idx, yr in enumerate(path_years):
                     sched_table[j, k, y_idx] = sched[yr]
         return sched_table, offsets, off_probs_by_driver

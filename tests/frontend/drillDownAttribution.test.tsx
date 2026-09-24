@@ -48,7 +48,7 @@ const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'dri
   inputs: {
     drivers: FixtureDriver[];
     config: { force_weights: Record<ForceName, number>; per_force_attenuation: Record<ForceName, number>;
-      within_force_overlap: Record<ForceName, number>; base_year: number; path_years: number[]; peak_year_jitter: boolean };
+      within_force_overlap: Record<ForceName, number>; path_years: number[]; peak_year_jitter: boolean };
     cellWeights: Record<string, Record<string, number>>;
   };
   expected: {
@@ -83,7 +83,6 @@ function buildStore(configLoaded: boolean, driversLoaded = true): PrismStore {
           force_weights: cfg.force_weights,
           per_force_attenuation: cfg.per_force_attenuation,
           within_force_overlap: cfg.within_force_overlap,
-          base_year: cfg.base_year,
           path_years: cfg.path_years,
           peak_year_jitter: cfg.peak_year_jitter,
         })

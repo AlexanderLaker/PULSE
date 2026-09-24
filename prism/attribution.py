@@ -63,7 +63,8 @@ import json
 
 import numpy as np
 
-from prism.config import CATEGORIES, DEFAULT_PATH_YEARS, FORCES, PRODUCTION_SEED, REGIONS, ModelConfig, display_code
+from prism.config import (BASE_YEAR, CATEGORIES, DEFAULT_PATH_YEARS, FORCES, PRODUCTION_SEED, REGIONS,
+                          ModelConfig, display_code)
 from prism.drivers import DriverSet
 from prism.engine import NUMERICS_BACKEND, MonteCarloEngine, exposure_matrix
 from prism.input_drift import driver_fingerprint
@@ -220,7 +221,7 @@ def inputs_hash(config: ModelConfig, drivers: list) -> str:
                                      for a, row in config.force_correlation_matrix.items()},
         "within_force_rho": round(float(config.within_force_rho), 6),
         "cell_weights": {c: {r: round(float(v), 8) for r, v in row.items()} for c, row in config.cell_weights.items()},
-        "base_year": int(config.base_year), "path_years": list(config.path_years),
+        "base_year": BASE_YEAR, "path_years": list(config.path_years),
         "peak_year_jitter": bool(config.peak_year_jitter),
         "model_version": MonteCarloEngine.MODEL_VERSION,
     }
@@ -419,7 +420,7 @@ def build_record(config: ModelConfig, drivers: list, reference: dict, persisted:
             "drivers": len(drivers),
             "model_version": reference["model_version"],
             "cell_weights_source": config.cell_weights_source,
-            "attenuation_source": config.attenuation_source,
+            "overlap_correction_source": config.overlap_correction_source,
             "force_weights": {f: r4(config.force_weights[f]) for f in forces},
             "per_force_attenuation": {f: r4(config.per_force_attenuation[f]) for f in forces},
             "within_force_overlap": {f: r4(config.within_force_overlap[f]) for f in forces},
@@ -478,7 +479,7 @@ def build_fixture(config: ModelConfig, drivers: list, dec: dict) -> dict:
             "force_weights": {f: float(config.force_weights[f]) for f in FORCES},
             "per_force_attenuation": {f: float(config.per_force_attenuation[f]) for f in FORCES},
             "within_force_overlap": {f: float(config.within_force_overlap[f]) for f in FORCES},
-            "base_year": int(config.base_year), "path_years": list(years),
+            "path_years": list(years),
             "peak_year_jitter": bool(config.peak_year_jitter),
         },
         "cellWeights": {cat: {r: float(W[c, ri]) for ri, r in enumerate(REGIONS)} for c, cat in enumerate(cats)},

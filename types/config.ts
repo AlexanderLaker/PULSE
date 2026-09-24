@@ -20,10 +20,9 @@ export interface ModelConfig {
   /** Copula correlation between two drivers of the same force. */
   within_force_rho: number;
   /** Label of the overlap-correction record the attenuation comes from. */
-  attenuation_source: string;
+  overlap_correction_source: string;
   /** The per-iteration peak-year jitter, each driver within the width its uncertainty score sets; off, every driver peaks in its own year. */
   peak_year_jitter: boolean;
-  base_year: number;
   path_years: number[];
 }
 

@@ -135,7 +135,7 @@ def results_bundle(result: dict, config: ModelConfig, driver_count: int, fingerp
             "engine_name": result["engine_name"],
             "numerics_backend": result["numerics_backend"],
             "driver_count": driver_count,
-            "attenuation_source": config.attenuation_source,
+            "overlap_correction_source": config.overlap_correction_source,
             # The next run compares its drivers with this fingerprint.
             "driver_fingerprint": fingerprint,
         },

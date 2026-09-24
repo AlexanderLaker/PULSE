@@ -103,7 +103,7 @@ def test_attenuation_monotonic_in_headline(seed_driver_set, seed):
     def headline(factor):
         scaled = {f: max(0.0, min(1.0, base_pfa[f] * factor)) for f in FORCES}
         cfg = ModelConfig().copy_with(per_force_attenuation=scaled,
-                                      attenuation_source=f"test: attenuation x {factor}")
+                                      overlap_correction_source=f"test: attenuation x {factor}")
         r = MonteCarloEngine(cfg, seed=seed).run(seed_driver_set, iterations=400)
         return float(r["totals"]["portfolio"][cfg.path_years[-1]]["median"])
 

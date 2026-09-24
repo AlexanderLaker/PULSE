@@ -3,12 +3,12 @@ from typing import Annotated, Literal, Optional
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StrictInt, model_validator
 
-from prism.config import DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, VALID_DIFFUSION_CURVES, VC_STAGES
+from prism.config import BASE_YEAR, DEFAULT_PATH_YEARS, VALID_DIFFUSION_CURVES, VC_STAGES
 from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, SOURCE_FIELD_LIMITS, SOURCE_TIERS, SOURCE_URL_PATTERN
 
 #: The years a peak year can take: after the base year, within the horizon.
 #: The API also refuses a peak year at or before the driver's own onset.
-FIRST_PEAK, LAST_PEAK = DEFAULT_BASE_YEAR + 1, DEFAULT_PATH_YEARS[-1]
+FIRST_PEAK, LAST_PEAK = BASE_YEAR + 1, DEFAULT_PATH_YEARS[-1]
 
 
 def one_of(values):

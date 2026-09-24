@@ -193,7 +193,7 @@ DESCRIPTION_EDITS = {
 }
 STORED_DESCRIPTION = {"consumer_r01": PREVIOUS_DESCRIPTION, "consumer_r04": ADMIN_DESCRIPTION}
 FIRST_RUN = {
-    "meta": {"trend_count": 51, "model_version": "2.12.0", "trend_fingerprint": {
+    "meta": {"trend_count": 51, "model_version": "2.12.0", "attenuation_source": "calibrated", "trend_fingerprint": {
         "consumer_r01": {"p": 5, "ce": {"Hair: Color": 3, "LHC: HSC (old)": 2},
                          "re": {"Europe": 5.0, "North America": 0.0, "Asia": 0.0, "High Growth": 0.0}},
         "retired_r99": {"p": 2, "ce": {"Hair: Care": 1}}}},
@@ -231,6 +231,7 @@ def previous_release_run() -> dict:
     meta["trend_fingerprint"] = {driver_id: {k: v for k, v in entry.items() if k != "s"}
                                  for driver_id, entry in meta.pop("driver_fingerprint").items()}
     dimensions["vc_steps"] = dimensions.pop("vc_stages")
+    meta["attenuation_source"] = meta.pop("overlap_correction_source")
     # parts the previous release stored besides
     meta.update(engine_fidelity="scipy", vc_attribution_basis="epicentre")
     bundle["vc_decomposition"] = {}
@@ -560,7 +561,8 @@ class TestMigration:
         # driver still in the database, None (compares as changed) for anything else; the exposure maps
         # of a driver in the database move onto the taxonomy's names as the driver's own do
         unknown = {key: None for key in FINGERPRINT_KEYS}
-        assert first["meta"] == {"driver_count": 51, "model_version": "2.12.0", "driver_fingerprint": {
+        assert first["meta"] == {"driver_count": 51, "model_version": "2.12.0",
+                                 "overlap_correction_source": "calibrated", "driver_fingerprint": {
             "consumer_r01": {**unknown, "p": 5, "s": 2025,
                              "ce": {c: (3.0 if c == "Hair: Color" else 0.0) for c in CATEGORIES},
                              "re": {"Asia": 0.0, "Europe": 5.0, "High Growth": 0.0, "North America": 0.0}},

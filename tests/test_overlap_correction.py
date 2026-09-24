@@ -32,7 +32,7 @@ def _script():
 
 class TestConfigEqualsTheRecord:
     def test_source_label(self, record):
-        assert C.DEFAULT_ATTENUATION_SOURCE == record["version"]
+        assert C.DEFAULT_OVERLAP_CORRECTION_SOURCE == record["version"]
 
     def test_per_force_attenuation(self, record):
         assert C.DEFAULT_PER_FORCE_ATTENUATION == record["per_force_effective_attenuation"]

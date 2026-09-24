@@ -12,7 +12,7 @@ API stores (prism/journey.py).
 import re
 from pathlib import Path
 
-from prism.config import CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS, VC_STAGES
+from prism.config import BASE_YEAR, CATEGORIES, DEFAULT_PATH_YEARS, FORCES, REGIONS, VC_STAGES
 from prism.drivers import SOURCE_FIELD_LIMITS, SOURCE_TIERS, SOURCE_URL_PATTERN
 from prism.journey import (INTENSITIES, JOURNEYS, OPTIONAL_TILE_KEYS, POOL_IMPACT_GRADES, POOL_IMPACT_KEYS,
                            PROVENANCE_GRADES, PROVENANCE_KEYS, STAGE_KEYS, TILE_KEYS, TILE_TYPES)
@@ -50,7 +50,7 @@ def test_value_chain_stages():
 
 
 def test_horizon():
-    assert re.search(r"export const BASE_YEAR = (\d{4});", FORMAT).group(1) == str(DEFAULT_BASE_YEAR)
+    assert re.search(r"export const BASE_YEAR = (\d{4});", FORMAT).group(1) == str(BASE_YEAR)
     years = re.search(r"export const YEARS: number\[\] = \[([^\]]*)\];", FORMAT).group(1)
     assert [int(y) for y in years.split(",")] == list(DEFAULT_PATH_YEARS)
 

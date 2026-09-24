@@ -68,6 +68,7 @@ or the write lock (SQLite), so nothing can write in between.
    know, such as user_roles, are never touched.
 4. The keys of the stored runs follow the new names: meta.trend_count ->
    meta.driver_count, meta.trend_fingerprint -> meta.driver_fingerprint,
+   meta.attenuation_source -> meta.overlap_correction_source,
    decompositions.dimensions.vc_steps -> vc_stages, and trend_ids /
    unscored_trend_ids -> driver_ids / unscored_driver_ids in the integrity
    events. Each driver fingerprint gains every field the previous one did
@@ -126,7 +127,7 @@ REPO = HERE.parents[1]
 sys.path.insert(0, str(REPO))
 
 import prism.env_loader  # noqa: E402,F401  (loads .env; shell variables win)
-from prism.config import (CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS,  # noqa: E402
+from prism.config import (BASE_YEAR, CATEGORIES, DEFAULT_PATH_YEARS, FORCES, REGIONS,  # noqa: E402
                           VALID_DIFFUSION_CURVES, VC_STAGES)
 from prism.drivers import (CONFIDENCE_LEVELS, DIRECTIONS, SCORE_FIELDS, SOURCE_TIERS,  # noqa: E402
                            SOURCE_URL_PATTERN)
@@ -163,7 +164,8 @@ SIMULATION_RUN_COLUMNS = ("id", "run_date", "iterations", "results")
 #: Tables locked for the whole transaction besides DROP_TABLES.
 LOCKED_TABLES = ("simulation_runs", "journey_content")
 LOCK_TIMEOUT = "10s"
-RUN_META_RENAMES = {"trend_count": "driver_count", "trend_fingerprint": "driver_fingerprint"}
+RUN_META_RENAMES = {"trend_count": "driver_count", "trend_fingerprint": "driver_fingerprint",
+                    "attenuation_source": "overlap_correction_source"}
 EVENT_DETAIL_RENAMES = {"trend_ids": "driver_ids", "unscored_trend_ids": "unscored_driver_ids"}
 DIMENSION_RENAMES = {"vc_steps": "vc_stages"}
 SOURCE_KINDS = ("primary source", "analyst report", "trade press", "primary_source", "analyst_report", "trade_press")
@@ -600,7 +602,7 @@ def proposal_scores(r: dict, start_year: int) -> tuple:
     stopping the migration; ``cleared`` names what was, and the expert can
     score it again. The value-chain profile becomes its stage.
     """
-    first_peak = max(DEFAULT_BASE_YEAR, int(start_year)) + 1
+    first_peak = max(BASE_YEAR, int(start_year)) + 1
     cleared = []
 
     def keep(name, ok):

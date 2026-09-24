@@ -25,8 +25,7 @@ def get_config(user: dict = Depends(require_auth)):
         "force_overlap_matrix": DEFAULT_FORCE_OVERLAP_MATRIX,
         "force_correlation_matrix": c.force_correlation_matrix,
         "within_force_rho": c.within_force_rho,
-        "attenuation_source": c.attenuation_source,
+        "overlap_correction_source": c.overlap_correction_source,
         "peak_year_jitter": c.peak_year_jitter,
-        "base_year": c.base_year,
         "path_years": list(c.path_years),
     }

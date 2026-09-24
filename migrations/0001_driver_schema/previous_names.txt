@@ -28,3 +28,8 @@ vc_epicentre_(?:step_)?of
 \bVC_STEPS\b
 \bvc_steps\b
 \bVcStep\b
+# the source label of the overlap correction
+\battenuation_source\b
+ATTENUATION_SOURCE
+# the base year was a configuration field with a default
+\bDEFAULT_BASE_YEAR\b

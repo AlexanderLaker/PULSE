@@ -17,7 +17,7 @@ import {
   attributeRun, computeDriverAttribution, computeMaterializationSchedule, expectedMaterialization,
   peakJitterFor, reconciliationFactor, signParts, type AttributionResult,
 } from '@/lib/driverAttribution';
-import { BASE_YEAR, CATEGORY_NAMES, YEARS } from '@/lib/format';
+import { CATEGORY_NAMES, YEARS } from '@/lib/format';
 
 const FIXTURE = path.resolve(__dirname, 'fixtures', 'driverAttribution.fixture.json');
 
@@ -99,28 +99,28 @@ describe('lib/driverAttribution parity with prism/attribution.py', () => {
 describe('materialisation schedule and jitter (ports of prism/config.py)', () => {
   it('matches the engine\'s curve values on the fixture drivers', () => {
     // s-curve 2025 -> 2030 (onset 2025): the engine rounds to 4 decimals.
-    const s = computeMaterializationSchedule(2030, 's_curve', YEARS, BASE_YEAR, 2025);
+    const s = computeMaterializationSchedule(2030, 's_curve', YEARS, 2025);
     expect(s[2026]).toBe(0.0242);
     expect(s[2027]).toBe(0.2301);
     expect(s[2028]).toBe(0.7699);
     expect(s[2029]).toBe(0.9758);
     expect(s[2030]).toBe(1);
     expect(s[2035]).toBe(1);
-    const lin = computeMaterializationSchedule(2029, 'linear', YEARS, BASE_YEAR, 2025);
+    const lin = computeMaterializationSchedule(2029, 'linear', YEARS, 2025);
     expect(lin[2027]).toBe(0.5);
-    const fl = computeMaterializationSchedule(2027, 'front_loaded', YEARS, BASE_YEAR, 2025);
+    const fl = computeMaterializationSchedule(2027, 'front_loaded', YEARS, 2025);
     expect(fl[2026]).toBe(0.7071);
-    const step = computeMaterializationSchedule(2030, 'step_function', YEARS, BASE_YEAR, 2025);
+    const step = computeMaterializationSchedule(2030, 'step_function', YEARS, 2025);
     expect(step[2028]).toBe(0.05);
   });
 
   it('gates the onset by start_year and saturates a jittered peak at onset + 1', () => {
-    const late = computeMaterializationSchedule(2035, 'linear', YEARS, BASE_YEAR, 2028);
+    const late = computeMaterializationSchedule(2035, 'linear', YEARS, 2028);
     expect(late[2028]).toBe(0);
     expect(late[2029]).toBe(0.1429);
     expect(late[2034]).toBe(0.8571);
     const m = expectedMaterialization(
-      { uncertainty: 5, peak_year: 2026, diffusion_curve: 'linear', start_year: 2025 }, YEARS, BASE_YEAR, true,
+      { uncertainty: 5, peak_year: 2026, diffusion_curve: 'linear', start_year: 2025 }, YEARS, true,
     );
     // width 4: offsets -4..+4 all clamp at onset + 1 = 2026 or later; 2026 is
     // fully materialised only for the clamped draws, so the expectation lies
@@ -139,8 +139,8 @@ describe('materialisation schedule and jitter (ports of prism/config.py)', () =>
   });
 
   it('refuses what the engine refuses: a peak not after the onset, an unknown curve', () => {
-    expect(() => computeMaterializationSchedule(2027, 'linear', YEARS, BASE_YEAR, 2027)).toThrow('after the onset 2027');
-    expect(() => computeMaterializationSchedule(2030, 'jump', YEARS, BASE_YEAR, 2025)).toThrow('unknown diffusion curve');
+    expect(() => computeMaterializationSchedule(2027, 'linear', YEARS, 2027)).toThrow('after the onset 2027');
+    expect(() => computeMaterializationSchedule(2030, 'jump', YEARS, 2025)).toThrow('unknown diffusion curve');
   });
 });
 

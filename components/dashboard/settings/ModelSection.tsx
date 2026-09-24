@@ -8,7 +8,7 @@ import { SlidersHorizontal } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import SectionCard from '@/components/dashboard/SectionCard';
 import { S, MONO_FONT } from '@/lib/theme';
-import { CATEGORY_NAMES, FORCES, NO_VALUE, REGIONS } from '@/lib/format';
+import { BASE_YEAR, CATEGORY_NAMES, FORCES, NO_VALUE, REGIONS } from '@/lib/format';
 import { cellMarginals, cellWeightsBasis } from '@/lib/cellWeights';
 import type { ForceName, ModelConfig, SimulationResult } from '@/types';
 import {
@@ -107,7 +107,7 @@ const ParameterCards: FC<{ config: ModelConfig }> = ({ config }) => {
             <div style={VALUE_STYLE}>{horizon}</div>
           </SubBlock>
           <SubBlock label="Base year" hint="Materialisation anchor.">
-            <div style={VALUE_STYLE}>{config.base_year}</div>
+            <div style={VALUE_STYLE}>{BASE_YEAR}</div>
           </SubBlock>
           <SubBlock
             label="Peak-year jitter"
@@ -143,7 +143,7 @@ const ParameterCards: FC<{ config: ModelConfig }> = ({ config }) => {
       <SectionCard size="regular"
         title="Attenuation & overlap"
         icon={SlidersHorizontal}
-        description={`The engine dampens each force's combined driver effect with a per-force attenuation, 0.5 × (1 − mean between-force overlap of that force's row), and dampens the drivers within a force by their within-force overlap, for the mechanisms they share. Source: ${config.attenuation_source}, a structured-judgment overlap correction built on the drivers' category exposures.`}
+        description={`The engine dampens each force's combined driver effect with a per-force attenuation, 0.5 × (1 − mean between-force overlap of that force's row), and dampens the drivers within a force by their within-force overlap, for the mechanisms they share. Source: ${config.overlap_correction_source}, a structured-judgment overlap correction built on the drivers' category exposures.`}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <ForceRowsTable

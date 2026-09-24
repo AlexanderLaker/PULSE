@@ -33,7 +33,7 @@
  * matrix's Expansion and Contraction filters split it (reconciliationFactor,
  * signParts).
  */
-import { FORCES, REGIONS } from '@/lib/format';
+import { BASE_YEAR, FORCES, REGIONS } from '@/lib/format';
 import { UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import type { ForceName } from '@/types';
 
@@ -57,7 +57,6 @@ export interface AttributionConfig {
   force_weights: Record<string, number>;
   per_force_attenuation: Record<string, number>;
   within_force_overlap: Record<string, number>;
-  base_year: number;
   path_years: number[];
   /** The per-iteration peak-year jitter. */
   peak_year_jitter: boolean;
@@ -111,9 +110,9 @@ function roundHalfEven4(x: number): number {
  * after it.
  */
 export function computeMaterializationSchedule(
-  peakYear: number, diffusionCurve: string, years: number[], baseYear: number, startYear: number,
+  peakYear: number, diffusionCurve: string, years: number[], startYear: number,
 ): Record<number, number> {
-  const onset = Math.max(baseYear, startYear);
+  const onset = Math.max(BASE_YEAR, startYear);
   if (peakYear <= onset) throw new Error(`peak year ${peakYear} does not come after the onset ${onset}`);
   const schedule: Record<number, number> = {};
   for (const year of years) {
@@ -148,20 +147,20 @@ export function peakJitterFor(uncertainty: number, jitterOn: boolean): number {
  */
 export function expectedMaterialization(
   d: Pick<AttributionDriver, 'uncertainty' | 'peak_year' | 'diffusion_curve' | 'start_year'>,
-  years: number[], baseYear: number, jitterOn: boolean,
+  years: number[], jitterOn: boolean,
 ): number[] {
   const jt = peakJitterFor(d.uncertainty, jitterOn);
   const offsets: number[] = [];
   for (let o = -jt; o <= jt; o++) offsets.push(o);
   const weights = offsets.map((o) => (jt <= 0 ? 1 : Math.max(0, jt + 1 - Math.abs(o))));
   const wsum = weights.reduce((a, b) => a + b, 0);
-  const onset = Math.max(baseYear, d.start_year);
+  const onset = Math.max(BASE_YEAR, d.start_year);
   const byYear = years.map(() => 0);
   offsets.forEach((off, k) => {
     const w = weights[k] / wsum;
     if (w === 0) return;
     const pk = Math.max(d.peak_year + off, onset + 1);
-    const sched = computeMaterializationSchedule(pk, d.diffusion_curve, years, baseYear, d.start_year);
+    const sched = computeMaterializationSchedule(pk, d.diffusion_curve, years, d.start_year);
     years.forEach((yr, i) => { byYear[i] += w * sched[yr]; });
   });
   return byYear;
@@ -174,7 +173,6 @@ export function expectedMaterialization(
 export function computeDriverAttribution(inputs: AttributionInputs): AttributionResult {
   const { drivers, categories, config, cellWeights } = inputs;
   const years = config.path_years.map(Number);
-  const baseYear = config.base_year;
   const jitterOn = config.peak_year_jitter;
   const nCat = categories.length, nReg = REGIONS.length, nCell = nCat * nReg, nYear = years.length;
   const n = drivers.length;
@@ -215,7 +213,7 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
   });
 
   // Expected materialisation per driver and year (onset, curve, peak jitter).
-  const mats = drivers.map((d) => expectedMaterialization(d, years, baseYear, jitterOn));
+  const mats = drivers.map((d) => expectedMaterialization(d, years, jitterOn));
 
   // Additive terms, force sums, compounding and the proportional spread.
   const effect = drivers.map((d) => d.expected_effect);

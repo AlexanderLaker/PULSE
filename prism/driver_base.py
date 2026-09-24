@@ -12,7 +12,7 @@ import json
 import re
 from pathlib import Path
 
-from prism.config import CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS, display_code
+from prism.config import BASE_YEAR, CATEGORIES, DEFAULT_PATH_YEARS, FORCES, REGIONS, display_code
 from prism.drivers import (CONFIDENCE_LEVELS, SOURCE_FIELD_LIMITS, SOURCE_TIERS, SOURCE_URL_PATTERN, Driver,
                            simulation_problems)
 
@@ -63,8 +63,8 @@ def validate(entries: list, numbering: dict) -> None:
         if d["force"] in FORCES and (not m or m.group(1) != d["force"].lower()
                                      or d["code"] != display_code(d["id"], d["force"])):
             problems.append(f"{tag}: id {d['id']!r} and code {d['code']!r} do not follow force + number")
-        if isinstance(d["start_year"], int) and d["start_year"] < DEFAULT_BASE_YEAR:
-            problems.append(f"{tag}: onset {d['start_year']} before the base year {DEFAULT_BASE_YEAR}")
+        if isinstance(d["start_year"], int) and d["start_year"] < BASE_YEAR:
+            problems.append(f"{tag}: onset {d['start_year']} before the base year {BASE_YEAR}")
         if isinstance(d["peak_year"], int) and d["peak_year"] > DEFAULT_PATH_YEARS[-1]:
             problems.append(f"{tag}: peak {d['peak_year']} after the horizon {DEFAULT_PATH_YEARS[-1]}")
         if d["confidence"] not in CONFIDENCE_LEVELS:

@@ -102,7 +102,7 @@ export interface RunMeta {
   engine_name: string;
   numerics_backend: string;
   driver_count: number;
-  attenuation_source: string;
+  overlap_correction_source: string;
 }
 
 /** GET /api/v1/simulation as it arrives. */

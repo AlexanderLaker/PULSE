@@ -56,13 +56,15 @@ REGIONS = ["Europe", "North America", "Asia", "High Growth"]
 
 # ── Horizon and materialisation ─────────────────────────────────────────────
 
-DEFAULT_BASE_YEAR = 2025
+#: The year every shift is measured against; no driver acts before it
+#: (lib/format.ts BASE_YEAR).
+BASE_YEAR = 2025
 
 
 def first_peak_year(start_year: int) -> int:
     """The earliest peak year a driver can take: the year after its onset, the
     later of the base year and its start year (lib/format.ts firstPeakYear)."""
-    return max(DEFAULT_BASE_YEAR, start_year) + 1
+    return max(BASE_YEAR, start_year) + 1
 
 
 #: The production recipe: every published run (scripts/run_production.py) and
@@ -76,6 +78,7 @@ PRODUCTION_ITERATIONS = 50_000
 RUN_ITERATIONS_RANGE = (100, 1_000_000)
 RUN_CHAINS_RANGE = (1, 10)
 
+#: The years a run covers, the ten after the base year (lib/format.ts YEARS).
 DEFAULT_PATH_YEARS = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035]
 
 # Diffusion curves: the shape of the ramp from onset to peak.
@@ -87,12 +90,11 @@ def compute_materialization_schedule(
     diffusion_curve: str,
     start_year: int,
     path_years: list[int] | None = None,
-    base_year: int = DEFAULT_BASE_YEAR,
 ) -> dict[int, float]:
     """Share of a driver's full effect that has materialised in each path year.
 
-    The effect is zero up to and including the onset, the later of
-    ``base_year`` and the driver's ``start_year``; it ramps along
+    The effect is zero up to and including the onset, the later of the base
+    year and the driver's ``start_year``; it ramps along
     ``diffusion_curve`` and is complete from ``peak_year`` on, which must come
     after the onset (simulation_problems refuses a driver whose peak does not,
     and the engine keeps a jittered peak after it).
@@ -103,7 +105,7 @@ def compute_materialization_schedule(
     ``s_curve`` (a logistic centred halfway, rescaled to run from 0 to 1).
     """
     years = path_years or DEFAULT_PATH_YEARS
-    onset = max(int(base_year), int(start_year))
+    onset = max(BASE_YEAR, int(start_year))
     if peak_year <= onset:
         raise ValueError(f"peak year {peak_year} does not come after the onset {onset}")
 
@@ -207,7 +209,7 @@ DEFAULT_FORCE_WEIGHTS = {f: 1.0 / len(FORCES) for f in FORCES}
 # 1 - overlap x (n_eff - 1) / n_eff, with n_eff the magnitude-weighted
 # effective number of contributing drivers in the cell.
 
-DEFAULT_ATTENUATION_SOURCE = overlap_correction.VERSION
+DEFAULT_OVERLAP_CORRECTION_SOURCE = overlap_correction.VERSION
 DEFAULT_PER_FORCE_ATTENUATION = overlap_correction.PER_FORCE_ATTENUATION
 DEFAULT_WITHIN_FORCE_OVERLAP = overlap_correction.WITHIN_FORCE_OVERLAP
 # O[i][j]: the share of force i's signal already carried by force j (not
@@ -315,8 +317,7 @@ class ModelConfig:
     and row sums of ``cell_weights`` (cell_weight_marginals).
     """
     per_force_attenuation: dict = field(default_factory=lambda: dict(DEFAULT_PER_FORCE_ATTENUATION))
-    attenuation_source: str = DEFAULT_ATTENUATION_SOURCE
-    base_year: int = DEFAULT_BASE_YEAR
+    overlap_correction_source: str = DEFAULT_OVERLAP_CORRECTION_SOURCE
     path_years: list = field(default_factory=lambda: list(DEFAULT_PATH_YEARS))
     force_weights: dict = field(default_factory=lambda: dict(DEFAULT_FORCE_WEIGHTS))
     cell_weights: dict = field(default_factory=_default_cell_weights)
