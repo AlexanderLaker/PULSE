@@ -455,8 +455,8 @@ class TestReadings:
         for code, text in readings.items():
             parts = split_paragraphs(text)
             assert [p[0] for p in parts] == [*LABELS, render.BASIS_LABEL], code
-            words = len(text.split())
-            assert 200 <= words <= 600, (code, words)
+            low, high = render.WORD_RANGE
+            assert low <= len(text.split()) <= high, (code, len(text.split()))
             assert render.basis_line(record) in text, code
 
     @pytest.mark.parametrize("pattern, what", FORBIDDEN, ids=[w for _, w in FORBIDDEN])

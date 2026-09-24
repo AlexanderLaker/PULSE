@@ -12,7 +12,7 @@ import re
 from prism.config import display_code
 from prism.seed_drivers import DRIVERS
 
-#: The largest tile map accepted, as JSON text (the bundled content is about a third of this).
+#: The largest tile map accepted, as JSON text (the bundled content takes under a quarter of it).
 MAX_CONTENT_BYTES = 2_000_000
 JOURNEYS = ("lhc", "hair")
 SIDES = ("benefiting", "negativelyImpacted")

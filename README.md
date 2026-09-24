@@ -64,7 +64,8 @@ python3 scripts/run_production.py --iterations 2000
 ```
 
 Roles come from a Clerk webhook, which cannot reach a development machine on
-its own; docs/OPERATIONS.md (Roles) shows how to work as an admin locally.
+its own; docs/OPERATIONS.md (Roles on a development machine) shows how to
+work as an admin locally.
 
 ## Repository layout
 
@@ -72,8 +73,8 @@ its own; docs/OPERATIONS.md (Roles) shows how to work as an admin locally.
 |---|---|
 | `app/` | Next.js pages and the dashboard's server routes (roles, admin writes, the viewer cookie, the Clerk webhook) |
 | `components/dashboard/` | The views and their shared pieces |
-| `hooks/`, `types/` | The data store and the types that mirror the API's JSON |
-| `lib/` | Shared logic: the API client, formatting, the Shift Matrix arithmetic, cell weights, the per-driver attribution, tokens, auth helpers |
+| `hooks/`, `types/` | The data store, the behaviour every overlay shares (Escape, the scroll lock, focus), and the types that mirror the API's JSON |
+| `lib/` | Shared logic: the API client, formatting, the Shift Matrix arithmetic, cell weights, the per-driver attribution, the Profit Pool Explorer's data, tokens, auth helpers |
 | `data/` | Dashboard content (the Consumer Journey, the generated driver code map), the driver base and the PRISM Analysis templates (`drivers/`), and the generated records of the overlap correction, the cell-weight estimate and the attribution (`parameters/`, `drivers/driver_attribution.json`) |
 | `prism/` | The Python package: the engine (`engine.py`), the model configuration, the driver base, persistence, the QA workbook and the API (`api/`) |
 | `api/index.py` | The Vercel entry point of the API |
@@ -120,7 +121,11 @@ effect with the next deployment.
 
 Variables set in the shell take precedence over `.env`, so one command can be
 pointed at another database. Set both URLs, because `POSTGRES_URL` wins when
-`.env` holds it: `POSTGRES_URL=... DATABASE_URL=... python3 scripts/run_production.py`.
+`.env` holds it:
+
+```bash
+POSTGRES_URL=... DATABASE_URL=... python3 scripts/run_production.py
+```
 
 ## Documentation
 

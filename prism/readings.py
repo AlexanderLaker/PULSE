@@ -26,6 +26,9 @@ from prism.config import DEFAULT_PATH_YEARS, ESTIMATE_SOURCE_PREFIX
 #: the same labels; tests/test_driver_analysis.py keeps them equal).
 LABELS = ("Weight in the answer", "Where it lands", "When it lands", "What the band hinges on")
 BASIS_LABEL = "Figures"
+#: How long every reading runs, in words, whatever the driver's weight
+#: (tests/test_driver_analysis.py holds each rendered text to it).
+WORD_RANGE = (200, 600)
 
 #: Category names in the texts: the labels the page shows (lib/format.ts
 #: CATEGORIES) in lower case, the hair ones named in full ("hair colour",

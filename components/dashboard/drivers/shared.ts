@@ -19,7 +19,7 @@ export const DIFFUSION_LABELS: Record<string, { label: string; description: stri
 };
 export const curveLabel = (curve: string): string => DIFFUSION_LABELS[curve]?.label ?? curve;
 
-// ─── Value chain epicentre ─────────────────────────────────────────
+// ─── Value-chain epicentre ─────────────────────────────────────────
 // A driver's value chain is one stage, the epicentre of its impact
 // (lib/valueChain.ts). Review & Endorse treats the stage as a category:
 // expert picks are counted as votes, never averaged, since a Supply Chain

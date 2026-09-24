@@ -13,8 +13,9 @@ or a weight changes.
 
 - The figures are an expected-value decomposition of the engine's own
   arithmetic at the score means, driver by driver and cell by cell, scaled by
-  one factor to the reference run's median (`prism/attribution.py`, written by
-  `scripts/build_driver_analysis.py`).
+  one factor to the reference run's median. `prism/attribution.py` computes
+  it; `scripts/build_driver_analysis.py` writes the record,
+  `data/drivers/driver_attribution.json`.
 - Each reading is an authored template whose every model figure is a
   placeholder, rendered from the record. Rules (no restated scores, no
   history, no management response, no hand-typed model figure) are held by

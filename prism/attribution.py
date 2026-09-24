@@ -77,6 +77,11 @@ BAND_SEED = 20260917
 #: The factors of the median over the sum at the means that the record
 #: accepts; the dashboard's drill-down applies the same range.
 RECONCILIATION_RANGE = (0.5, 2.0)
+#: How far each terminal-year quantile of the reference run may lie from the
+#: recorded production run's. The QA workbook stores the run's to six decimals
+#: and the reference is rounded the same way, so this admits one unit in the
+#: sixth decimal and nothing more.
+REFERENCE_ATOL = 1.5e-6
 #: How many of its largest cells, and same-force partners per cell, the
 #: record keeps for each driver.
 TOP_CELLS = 6
@@ -208,10 +213,12 @@ def band_analysis(config: ModelConfig, drivers: list, dec: dict, factor: float) 
 def inputs_hash(config: ModelConfig, drivers: list) -> str:
     """A digest of everything the reference run depends on: the scoring
     state of every driver (its input-drift fingerprint, which includes the
-    onset year), the force layers, the cell weights, the path and the engine
-    version. The reference run is stamped with it, and a record whose inputs
-    no longer match its reference run is refused, so that a re-scored base
-    cannot be reconciled to a median it does not produce."""
+    onset year), the force weights, attenuation and overlaps, the copula
+    correlations, the cell weights, the base year, the path, the jitter
+    switch and the engine version. The reference run is stamped with it, and
+    a record whose inputs no longer match its reference run is refused, so
+    that a re-scored base cannot be reconciled to a median it does not
+    produce."""
     payload = {
         "drivers": driver_fingerprint(drivers),
         "force_weights": {f: round(float(config.force_weights[f]), 6) for f in FORCES},
@@ -248,7 +255,7 @@ def reference_run(config: ModelConfig, drivers: list, chains: int, iterations: i
     }
 
 
-def reference_reproduces(reference: dict, persisted: dict, tol: float = 1.5e-6) -> list:
+def reference_reproduces(reference: dict, persisted: dict, tol: float = REFERENCE_ATOL) -> list:
     """Names of the categories and quantiles where the reference run does not
     reproduce the persisted run (empty when it does)."""
     ref_cats, run_cats = reference["categories_terminal"], persisted["categories_terminal"]

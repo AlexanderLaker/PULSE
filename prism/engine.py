@@ -53,6 +53,15 @@ def distribution(values: np.ndarray) -> dict:
 #: standard errors of a run are reproducible (any fixed value would do;
 #: changing it moves the reported errors, not the shifts).
 MC_SE_BOOTSTRAP_SEED = 20260713
+#: Resamples of that bootstrap.
+BOOTSTRAP_RESAMPLES = 200
+#: Chain i runs on the master seed + i x CHAIN_SEED_STRIDE.
+CHAIN_SEED_STRIDE = 1_000_003
+#: The copula's uniforms are kept inside [UNIFORM_CLIP, 1 - UNIFORM_CLIP], so
+#: the Beta quantile never sees exactly 0 or 1.
+UNIFORM_CLIP = 1e-12
+#: The smallest factor the within-force dampening can take.
+DAMPENING_FLOOR = 0.1
 
 
 def region_presence(driver) -> np.ndarray:
@@ -276,7 +285,7 @@ class MonteCarloEngine:
 
         Z ~ N(0, R), U = Phi(Z), probability = BetaInv(U; alpha, beta), and the
         effect is probability x gp1_pct_affected x direction. U is clipped to
-        [1e-12, 1 - 1e-12] so that BetaInv never sees exactly 0 or 1.
+        [UNIFORM_CLIP, 1 - UNIFORM_CLIP].
         """
         n_drivers = len(drivers)
         if n_drivers == 0:
@@ -300,7 +309,7 @@ class MonteCarloEngine:
         Z = self.rng.standard_normal((n_iter, n_drivers))
         Z_correlated = Z @ L.T
         U = _norm_dist.cdf(Z_correlated)
-        U = np.clip(U, 1e-12, 1.0 - 1e-12)
+        U = np.clip(U, UNIFORM_CLIP, 1.0 - UNIFORM_CLIP)
 
         samples = np.zeros((n_iter, n_drivers))
         for j, driver in enumerate(drivers):
@@ -366,10 +375,13 @@ class MonteCarloEngine:
         n_eff = (sum m)^2 / sum m^2 is the participation ratio of the force's
         deterministic mean contributions m = |expected_effect| x exposure. It
         equals the count for equal contributions, tends to 1 as one driver
-        dominates, and barely moves when a negligible driver is added, so
-        adding a small driver can never make a force's total smaller. The
+        dominates, and barely moves when a negligible driver is added. It is
+        set from the means, the same in every year, so, while every overlap
+        stays below 0.5, adding a driver moves the force's total at the means
+        in its own direction in any year in which it has materialised at least
+        as far as the force's other drivers (docs/MODEL.md, step 5). The
         dampening is 1 - overlap x (n_eff - 1) / n_eff where n_eff > 1, else 1,
-        floored at 0.1. ``exposure`` is exposure_matrix(drivers).
+        floored at DAMPENING_FLOOR. ``exposure`` is exposure_matrix(drivers).
         """
         n_forces, n_cells = len(FORCES), exposure.shape[1]
         driver_force_idx = np.array([FORCES.index(d.force) for d in drivers])
@@ -393,7 +405,7 @@ class MonteCarloEngine:
             # empty cells (n_eff = 0, dampening 1.0) free of division warnings.
             n_eff_safe = np.maximum(n_eff, 1.0)
             dampen = np.where(n_eff > 1.0, 1.0 - ov * (n_eff - 1.0) / n_eff_safe, 1.0)
-            dampening[f_idx, :] = np.clip(dampen, 0.1, 1.0)
+            dampening[f_idx, :] = np.clip(dampen, DAMPENING_FLOOR, 1.0)
         return dampening, n_eff_all
 
     def _cell_shift_samples(self, drivers: list, effects: np.ndarray, n_iter: int, n_cats: int,
@@ -558,13 +570,14 @@ class MonteCarloEngine:
             "totals": totals,
         }
 
-    def _mc_standard_error(self, samples: np.ndarray, n_boot: int = 200) -> dict:
+    def _mc_standard_error(self, samples: np.ndarray, n_boot: int = BOOTSTRAP_RESAMPLES) -> dict:
         """Bootstrap standard error of the terminal-year median, P10 and P90, in pp.
 
         This is the sampling noise of the published percentiles at the run's
-        iteration count (0.001 to 0.003 pp at 3 x 50,000, far below the 0.1 pp
-        display precision). It measures Monte Carlo noise only, never model
-        error. A fixed sub-generator keeps the reported value reproducible.
+        iteration count (a few thousandths of a percentage point at
+        3 x 50,000, far below the one-decimal display). It measures Monte Carlo
+        noise only, never model error. A fixed sub-generator keeps the
+        reported value reproducible.
         """
         n_iter, n_cats, n_years = samples.shape
         last = n_years - 1
@@ -612,7 +625,7 @@ class MonteCarloEngine:
         if chains < 1:
             raise ValueError("chains must be >= 1")
         if seeds is None:
-            seeds = [int(self.seed) + i * 1000003 for i in range(chains)]
+            seeds = [int(self.seed) + i * CHAIN_SEED_STRIDE for i in range(chains)]
         if len(seeds) != chains:
             raise ValueError("len(seeds) must equal chains")
         n_iter = int(iterations)

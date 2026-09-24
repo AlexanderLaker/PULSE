@@ -1,8 +1,9 @@
 /**
  * The Drivers page's chips and labels: the per-field help of the section
  * cards, the meta and Edited chips, the source item with its credibility
- * tier and publishing host, and the small labels the panels share. The section card itself is
- * shared with the Settings sheet (components/dashboard/SectionCard.tsx).
+ * tier and publishing host, and the small labels the panels share. The
+ * section card itself is shared with the Settings sheet
+ * (components/dashboard/SectionCard.tsx).
  */
 import React, { type FC } from 'react';
 import { FileText, ExternalLink, AlertTriangle } from 'lucide-react';

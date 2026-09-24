@@ -62,10 +62,13 @@ of a segmented control, `lift`, `primaryButton`, `authCard`, and `door` and
 
 ### Shifts
 
-One colour pair means direction everywhere: green `#1f7a3d` for expansion,
-red `#9f403d` for contraction, slate for flat. Colour is never the only
-signal: a shift always carries its sign, and headline figures an arrow as
-well (`components/dashboard/shift/ShiftValue.tsx`), so the direction survives
+One colour pair means direction wherever a shift or a driver's direction is
+shown: green `#1f7a3d` for expansion, red `#9f403d` for contraction, slate for
+flat. On the Drivers page the green also marks a finished review (an edited or
+endorsed value, a saved proposal) and the evidence grade Reported, each with a
+text label, so none of them reads as a direction. Colour is never the only
+signal: a shift always carries its sign, and headline figures an arrow as well
+(`components/dashboard/shift/ShiftValue.tsx`), so the direction survives
 colour-vision deficiency, a projector and greyscale print. The Shift Matrix
 tints its cells in the shift's own hue, stronger with the magnitude up to the
 95th percentile of the values in view; the tint stops where the cell text
@@ -129,8 +132,8 @@ value a reader needs.
   headers with a direction icon.
 - Provenance and grades are chips with text (`components/dashboard/Chip.tsx`),
   never colour alone.
-- Loading, empty and error states use the same palette
-  (`LoadingSkeleton.tsx`, `ErrorBoundary.tsx`) and say what is missing and why.
+- Loading, empty and error states use the same palette (`LoadingSkeleton.tsx`,
+  `ErrorBoundary.tsx`) and say what is missing and why.
 - Overlays close on Escape, keep the page behind them from scrolling, keep
   focus inside while open and return it afterwards (`hooks/useOverlay.ts`).
 

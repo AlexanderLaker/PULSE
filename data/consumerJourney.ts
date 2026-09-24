@@ -33,10 +33,8 @@ export type PoolImpactGrade = 'Low' | 'Med' | 'High';
 
 /** How strongly a tile moves the profit pool; its side gives the direction. */
 export interface PoolImpactInfo {
-  /** An authored grade, anchored on a score of the modelled drivers the tile
-   *  cites (the largest, over them, of |expected_effect| x probability / 5 x
-   *  gp1_pct_affected, times the tile's intensity); a tile without a modelled
-   *  driver is Low. */
+  /** An authored grade, judged from the modelled drivers the tile cites and
+   *  the tile's intensity; a tile without a modelled driver is Low. */
   grade: PoolImpactGrade;
 }
 

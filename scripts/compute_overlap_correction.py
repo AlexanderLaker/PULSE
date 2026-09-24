@@ -21,8 +21,8 @@ The result depends on the exposure space and on how many drivers each force
 has, so re-run the script whenever the taxonomy, the exposure scores or the
 drivers change, with a new VERSION. The new values move the model's numbers:
 a new MODEL_VERSION, new golden pins and a PRISM Analysis record rebuilt from
-a production run of the new code go with them (CLAUDE.md,
-docs/DRIVER_ANALYSIS.md).
+a production run of the new code go with them
+(docs/adr/0014-versioning-and-golden-pins.md, docs/DRIVER_ANALYSIS.md).
 
     python3 scripts/compute_overlap_correction.py           write both outputs
     python3 scripts/compute_overlap_correction.py --check   exit 1 if either output is out of date (CI)
@@ -55,6 +55,8 @@ OUT_PY = REPO / "prism" / "overlap_correction.py"
 
 WITHIN_FLOOR, WITHIN_CEIL = 0.10, 0.45
 CROSS_FLOOR, CROSS_CEIL = 0.00, 0.45
+#: The largest factor by which a broad force can cover a narrow one.
+ASYMMETRY_CAP = 1.5
 
 
 def weighted_jaccard(a, b):
@@ -65,7 +67,7 @@ def weighted_jaccard(a, b):
 
 def asymm_factor(n_i, n_j):
     """How much a broad force j 'covers' a narrow force i's signal."""
-    return min(1.5, math.sqrt(n_j / n_i))
+    return min(ASYMMETRY_CAP, math.sqrt(n_j / n_i))
 
 
 # ── Mechanism adjustments ─────────────────────────────────────────────────

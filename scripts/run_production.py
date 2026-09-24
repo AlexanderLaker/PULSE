@@ -34,12 +34,14 @@ Exit codes
     5  the run size or the configuration is invalid: --iterations or --chains
        outside their range (prism.config RUN_*_RANGE), or the --cell-weights
        file missing or invalid
-    6  a driver cannot be simulated (prism.drivers.simulation_problems: a score
-       missing or off its scale, a peak year not after the onset, an exposure
-       map without a score for every category and region); every problem is
-       listed. PRISM stores no such driver, so this points at a change made to
-       the database outside PRISM; a start year or a force corrected there
-       needs its revision raised as well, so the service reloads the driver
+    6  a driver cannot be simulated (prism.drivers.simulation_problems: an
+       unknown force, direction, curve or value-chain stage, a missing score, a
+       score outside its scale, a peak year not after the onset, a category or
+       region without an exposure score, an exposure on a name outside the
+       taxonomy, a duplicate id); every problem is listed. PRISM stores no such
+       driver, so this points at a change made to the database outside PRISM;
+       a start year or a force corrected there needs its revision raised as
+       well, so the service reloads the driver
 Any other error stops the run with a traceback and Python's exit code 1.
 """
 from __future__ import annotations

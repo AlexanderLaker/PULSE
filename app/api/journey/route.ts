@@ -2,10 +2,10 @@
  * PUT /api/journey: an admin saves the Consumer Journey tile map.
  *
  * Body: {base_version, content: {lhc, hair}}, where base_version is the stored
- * version the edit started from. Forwarded to PUT /api/v1/journey with an
- * admin token (lib/adminWrite.ts), which checks the whole shape and answers 409
- * when someone saved in the meantime. The dashboard reads the stored content
- * from GET /api/v1/journey directly.
+ * version the edit started from. Forwarded with an admin token
+ * (lib/adminWrite.ts) to PUT /api/v1/journey, which checks the whole shape and
+ * answers 409 when someone saved in the meantime. The dashboard reads the
+ * stored content from GET /api/v1/journey directly.
  */
 import { forwardAdminWrite } from '@/lib/adminWrite';
 

@@ -29,8 +29,8 @@ Outputs, never edited by hand:
 
 A new estimate moves the category and portfolio numbers: it gets a new
 VERSION, and a new MODEL_VERSION, golden pins and a PRISM Analysis record
-rebuilt from a production run of the new code go with it (CLAUDE.md,
-docs/DRIVER_ANALYSIS.md).
+rebuilt from a production run of the new code go with it
+(docs/adr/0014-versioning-and-golden-pins.md, docs/DRIVER_ANALYSIS.md).
 """
 import argparse
 import json

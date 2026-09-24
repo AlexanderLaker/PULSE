@@ -101,20 +101,21 @@ engine.
 | `GET /api/v1/journey` | signed in | `{version, content}`: the newest stored Consumer Journey tile map, or version 0 and no content while the dashboard's bundled content applies |
 | `PUT /api/v1/journey` | admin | Stores a new version of the whole tile map, edited from the version the request names (409 when another save came in between); a map the dashboard could not render, or one citing a code that is not a driver, is refused (`prism/journey.py`) |
 
-A body the API cannot accept is answered 422 with the reason, and a write made
-on an outdated revision or version 409; the dashboard shows both messages as
-they come (its own server routes answer 400 to a body they refuse before
-forwarding it). A write that gets no answer from the API (a timeout, a lost
-connection, a 502 or 504 from the gateway or from the dashboard's route) may
-still have been stored: the editors say so and ask for the stored version
-before the next save. While the database cannot be used the routes that read
-or write it answer 503: with the migration to run when the schema is older
-than the code, with the missing setting when no database is configured, and
-with "try again in a moment" when the database cannot be reached after three
-attempts (the details go to the log, never to the browser). `/health` and
-`/diagnostics` answer 200 even then and say what is wrong (`/health` with
-status `degraded`, both with the reason). Any other database error is logged
-and answered 500.
+A body the API cannot accept is answered 422 with the reason, which the
+dashboard shows as it comes (its own server routes answer 400 to a body they
+refuse before forwarding it). A write made on an outdated revision or version
+is answered 409, and the editor says in its own words that someone saved in
+between and how to get the current version. A write that gets no answer from
+the API (a timeout, a lost connection, a 502 or 504 from the gateway or from
+the dashboard's route) may still have been stored: the editors say so and ask
+for the stored version before the next save. While the database cannot be used
+the routes that read or write it answer 503: with the migration to run when
+the schema is older than the code, with the missing setting when no database
+is configured, and with "try again in a moment" when the database cannot be
+reached after three attempts (the details go to the log, never to the
+browser). `/health` and `/diagnostics` answer 200 even then and say what is
+wrong (`/health` with status `degraded`, both with the reason). Any other
+database error is logged and answered 500.
 
 Each instance keeps the drivers and the latest run in memory
 (`prism/api/state.py`). A request that reads them first checks whether the
@@ -203,14 +204,17 @@ its own:
 | View | File | What it shows |
 |---|---|---|
 | Entry gate | `HomeGate.tsx` | The four views and what each is for |
-| Drivers | `Drivers.tsx`, `drivers/` | The drivers with their scores, sources and PRISM Analysis; Expert Rating, where every signed-in user can propose scores; for admins the editor and Review & Endorse, which sets the expert aggregate against the driver's scores. `Drivers.tsx` is the table; `drivers/` holds the row, the three panels, the PRISM Analysis card and the scales and cards they share |
+| Drivers | `Drivers.tsx`, `drivers/` | The drivers with their scores, sources and PRISM Analysis; Expert Rating, where every signed-in user can propose scores; for admins the editor and Review & Endorse, which sets the expert aggregate against the baseline and endorses the chosen values as an ordinary edit. `Drivers.tsx` is the table; `drivers/` holds the row, the three panels, the PRISM Analysis card and the scales and cards they share |
 | Consumer Journey | `ConsumerJourney.tsx`, `journey/` | Consumer moments per journey stage with the drivers behind them; admins edit the tiles. `journey/` holds the tile parts, the tile dialog, its why-chain and the tile editor |
 | Profit Pool Shift Analysis | `ShiftAnalysis.tsx`, `shift/` | The Shift Matrix through the four lenses, the portfolio band and the drill-down per category (`shift/CategoryDetailPanel.tsx`). The page attributes the run to the drivers once, at the score means: the drill-down ranks its drivers with it and the Time Path's Expansion and Contraction filters split the median with it. `shift/` also holds the matrix model, the toolbar, the state without a run and the "About this model" footer |
 | Profit Pool Explorer (beta) | `ProfitPoolExplorer.tsx`, `explorer/` | Sourced profit pool views of the Hair and Laundry & Home Care industries |
 | Settings | `SettingsModal.tsx`, `settings/` | Profile, password and sessions (from Clerk); the model configuration, read-only: the code's parameters and the cell weights the served run used; the user list for admins |
 
 `Chip.tsx` and `SectionCard.tsx` are the pieces several views share: one look
-for a label and one for a boxed section.
+for a label and one for a boxed section. The shell around the views is
+`WelcomeModal.tsx` (the orientation shown once per sign-in),
+`ServiceNotice.tsx` (the banner while the database cannot be used),
+`ErrorBoundary.tsx` and `LoadingSkeleton.tsx`.
 
 Shared logic lives in `lib/`: `apiClient.ts` (every request the dashboard
 makes), `apiError.ts` (one readable line from an error answer, for the client

@@ -117,7 +117,11 @@ README.md; the documents in `docs/` explain everything below in full.
   the forms to avoid and the names that keep theirs; the same two test files
   enforce it.
 - Documents and comments describe the system as it is. The history of how it
-  got here lives in git, not in the tree.
+  got here lives in git, not in the tree. The figures a document takes from
+  the model and its records (parameters, tables, counts, tolerances), the
+  design tokens and the security and session settings are checked by
+  `tests/test_documents.py`; update both, and add a check for a figure a
+  document starts to quote.
 
 ## Commands
 
@@ -148,5 +152,5 @@ also tested on PostgreSQL. The Python suite never touches the database in
 | `scripts/` | production run, generators, `promote_admin.py`, handover packaging |
 | `data/drivers/` | the driver base and the PRISM Analysis sources |
 | `components/dashboard/` | the views: each page in one file, its parts in a folder of its own (`drivers/`, `shift/`, `journey/`, `explorer/`, `settings/`), and the pieces several views share |
-| `lib/`, `hooks/`, `types/` | shared dashboard logic and the API client, the store, the types |
+| `lib/`, `hooks/`, `types/` | shared dashboard logic and the API client; the store and the behaviour every overlay shares; the types |
 | `docs/` | ARCHITECTURE, MODEL, DRIVERS, DRIVER_ANALYSIS, OPERATIONS, DESIGN, EXPLORER, `adr/` |

@@ -13,9 +13,9 @@ arithmetic.
 
 ## Reading the output
 
-- **Relative, never absolute.** A shift of -0.058 means 5.8 percent of the
-  gross profit of today's business. A reader applies it to their own figures:
-  `GP1_2035 = GP1_today x (1 + shift)`.
+- **Relative, never absolute.** A shift of -0.058 means a loss of 5.8 percent
+  of today's gross profit by that year. A reader applies it to their own
+  figures: `GP1_2035 = GP1_today x (1 + shift)`.
 - **Ceteris paribus.** The engine propagates external drivers only. There is
   no pricing response, no innovation and no competitive reaction by Henkel or
   anyone else, so a negative total means exposure if nothing changes, not a
@@ -37,7 +37,7 @@ arithmetic.
 | Correlation within a force | 0.3 | Structured judgment |
 | Correlation across forces | a 6 x 6 matrix, values 0.04 to 0.22 | Structured judgment; positive definite as entered |
 | Cell weights | the estimated HCB gross-profit mix, 13 x 4 | `scripts/build_cell_weights.py`; replaced by the finance file at run time |
-| Base year, path | 2025; 2026 to 2035 | |
+| Base year, path | 2025; 2026 to 2035 | `BASE_YEAR`, `DEFAULT_PATH_YEARS` |
 | Peak-year jitter | on, each driver within the width its uncertainty score sets | `peak_year_jitter`; off, every driver peaks in its own year |
 | Iterations | 3 chains x 50,000 in production, master seed 42 | `PRODUCTION_CHAINS`, `PRODUCTION_ITERATIONS`, `PRODUCTION_SEED` |
 
@@ -152,11 +152,16 @@ n_eff = (sum of mu)^2 / (sum of mu^2),   mu_j = |E[s_j]| x x_jcr
 within-force overlap. `n_eff` is the effective number of contributing drivers:
 it equals their count when they contribute equally, approaches 1 when one
 dominates, and changes in proportion to a driver's size, so a small driver
-changes it little. The dampening is set from the score means, and with every
-overlap below 0.5 adding a driver moves its force's total at the means in the
-driver's own direction: a small tailwind never worsens a cell and a small
-headwind never improves it. A single iteration, whose draws differ from the
-means, can deviate slightly.
+changes it little. The dampening is set from the score means and is the same
+in every year. With every overlap below 0.5, adding a driver moves its force's
+total at the means in the driver's own direction in any year in which the
+driver has materialised at least as far as each of the force's other drivers,
+in particular once all of them have fully materialised: a small tailwind then
+never worsens a cell and a small headwind never improves it. In an earlier
+year a driver that has not yet materialised already counts in `n_eff`, so it
+changes the dampening of the drivers acting that year and can move the total
+the other way. A single iteration, whose draws differ from the means, can
+deviate slightly.
 
 ### 6. Compounding across forces
 
@@ -217,12 +222,11 @@ an integrity event.
   signs, timing and the overlap correction, so its totals by force or region
   can differ from these lenses.
 - **Monte Carlo standard error.** A bootstrap (200 resamples) of each
-  category's terminal-year median, P10 and P90. At 3 x 50,000 iterations it is
-  0.001 to 0.002 percentage points for the medians and P10s and at most about
-  0.003 for the P90s, far below the one-decimal display. It measures sampling
-  noise only, never model error. The About this model section of the Shift
-  Analysis shows the largest standard error of a category median next to the
-  seed stability.
+  category's terminal-year median, P10 and P90. At 3 x 50,000 iterations it
+  is a few thousandths of a percentage point, far below the one-decimal
+  display. It measures sampling noise only, never model error. The About this
+  model section of the Shift Analysis shows the largest standard error of a
+  category median next to the seed stability.
 - **Chains and seed stability.** Production runs three chains with seeds
   `42 + i x 1,000,003` and pools them for every published number. The spread
   of the three chains' terminal-year portfolio medians is reported as seed
@@ -235,7 +239,7 @@ and the dashboard shows the list next to the run.
 
 | Event | Raised when |
 |---|---|
-| `input_drift` | on every production run after the first: how the drivers' scores changed since the previous run, or that nothing changed |
+| `input_drift` | on every production run after the first: how the drivers' scores changed since the previous run, or that nothing changed; a warning that the two were not compared when the previous run stored no complete driver fingerprint |
 | `correlation_pd_repair`, `cholesky_repair` | the correlation matrix had to be repaired |
 | `compounding_floor` | a compounding factor was floored at -100 percent |
 | `cell_weight_zero_row` | a category has a zero gross-profit share in every region |
@@ -245,7 +249,9 @@ The input drift compares a fingerprint of every driver's scoring state
 curve, category and regional exposure, value-chain stage) with the
 fingerprint stored with the previous run. It is telemetry, not a gate: a
 planned re-scoring should drift, and the point is that drift never goes
-unnoticed.
+unnoticed. The event is a warning when a direction flips, when a driver is
+added or removed, or when more than ten drivers change their scores or more
+than ten change their structure; otherwise it is information.
 
 ## The overlap correction
 
@@ -273,9 +279,9 @@ in `O` over the five other forces. The record is
 `data/parameters/overlap_correction.json`; the script also writes the three
 layers to `prism/overlap_correction.py`, which the model's defaults read. The
 correction is computed from the driver base, not from the live database: it
-is recomputed whenever the categories or the base's exposure scores change
-(`--check` fails until it is), and an exposure edit made on the Drivers page
-moves it only once the base carries the edit.
+is recomputed whenever the categories, the drivers or their exposure scores
+change (`--check` fails until it is), and an exposure edit made on the
+Drivers page moves it only once the base carries the edit.
 
 ## The cell weights
 
@@ -308,11 +314,11 @@ Additives 2.6, Hand Dishwash 3.4, Auto Dishwash 6.5, Hard-Surface Cleaner
 4.1, Toilet Care 2.5, Insect Control 0.6 percent; regions Europe 51.4, North
 America 23.2, Asia 5.6, High Growth 19.8 percent.
 
-The finance shares replace the estimate at run time
-(`run_production.py --cell-weights FILE`, docs/OPERATIONS.md). The file is
-kept outside the repository; absolute figures in it are divided by their
-total before the engine sees them and are never stored. Every run records the
-weights it applied and their source.
+The finance shares replace the estimate at run time (`run_production.py
+--cell-weights FILE`, docs/OPERATIONS.md). The file is kept outside the
+repository; absolute figures in it are divided by their total before the
+engine sees them and are never stored. Every run records the weights it
+applied and their source.
 
 ## Reproducibility
 

@@ -10,11 +10,11 @@ it follows and how it is regenerated.
 Everything an expert scores is already on the page: the direction, the
 probability, the GP1 share, the timing, the uncertainty, the exposures, the
 sources. None of it says what the driver does to the dashboard's headline. A
-driver with a large expected effect can be a small item in the portfolio because
-it acts in a region that holds a twentieth of the pool; a driver with modest
-scores can be the largest single headwind because it reaches every cell. The
-exposures say where a mechanism acts; only the roll-up says where the gross
-profit is.
+driver with a large expected effect can be a small item in the portfolio
+because it acts in a region that holds a twentieth of the pool; a driver with
+modest scores can be the largest single headwind because it reaches every
+cell. The exposures say where a mechanism acts; only the roll-up says where
+the gross profit is.
 
 The reading answers one question per driver, in four labelled paragraphs:
 
@@ -25,9 +25,10 @@ The reading answers one question per driver, in four labelled paragraphs:
    effect once the gross-profit mix is applied, and the drivers of the same
    force that share those cells (the overlap correction already discounts
    them together, so a reader must not add them up).
-3. **When it lands.** The share of the terminal-year effect in the numbers by
-   2028 and by 2030, the half-way year, and what the curve does inside the
-   horizon. Dated instruments are named with their dates.
+3. **When it lands.** How much of the terminal-year effect is in the numbers
+   by an early year of the path (most readings name 2028), the half-way year,
+   and what the curve does inside the horizon. Dated instruments are named
+   with their dates.
 4. **What the band hinges on.** The driver's own P10 to P90 range at 2035,
    its share of the portfolio band where that is material, the condition the
    width depends on, the drivers that move with it, and the observable that
@@ -78,9 +79,9 @@ attribution and not a second simulation, and it is labelled attribution
 wherever it is shown. The record, `data/drivers/driver_attribution.json`,
 holds per driver:
 
-- the terminal-year contribution to the portfolio in points, by year, with
-  its rank among all drivers and among the headwinds or tailwinds, its share
-  of the gross headwind or tailwind and of its force;
+- the contribution to the portfolio in points in every year and, in the
+  terminal year, its rank among all drivers and among the headwinds or
+  tailwinds and its share of the gross headwind or tailwind and of its force;
 - the contribution by category and by region, and in the driver's six
   largest cells: each cell's share of the pool, the driver's share of the
   cell's shift and up to three drivers of the same force in the cell; and,
@@ -101,10 +102,13 @@ holds per driver:
 The record also carries its reference run, the production recipe (3 x 50,000
 iterations, seed 42) on the committed driver base and the default
 configuration, and a digest of everything that run depends on: every
-driver's scoring state, the force layers, the cell weights, the path and the
-engine version. It records the production run the reference reproduces:
-that run's terminal-year P10, median and P90 of each of the 13 categories,
-read from its QA workbook (`prism/workbook.py`, `read_workbook`).
+driver's scoring state (the onset year included), the force weights,
+attenuation and overlaps, the copula correlations, the cell weights, the base
+year, the path, the jitter switch and the engine version (`inputs_hash` in
+`prism/attribution.py`). It records the production run the reference
+reproduces: that run's terminal-year P10, median and P90 of each of the 13
+categories, read from its QA workbook (`read_workbook` in
+`prism/workbook.py`).
 
 ## The readings
 

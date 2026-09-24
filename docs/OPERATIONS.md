@@ -128,6 +128,10 @@ A few rules the suite holds:
   no script or migration imports a script.
 - **Configuration**: the table in README.md and `.env.example` name the same
   variables, and every variable the code reads is one of them.
+- **Documents**: the figures the documents take from the model and its
+  records (a parameter, a table, a count, a tolerance), the design tokens and
+  the security and session settings are computed in `tests/test_documents.py`,
+  which fails until the document says the same.
 
 ## The production run
 
@@ -153,7 +157,8 @@ estimate was used), the velocities and the run's metadata.
 | `--allow-sqlite` | use the local SQLite file when no database URL is set |
 | `--allow-nonpsd` | run although the correlation matrix is not positive definite on this driver mix; the engine repairs it and records an integrity event |
 
-The cell-weights file is JSON, kept outside the repository:
+The cell-weights file is JSON, kept outside the repository (the shares
+below are illustrative):
 
 ```json
 {
@@ -187,9 +192,9 @@ mistaken for the estimate.
 Any other error stops the run with a traceback and exit code 1.
 
 After a run, the Shift Analysis's "About this model" footer shows the new
-run's id, date, master seed, numerics, Monte Carlo standard error, seed
-stability and integrity events, including the input drift against the
-previous run.
+run's id, date, master and chain seeds, numerics, Monte Carlo standard
+error, seed stability and integrity events, including the input drift
+against the previous run.
 
 When scores or model parameters changed, regenerate the PRISM Analysis
 readings after the run as docs/DRIVER_ANALYSIS.md describes. A run on the
@@ -287,8 +292,8 @@ sign-up.
 
 1. Create a Clerk application with email sign-in (and any SSO provider
    wanted).
-2. Copy the publishable and secret keys into `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-   and `CLERK_SECRET_KEY`.
+2. Copy the publishable and secret keys into
+   `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`.
 3. Add a webhook endpoint `https://<domain>/api/webhooks/clerk` for the
    events `user.created`, `user.updated` and `user.deleted`, and copy its
    signing secret into `CLERK_WEBHOOK_SIGNING_SECRET`. The route rejects any
@@ -306,7 +311,7 @@ sign-up.
 | Symptom | Cause and remedy |
 |---|---|
 | Every data request answers 401 | The dashboard and the API see different `PRISM_JWT_SECRET` values, or the value is shorter than 32 characters. Set the same value everywhere and redeploy |
-| The dashboard says the service is unavailable, or a notice under the navigation says the data cannot be loaded | Check `/api/v1/health` and `/api/v1/diagnostics`. `simulation_reason` names the cause: `migration_pending` (the database needs a migration; the `error` field names it), `no_database` (neither `DATABASE_URL` nor `POSTGRES_URL` is set in this Vercel deployment) or `db_error` (the API cannot reach the database or a query failed; the `error` field says why) |
+| The dashboard says the service is unavailable, or a notice under the navigation says the data cannot be loaded | Check `/api/v1/health` and `/api/v1/diagnostics`. `simulation_reason` names the cause: `migration_pending` (the database needs a migration; the `error` field of `/diagnostics` names it), `no_database` (neither `DATABASE_URL` nor `POSTGRES_URL` is set in this Vercel deployment) or `db_error` (the API cannot reach the database or a query failed; the `error` field of `/diagnostics` says why) |
 | The Shift Analysis is empty | `simulation_reason` in `/api/v1/diagnostics` is `no_rows` (write a run) or `malformed` (the newest run lacks a part the dashboard needs, such as a key, a category, region or year, a gross-profit share, its run metadata or a complete driver fingerprint; the `error` field lists them; write a new run) |
 | Nobody is admin | The webhook did not reach the dashboard: check its deliveries in the Clerk dashboard, then set the role as described under Roles |
 | The production run exits with 4 | The correlation settings are not positive definite on the current driver mix; lower the cross-force correlations in `prism/config.py` |

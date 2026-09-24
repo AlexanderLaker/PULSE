@@ -24,7 +24,7 @@ export type ExposureMap = Record<string, number>;
 export interface DriverScores {
   /** Likelihood 1 to 5; the Beta prior's mean is probability / 6. */
   probability: number;
-  /** Share of the exposed gross profit affected at full materialisation, 0 to 1. */
+  /** Share of the category's GP1 the driver moves at full materialisation, 0 to 1. */
   gp1_pct_affected: number;
   /** Year by which the effect is fully present. */
   peak_year: number;
@@ -45,7 +45,7 @@ export interface Driver extends DriverScores {
   name: string;
   description: string;
   direction: Direction;
-  /** Year the effect starts to materialise. */
+  /** The onset: no effect up to and including this year. */
   start_year: number;
   confidence: Confidence;
   /** Beta-prior mean x GP1 share x direction sign: the driver's expected signed effect before exposures

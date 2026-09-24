@@ -2,7 +2,7 @@
  * The welcome dialog: two steps of orientation, shown once per sign-in
  * (app/dashboard/page.tsx keeps the per-session flag).
  *
- *   Step 1: the early-access note and who to send feedback to.
+ *   Step 1: the early-access note and a request for feedback.
  *   Step 2: the three production views in header order: Drivers (the input),
  *           Consumer Journey, Profit Pool Shift Analysis. The Profit Pool
  *           Explorer (Beta) is left out; it sits at the right of the top nav.

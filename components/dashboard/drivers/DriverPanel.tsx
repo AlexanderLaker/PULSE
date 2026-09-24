@@ -1,10 +1,11 @@
 /**
  * The expanded Driver List panel: everything about one driver, read-only for
  * viewers. Two columns: the description, PRISM Analysis, GP1 %, probability,
- * timing, uncertainty and sources on the left; the category, regional and
- * value-chain exposure on the right. Admins get an Edit button that turns
- * every field except the PRISM Analysis into a form; Save sends one
- * DriverUpdate with the fields that changed and the revision it started from.
+ * timing, uncertainty and sources on the left; the category and regional
+ * exposure and the value-chain epicentre on the right. Admins get an Edit
+ * button that turns every field except the PRISM Analysis into a form; Save
+ * sends one DriverUpdate with the fields that changed and the revision it
+ * started from.
  */
 import { useState, type FC } from 'react';
 import {
@@ -253,8 +254,8 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
         {!isEditing && driver.sources.length > 0 && <MetaChip label={evidenceLine(driver.sources)} />}
       </div>
 
-      {/* Two columns: the editorial detail on the left, the exposure grids on
-          the right in the order Category, Region, Value Chain. */}
+      {/* Two columns: the editorial detail on the left; on the right the
+          category and regional exposure grids and the value-chain epicentre. */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 1fr)',
@@ -632,7 +633,7 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
           )}
         </div>
 
-        {/* Right column: the exposure grids, Category, Region, Value Chain */}
+        {/* Right column: the category and regional exposure grids, then the value-chain epicentre */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <SectionCard title="Category exposure" icon={Layers}>
             {isEditing ? (

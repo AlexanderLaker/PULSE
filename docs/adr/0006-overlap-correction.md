@@ -17,8 +17,10 @@ naively, such a mechanism counts twice.
 - Within a force, contributions to a cell are dampened by
   `1 - overlap x (n_eff - 1) / n_eff`, where `n_eff` is the magnitude-weighted
   effective number of contributing drivers, set from the score means. Unlike a
-  plain count, it guarantees that adding a driver moves the total at the
-  means in the driver's own direction.
+  plain count, it guarantees, while every overlap stays below 0.5 (the clamps
+  of the overlap correction keep it there), that adding a driver moves the
+  total at the means in the driver's own direction in every year in which the
+  driver has materialised at least as far as the force's other drivers.
 - The overlaps are structured judgment computed from the drivers' category
   exposure vectors (weighted Jaccard similarity, excess over the random-pair
   baseline, a force-size factor, per-force and per-pair mechanism adjustments
@@ -28,5 +30,10 @@ naively, such a mechanism counts twice.
 ## Consequences
 
 The correction depends on the exposure space and is recomputed whenever the
-categories or the base's exposures change; its `--check` fails until it is.
-Its reasons are written next to the numbers.
+categories, the drivers or their exposures change; its `--check` fails until
+it is. Its reasons are written next to the numbers.
+
+Because `n_eff` is set from the score means rather than year by year, a driver
+that has not yet materialised already changes the dampening of the drivers
+acting in that year, and can move the force's total the other way. A
+year-specific `n_eff` would remove this, and would be a model change.

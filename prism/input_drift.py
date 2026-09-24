@@ -18,6 +18,9 @@ from __future__ import annotations
 STRUCTURE_KEYS = ("f", "ce", "ve", "re", "s", "pk", "dc", "u")
 #: Every field of a driver's fingerprint entry.
 FINGERPRINT_KEYS = ("p", "g", "d") + STRUCTURE_KEYS
+#: More drivers than this with changed scores, or more with a changed
+#: structure, make the drift event a warning.
+WARNING_CHANGES = 10
 
 
 def _rounded_map(m: dict) -> dict:
@@ -154,7 +157,8 @@ def compute_input_drift_event(
     # Adding or removing drivers reshapes the whole model, so it is never a
     # footnote.
     severity = "warning" if (
-        direction_flips or len(scores_changed) > 10 or added or removed or len(structure_changes) > 10
+        direction_flips or added or removed
+        or len(scores_changed) > WARNING_CHANGES or len(structure_changes) > WARNING_CHANGES
     ) else "info"
 
     return {

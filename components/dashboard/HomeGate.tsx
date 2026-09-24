@@ -36,7 +36,7 @@ import { getYearPercentiles } from '@/lib/shiftMatrix';
 import { DRIVER_CODE_MAP } from '@/data/driverCodeMap';
 import type { ForceName } from '@/types';
 
-/** The tabs the gate opens: the dashboard's production tab ids. */
+/** The tabs the gate opens: the dashboard's tab ids. */
 export type GateRoom =
   | 'drivers'
   | 'consumer-journey'
