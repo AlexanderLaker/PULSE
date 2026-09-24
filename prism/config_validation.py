@@ -10,21 +10,15 @@ answer: whether the driver-level correlation matrix built from the settings
 is positive semidefinite, so the engine never has to weaken the configured
 correlations to repair it.
 """
-import math
-
 import numpy as np
 
 from prism.config import (CATEGORIES, FORCES, REGIONS, RUN_CHAINS_RANGE, RUN_ITERATIONS_RANGE, ModelConfig,
                           build_driver_correlation_matrix)
+from prism.numbers import finite_number
 
 SUM_TOLERANCE = 0.01
 #: The base years a configuration may name.
 BASE_YEAR_RANGE = (2020, 2030)
-
-
-def _number(value) -> bool:
-    """A finite real number, never a bool."""
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
 def _key_problems(name: str, provided, required) -> list:
@@ -41,7 +35,7 @@ def _key_problems(name: str, provided, required) -> list:
 def _bounded_map_problems(name: str, values: dict, required, low: float, high: float) -> list:
     out = _key_problems(name, values, required)
     out += [f"{name}['{key}'] = {value} is outside [{low}, {high}]" for key, value in values.items()
-            if not _number(value) or not low <= value <= high]
+            if not finite_number(value) or not low <= value <= high]
     return out
 
 
@@ -52,7 +46,7 @@ def _correlation_problems(matrix: dict) -> list:
     if out:
         return out
     out += [f"force_correlation_matrix ({f},{g}) = {matrix[f][g]} is outside [0, 1]" for f in FORCES for g in FORCES
-            if not _number(matrix[f][g]) or not 0.0 <= matrix[f][g] <= 1.0]
+            if not finite_number(matrix[f][g]) or not 0.0 <= matrix[f][g] <= 1.0]
     if out:
         return out
     for i, f in enumerate(FORCES):
@@ -75,7 +69,7 @@ def _cell_weight_problems(weights: dict) -> list:
     for cat, row in weights.items():
         out += _key_problems(f"cell_weights['{cat}']", row, REGIONS)
         for region, w in row.items():
-            if not _number(w) or w < 0:
+            if not finite_number(w) or w < 0:
                 out.append(f"cell_weights['{cat}']['{region}'] must be a non-negative number")
             else:
                 total += w
@@ -100,11 +94,11 @@ def model_config_problems(config: ModelConfig) -> list:
         problems.append("peak_year_jitter must be true or false")
     weights = config.force_weights
     problems += _key_problems("force_weights", weights, FORCES)
-    if not all(_number(w) and w >= 0 for w in weights.values()):
+    if not all(finite_number(w) and w >= 0 for w in weights.values()):
         problems.append("force_weights must be non-negative numbers")
     elif abs(sum(weights.values()) - 1.0) > SUM_TOLERANCE:
         problems.append(f"force_weights must sum to 1.0 (got {sum(weights.values()):.4f})")
-    if not _number(config.within_force_rho) or not 0.0 <= config.within_force_rho <= 1.0:
+    if not finite_number(config.within_force_rho) or not 0.0 <= config.within_force_rho <= 1.0:
         problems.append(f"within_force_rho must be in [0, 1] (got {config.within_force_rho})")
     problems += _correlation_problems(config.force_correlation_matrix)
     problems += _cell_weight_problems(config.cell_weights)

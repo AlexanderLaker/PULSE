@@ -1,10 +1,11 @@
 """The Profit Pool Driver, the checks it must pass to be simulated, and the driver set."""
 
 import copy
-import math
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import Optional
+
+from prism.numbers import finite_number, whole_in_range
 
 #: The scores experts can propose; a driver's baseline records the same fields.
 SCORE_FIELDS = ("probability", "gp1_pct_affected", "peak_year", "diffusion_curve", "uncertainty",
@@ -91,8 +92,8 @@ class Driver:
         except (TypeError, ValueError):
             self.probability_prior = None
         gp1 = self.gp1_pct_affected
-        share = isinstance(gp1, (int, float)) and not isinstance(gp1, bool) and math.isfinite(gp1) and 0 < gp1 <= 1
-        if self.probability_prior is None or not share or self.direction not in DIRECTIONS:
+        if (self.probability_prior is None or not (finite_number(gp1) and 0 < gp1 <= 1)
+                or self.direction not in DIRECTIONS):
             self.expected_effect = None
             return
         a, b = self.probability_prior
@@ -106,12 +107,6 @@ class Driver:
     def direction_sign(self) -> int:
         """+1 for an expansion, -1 for a contraction; a driver with neither has no sign (KeyError)."""
         return {"Expansion": 1, "Contraction": -1}[self.direction]
-
-
-def whole_in_range(value, low: int, high: int) -> bool:
-    """A whole number (int or integral float, never a bool) from low to high."""
-    return (not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
-            and value == int(value) and low <= value <= high)
 
 
 def simulation_problems(drivers) -> list:
@@ -136,7 +131,7 @@ def simulation_problems(drivers) -> list:
         if not whole_in_range(d.probability, 1, 5):
             problems.append(f"{where}: probability {d.probability!r} is not a whole number from 1 to 5")
         gp1 = d.gp1_pct_affected
-        if isinstance(gp1, bool) or not isinstance(gp1, (int, float)) or not (0 < gp1 <= 1):
+        if not (finite_number(gp1) and 0 < gp1 <= 1):
             problems.append(f"{where}: gp1_pct_affected {gp1!r} is not a share in (0, 1]")
         if not whole_in_range(d.uncertainty, 0, 5):
             problems.append(f"{where}: uncertainty {d.uncertainty!r} is not a whole number from 0 to 5")

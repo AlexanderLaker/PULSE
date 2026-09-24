@@ -11,7 +11,8 @@ from prism.api.auth import identity_from_user, require_admin, require_auth
 from prism.api.proposals import build_proposal_summary, build_proposals_response
 from prism.api.schemas import DriverUpdate, ProposalUpdate
 from prism.config import CATEGORIES, REGIONS, first_peak_year
-from prism.drivers import MODEL_FIELDS, InvalidDriversError, whole_in_range
+from prism.drivers import MODEL_FIELDS, InvalidDriversError
+from prism.numbers import whole_in_range
 
 #: The names an exposure map may use, per field.
 EXPOSURE_KEYS = {"category_exposure": CATEGORIES, "regional_exposure": REGIONS}

@@ -23,6 +23,8 @@ from typing import Optional
 from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from prism.numbers import finite_number
+
 _bearer = HTTPBearer(auto_error=False)
 
 
@@ -55,7 +57,7 @@ def verify_jwt(token: str) -> Optional[dict]:
     if not isinstance(payload, dict):
         return None
     exp = payload.get("exp")
-    if isinstance(exp, bool) or not isinstance(exp, (int, float)) or exp < time.time():
+    if not finite_number(exp) or exp < time.time():
         return None
     return payload
 

@@ -64,6 +64,7 @@ from prism.database import (POSTGRES_URL, USE_POSTGRES, MigrationPendingError, d
 from prism.drivers import DriverSet, simulation_problems  # noqa: E402
 from prism.input_drift import compare_with_run, driver_fingerprint, not_compared_event  # noqa: E402
 from prism.engine import MonteCarloEngine  # noqa: E402
+from prism.numbers import finite_number  # noqa: E402
 from prism.workbook import write_workbook  # noqa: E402
 
 log = logging.getLogger("run_production")
@@ -93,7 +94,7 @@ def load_cell_weights_file(path: Path) -> tuple:
             raise ValueError(f"cells['{cat}']: missing regions {missing}; unknown regions {unknown}")
         for region in REGIONS:
             v = row[region]
-            if isinstance(v, bool) or not isinstance(v, (int, float)) or v != v or v < 0:
+            if not finite_number(v) or v < 0:
                 raise ValueError(f"cells['{cat}']['{region}'] must be a non-negative number, not {v!r}")
         values[cat] = {r: float(row[r]) for r in REGIONS}
     total = sum(v for row in values.values() for v in row.values())

@@ -134,6 +134,7 @@ from prism.database import describe_error  # noqa: E402
 from prism.input_drift import FINGERPRINT_KEYS  # noqa: E402
 from prism.journey import (DRIVER_CODES, JOURNEYS, OPTIONAL_TILE_KEYS, POOL_IMPACT_KEYS,  # noqa: E402
                            PROVENANCE_KEYS, SIDES, STAGE_KEYS, TILE_KEYS, content_problem, unknown_keys)
+from prism.numbers import finite_number, whole_in_range  # noqa: E402
 
 MIGRATION = "0001_driver_schema"
 ARCHIVE_DIR = HERE / "archive"
@@ -501,12 +502,6 @@ class NeedsCorrection(ValueError):
         super().__init__("\n  ".join(["these need correcting before the migration can run:"] + self.problems))
 
 
-def whole(value, low: int, high: int) -> bool:
-    """A whole number (int or integral float, never a bool) from low to high."""
-    return (not isinstance(value, bool) and isinstance(value, (int, float)) and value == value
-            and value == int(value) and low <= value <= high)
-
-
 def exposure_on_taxonomy(stored, names) -> tuple:
     """``(map, dropped, filled)``: a stored exposure map on the taxonomy's names.
 
@@ -616,12 +611,11 @@ def proposal_scores(r: dict, start_year: int) -> tuple:
         return value
 
     values = {
-        "probability": keep("probability", lambda v: whole(v, 1, 5)),
-        "gp1_pct_affected": keep("gp1_pct_affected", lambda v: not isinstance(v, bool)
-                                 and isinstance(v, (int, float)) and 0 < v <= 1),
-        "peak_year": keep("peak_year", lambda v: whole(v, first_peak, DEFAULT_PATH_YEARS[-1])),
+        "probability": keep("probability", lambda v: whole_in_range(v, 1, 5)),
+        "gp1_pct_affected": keep("gp1_pct_affected", lambda v: finite_number(v) and 0 < v <= 1),
+        "peak_year": keep("peak_year", lambda v: whole_in_range(v, first_peak, DEFAULT_PATH_YEARS[-1])),
         "diffusion_curve": keep("diffusion_curve", lambda v: v in VALID_DIFFUSION_CURVES),
-        "uncertainty": keep("uncertainty", lambda v: whole(v, 0, 5)),
+        "uncertainty": keep("uncertainty", lambda v: whole_in_range(v, 0, 5)),
     }
     for name, names in (("category_exposure", CATEGORIES), ("regional_exposure", REGIONS)):
         try:
@@ -629,7 +623,7 @@ def proposal_scores(r: dict, start_year: int) -> tuple:
         except ValueError:
             stored = None
         stored = stored if isinstance(stored, dict) else {}
-        kept = {k: int(v) for k, v in stored.items() if k in names and whole(v, 0, 5)}
+        kept = {k: int(v) for k, v in stored.items() if k in names and whole_in_range(v, 0, 5)}
         if len(kept) < len(stored):
             cleared.append(name if not kept else f"{name} ({len(stored) - len(kept)} of {len(stored)} cells)")
         values[name] = kept or None

@@ -125,8 +125,10 @@ class TestAuthentication:
         api.cookies.set("prism-token", token())
         assert api.get("/api/v1/drivers").status_code == 200
 
-    @pytest.mark.parametrize("bad", ["not-a-token", "a.b.c", token(exp_offset=-10), token(secret="z" * 40)],
-                             ids=["garbage", "malformed", "expired", "wrong-secret"])
+    @pytest.mark.parametrize("bad", ["not-a-token", "a.b.c", token(exp_offset=-10), token(secret="z" * 40),
+                                     token(exp=float("nan")), token(exp=True), token(exp="9999999999")],
+                             ids=["garbage", "malformed", "expired", "wrong-secret",
+                                  "expiry-nan", "expiry-bool", "expiry-text"])
     def test_an_invalid_token_is_refused(self, api, bad):
         assert api.get("/api/v1/drivers", headers={"Authorization": f"Bearer {bad}"}).status_code == 401
 
@@ -425,7 +427,7 @@ class TestDrivers:
         response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"revision": 1, **body})
         assert response.status_code == 422
 
-    @pytest.mark.parametrize("score", [9, -2, 2.5, "3", True])
+    @pytest.mark.parametrize("score", [9, -2, 2.5, "3", True, 10**400])   # the last: an int no float holds
     def test_an_exposure_score_is_a_whole_number_from_0_to_5(self, api, score):
         response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"),
                            json={"revision": 1, "category_exposure": {"Hair: Care": score}})
@@ -532,6 +534,7 @@ class TestProposals:
         path = "/api/v1/drivers/consumer_r01/proposals"
         assert api.put(path, headers=bearer(), json={"diffusion_curve": "exponential"}).status_code == 422
         assert api.put(path, headers=bearer(), json={"category_exposure": {"Hair: Care": 7}}).status_code == 422
+        assert api.put(path, headers=bearer(), json={"category_exposure": {"Hair: Care": 10**400}}).status_code == 422
         assert api.put(path, headers=bearer(), json={"regional_exposure": {"Mars": 2}}).status_code == 422
         assert api.put(path, headers=bearer(), json={"probability": 0}).status_code == 422
         assert api.put(path, headers=bearer(), json={"gp1_pct_affected": 0}).status_code == 422
