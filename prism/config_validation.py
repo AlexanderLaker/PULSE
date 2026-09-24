@@ -3,12 +3,12 @@
 ``validate_model_config`` checks every parameter the engine consumes: complete
 force, category and region coverage, weights and shares that sum to one,
 attenuation and overlap values inside their bounds, and a symmetric,
-unit-diagonal, positive-semidefinite force correlation matrix.
+unit-diagonal, positive definite force correlation matrix.
 ``validate_run_size`` checks the iterations and chains.
 ``correlation_lambda_min`` adds the check that only the loaded driver mix can
 answer: whether the driver-level correlation matrix built from the settings
-is positive semidefinite, so the engine never has to weaken the configured
-correlations to repair it.
+is positive definite (its smallest eigenvalue above zero), so the engine
+never has to weaken the configured correlations to repair it.
 """
 import numpy as np
 
@@ -55,8 +55,8 @@ def _correlation_problems(matrix: dict) -> list:
     if out:
         return out
     lam_min = float(np.linalg.eigvalsh(np.array([[matrix[f][g] for g in FORCES] for f in FORCES])).min())
-    if lam_min < -1e-9:
-        out.append(f"force_correlation_matrix is not positive semidefinite (minimum eigenvalue {lam_min:.4f}); "
+    if lam_min <= 0:
+        out.append(f"force_correlation_matrix is not positive definite (minimum eigenvalue {lam_min:.4f}); "
                    "lower the cross-force correlations")
     return out
 
@@ -124,9 +124,10 @@ def correlation_lambda_min(force_correlation_matrix: dict,
                            driver_forces: list) -> float:
     """Minimum eigenvalue of the driver-level correlation matrix for a driver mix.
 
-    A negative value means the settings describe no valid correlation matrix
-    for these drivers; the engine would then have to shrink every correlation
-    to repair it, so the configured dependence would not be the one simulated.
+    A value at or below zero means the settings give no positive definite
+    correlation matrix for these drivers; the engine would then have to shrink
+    every correlation to repair it, so the configured dependence would not be
+    the one simulated.
     """
     if len(driver_forces) == 0:
         return 1.0

@@ -218,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
     lam_min = correlation_lambda_min(config.force_correlation_matrix, config.within_force_rho,
                                      [d.force for d in drivers])
     log.info("Copula correlations on these %d drivers: minimum eigenvalue %+.4f", len(drivers), lam_min)
-    if lam_min < 0 and not args.allow_nonpsd:
+    if lam_min <= 0 and not args.allow_nonpsd:
         log.error("The correlation matrix is not positive definite on this driver mix. The engine would "
                   "have to repair it, so the correlations it uses would differ from the configured ones. "
                   "Lower the cross-force correlations in prism/config.py, or pass --allow-nonpsd.")

@@ -98,8 +98,10 @@ class TestProductionRun:
         assert "driver technology_r01: peak year" in caplog.text
         assert seeded.load_latest_run() is None
 
-    def test_the_correlation_check_stops_the_run(self, production, seeded, monkeypatch):
-        monkeypatch.setattr(production, "correlation_lambda_min", lambda *a: -0.01)
+    @pytest.mark.parametrize("lam_min", [-0.01, 0.0], ids=["negative", "zero"])
+    def test_the_correlation_check_stops_the_run(self, production, seeded, monkeypatch, lam_min):
+        """The copula needs a positive definite matrix: a smallest eigenvalue of zero stops the run too."""
+        monkeypatch.setattr(production, "correlation_lambda_min", lambda *a: lam_min)
         assert production.main(["--allow-sqlite", "--iterations", "200"]) == 4
         assert seeded.load_latest_run() is None
 

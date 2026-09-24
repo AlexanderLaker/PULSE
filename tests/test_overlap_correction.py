@@ -102,3 +102,11 @@ class TestCopula:
 
     def test_the_default_configuration_validates(self):
         validate_model_config(C.ModelConfig())
+
+    def test_a_force_matrix_with_a_zero_eigenvalue_is_refused(self):
+        """Two forces that always move together leave the matrix only semidefinite. The copula needs it
+        positive definite, so the check refuses it rather than let the engine repair it."""
+        matrix = {f: {g: 1.0 if f == g else 0.0 for g in C.FORCES} for f in C.FORCES}
+        matrix["Consumer"]["Customer"] = matrix["Customer"]["Consumer"] = 1.0
+        with pytest.raises(ValueError, match="force_correlation_matrix is not positive definite"):
+            validate_model_config(C.ModelConfig(force_correlation_matrix=matrix))
