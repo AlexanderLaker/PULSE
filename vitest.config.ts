@@ -11,5 +11,8 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/frontend/**/*.test.{ts,tsx}'],
     setupFiles: ['tests/frontend/setup.ts'],
+    // Above the 5 s that tests/frontend/setup.ts gives Testing Library's
+    // waits, so a wait that fails reports its own message and the page.
+    testTimeout: 20_000,
   },
 });
