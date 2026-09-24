@@ -3,16 +3,18 @@
  *
  * Body { role: 'admin' | 'viewer' }. An admin cannot demote themselves, so
  * the last admin can never lock everyone out; another admin has to do it. A
- * user the webhook has not added yet gets a viewer row first. The change is
- * written to the audit log where possible: a failed audit write is logged and
- * the change stands. Response: { role }.
+ * user the webhook has not added yet gets their row first, with the email
+ * Clerk holds for them (404 for an id Clerk does not know, 409 while Clerk
+ * holds no email address for the user, whom the webhook skips too). The
+ * change is written to the audit log where possible: a failed audit write is
+ * logged and the change stands. Response: { role }.
  */
 import { NextResponse } from 'next/server';
+import { clerkClient } from '@clerk/nextjs/server';
 import {
-  requireAdmin, setRole, getRole,
+  requireAdmin, setRole, getRole, upsertUserRole,
   ForbiddenError, UnauthorizedError,
 } from '@/lib/roles';
-import { getSQL } from '@/lib/db';
 import { recordRoleChange } from '@/lib/audit';
 
 export const runtime = 'nodejs';
@@ -47,16 +49,22 @@ export async function PATCH(req: Request, { params }: Params) {
       );
     }
 
-    // A user the webhook has not reached yet gets a viewer row first, with a
-    // placeholder email the next user.updated event replaces.
+    // A user the webhook has not reached yet is added now, as the webhook
+    // would: the calling admin's row means the table is not empty, so the
+    // user starts as viewer.
     const existing = await getRole(targetUserId);
-    const sql = getSQL();
     if (existing === null) {
-      await sql`
-        INSERT INTO user_roles (clerk_user_id, email, role)
-        VALUES (${targetUserId}, ${'pending-webhook@prism'}, 'viewer')
-        ON CONFLICT (clerk_user_id) DO NOTHING
-      `;
+      const email = await clerkEmail(targetUserId);
+      if (email === null) {
+        return NextResponse.json({ error: 'Clerk has no user with this id' }, { status: 404 });
+      }
+      if (email === '') {
+        return NextResponse.json(
+          { error: 'Clerk holds no email address for this user yet; try again once they have one.' },
+          { status: 409 },
+        );
+      }
+      await upsertUserRole(targetUserId, email);
     }
 
     await setRole(targetUserId, nextRole);
@@ -79,5 +87,17 @@ export async function PATCH(req: Request, { params }: Params) {
       { error: 'Failed to update role' },
       { status: 500 }
     );
+  }
+}
+
+/** The user's primary email address in Clerk (else the first one, else ''), or null when Clerk has no such user. */
+async function clerkEmail(userId: string): Promise<string | null> {
+  const client = await clerkClient();
+  try {
+    const user = await client.users.getUser(userId);
+    return (user.primaryEmailAddress ?? user.emailAddresses[0])?.emailAddress ?? '';
+  } catch (err) {
+    if ((err as { status?: number }).status === 404) return null;
+    throw err;
   }
 }

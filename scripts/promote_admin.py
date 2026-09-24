@@ -85,8 +85,8 @@ def _set_role(conn, email: str, role: str) -> int:
         audited = cur.fetchone()["present"]
         if audited:
             cur.execute("INSERT INTO audit_log (action, entity_type, entity_id, old_value, new_value, reason, user_id) "
-                        "VALUES ('role_change', 'user', %s, %s, %s, 'scripts/promote_admin.py', 'promote-admin-cli')",
-                        (row["clerk_user_id"], row["role"], role))
+                        "VALUES ('role_change', 'user', %s, %s, %s, %s, 'promote-admin-cli')",
+                        (row["clerk_user_id"], row["role"], role, "via scripts/promote_admin.py"))
     print(f"{email}: {row['role']} -> {role}" + ("" if audited else " (no audit log yet, so not logged)"))
     return 0
 

@@ -1,7 +1,6 @@
 /**
- * Sign-up: the same surface as the sign-in page (wordmark, one plain card,
- * Clerk's frames flattened in app/globals.css), with an access-code gate in
- * front of Clerk's <SignUp />.
+ * Sign-up: Clerk's <SignUp /> in the card of app/(auth)/layout.tsx, with an
+ * access-code gate in front of it.
  *
  * Clerk has no shared invite code for self-service sign-up, so the page asks
  * for the code the early-access cohort received (NEXT_PUBLIC_SIGNUP_CODE,
@@ -19,6 +18,7 @@
 import Link from 'next/link';
 import { useState, useSyncExternalStore, type FormEvent } from 'react';
 import { SignUp } from '@clerk/nextjs';
+import { CardHeading, EMBEDDED_FORM } from '@/app/(auth)/shared';
 import { S, SHADOW, PRIMARY_RGB, CONTRACTION_RGB, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 
 // NEXT_PUBLIC_* variables are baked into the client bundle at build time.
@@ -49,90 +49,27 @@ export default function SignUpPage() {
   );
   const unlocked = codeAccepted || storedUnlock;
 
-  return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center px-6 py-16"
-      style={{
-        backgroundColor: S.bg,
-        color: S.onBg,
-        fontFamily: BODY_FONT,
-      }}
-    >
-      {/* The PRISM wordmark in the top nav's brand treatment. */}
-      <div className="mb-10">
-        <div
-          className="text-2xl font-extrabold tracking-tighter uppercase"
-          style={{ fontFamily: HEADLINE_FONT, color: S.onBg }}
-        >
-          PRISM
-        </div>
-      </div>
-
-      {/* One card, no nested panels */}
-      <div
-        className="w-full max-w-md rounded-3xl"
-        style={{
-          backgroundColor: S.surface,
-          boxShadow: SHADOW.authCard,
-          padding: '40px 32px 32px',
+  if (!unlocked) {
+    return (
+      <AccessCodeGate
+        onUnlock={() => {
+          try {
+            window.sessionStorage.setItem(UNLOCK_KEY, '1');
+          } catch {
+            /* unreadable storage: the gate opens for this page only */
+          }
+          setCodeAccepted(true);
         }}
-      >
-        {!unlocked ? (
-          <AccessCodeGate
-            onUnlock={() => {
-              try {
-                window.sessionStorage.setItem(UNLOCK_KEY, '1');
-              } catch {
-                /* noop */
-              }
-              setCodeAccepted(true);
-            }}
-          />
-        ) : (
-          <>
-            <div className="text-center mb-8">
-              <div
-                className="text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: S.onSurfaceVariant }}
-              >
-                Request access
-              </div>
-              <div
-                className="mt-2 text-2xl font-extrabold tracking-tight"
-                style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}
-              >
-                Create account
-              </div>
-            </div>
-
-            {/* Clerk's form without its own card, header or logo */}
-            <div className="flex justify-center">
-              <SignUp
-                appearance={{
-                  elements: {
-                    rootBox:     'w-full',
-                    cardBox:     'shadow-none bg-transparent border-none p-0 w-full',
-                    card:        'shadow-none bg-transparent border-none p-0 w-full',
-                    main:        'gap-4',
-                    header:      'hidden',
-                    logoBox:     'hidden',
-                    footerPages: 'hidden',
-                    badge:       'hidden',
-                  },
-                }}
-              />
-            </div>
-          </>
-        )}
+      />
+    );
+  }
+  return (
+    <>
+      <CardHeading label="Request access" title="Create account" />
+      <div className="flex justify-center">
+        <SignUp appearance={EMBEDDED_FORM} />
       </div>
-
-      <div
-        className="mt-10 text-[10px] font-semibold uppercase tracking-[0.22em]"
-        style={{ color: S.onSurfaceVariant }}
-      >
-        Authorised users only
-      </div>
-    </div>
+    </>
   );
 }
 
@@ -154,27 +91,9 @@ const AccessCodeGate = ({ onUnlock }: { onUnlock: () => void }) => {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="text-center mb-7">
-        <div
-          className="text-[10px] font-bold uppercase tracking-[0.22em]"
-          style={{ color: S.onSurfaceVariant }}
-        >
-          Early access
-        </div>
-        <div
-          className="mt-2 text-2xl font-extrabold tracking-tight"
-          style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}
-        >
-          Enter access code
-        </div>
-        <p
-          className="mt-3 text-sm leading-relaxed"
-          style={{ color: S.onSurfaceVariant }}
-        >
-          PRISM is currently invite-only. Please enter the access code
-          you received to continue.
-        </p>
-      </div>
+      <CardHeading label="Early access" title="Enter access code">
+        PRISM is currently invite-only. Please enter the access code you received to continue.
+      </CardHeading>
 
       <label
         htmlFor="prism-access-code"

@@ -71,8 +71,8 @@ export default function RootLayout({
           formButtonPrimary:
             'rounded-full bg-theme-primary hover:bg-theme-primary-dim text-theme-on-primary font-semibold tracking-tight shadow-primary-button transition-colors normal-case',
           // The sign-in and sign-up pages draw their own card around Clerk's
-          // form, so Clerk's card stays invisible; their appearance props
-          // refine this further.
+          // form (app/(auth)/layout.tsx), so Clerk's card stays invisible;
+          // EMBEDDED_FORM in app/(auth)/shared.tsx refines this further.
           card: 'shadow-none border-none bg-transparent',
           // Header typography matches the editorial h1 treatment.
           headerTitle:

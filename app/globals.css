@@ -70,12 +70,13 @@ input:focus {
 }
 
 /* ─── Clerk's sign-in and sign-up forms ───
-   The sign-in and sign-up pages draw the card themselves, so Clerk's own
-   frames, shadows, borders and backgrounds go, and so do its branding footer
-   and the striped watermark it paints with development keys (the "Sign up" /
-   "Sign in" link below the form is a separate node and stays). Clerk's frames
-   also carry masks, clip-paths, filters and pseudo-elements that paint a
-   circular artefact over the form on this background; none are needed. */
+   The sign-in and sign-up pages draw the card (app/(auth)/layout.tsx), so
+   Clerk's own frames, shadows, borders and backgrounds go, and so do its
+   branding footer and the striped watermark it paints with development keys
+   (the "Sign up" / "Sign in" link below the form is a separate node and
+   stays). Clerk's frames also carry masks, clip-paths, filters and
+   pseudo-elements that paint a circular artefact over the form on this
+   background; none are needed. */
 .cl-rootBox,
 .cl-cardBox,
 .cl-card,

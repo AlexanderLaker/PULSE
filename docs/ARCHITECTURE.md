@@ -183,7 +183,7 @@ The dashboard's server routes (`app/api`):
 | `PUT /api/drivers/{id}` | admin | Forwards a driver edit to the API with an admin token |
 | `PUT /api/journey` | admin | Forwards a journey save to the API with an admin token |
 | `GET /api/users` | admin | The Clerk users (up to 500, newest first) with their roles, for the user list in Settings |
-| `PATCH /api/users/{userId}/role` | admin | Changes a role (never the caller's own) and writes it to the audit log where possible; a failed audit write does not undo the change |
+| `PATCH /api/users/{userId}/role` | admin | Changes a role (never the caller's own) and writes it to the audit log where possible; a failed audit write does not undo the change. A user the webhook has not added yet gets their row first, with the email Clerk holds (409 while it holds none, as the webhook skips such a user) |
 | `POST /api/webhooks/clerk` | Svix signature | Adds, updates or removes a user's row in `user_roles` |
 | `POST /api/admin/bootstrap` | shared secret | Makes a signed-up user admin; exists only while `ADMIN_BOOTSTRAP_SECRET` is set |
 

@@ -14,7 +14,7 @@ export async function recordRoleChange(change: {
   userId: string;
   from: Role | null;
   to: Role;
-  /** How the change was made, for the reason column: the route or the script. */
+  /** How the change was made, for the reason column: the route. */
   via: string;
   /** Who made it: an admin's Clerk user id, or the mechanism. */
   actor: string;
