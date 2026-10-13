@@ -76,7 +76,8 @@ jobs:
           cache-dependency-path: requirements-dev.txt
       - run: pip install -r requirements-dev.txt
       # No known vulnerability in the pinned Python dependencies, the function's included.
-      - run: pip install pip-audit && pip-audit -r requirements-dev.txt -r api/requirements.txt
+      # The tool is pinned like the actions; the advisories it reads are fetched fresh on every run.
+      - run: pip install pip-audit==2.10.1 && pip-audit -r requirements-dev.txt -r api/requirements.txt
       - run: ruff check .
       - run: python -m pytest tests/ -q -n auto
       # The suite checks the generated files too; these steps name a stale one in the log.
