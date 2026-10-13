@@ -204,6 +204,8 @@ def test_the_spelling_check_spares_names_links_and_the_size_family():
     assert american_forms("Keratin Color, Colorado, one-size-fits-all, downsizing, a prize, "
                           "https://example.org/hair-color") == []
     assert american_forms("a range that emphasizes scent, oversized packs") == ["emphasizes"]
+    assert american_forms("an aging base, per liter, a dying artifact; ageing, litre, artefact") == [
+        "aging", "liter", "artifact"]
 
 
 #: Calls that load or run Python code by a name or a path chosen at run time.
