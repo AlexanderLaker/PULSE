@@ -244,11 +244,11 @@ as Rollback describes and try again another day.
 
 6. **Check.** `https://prism-hcb.vercel.app/api/v1/health` answers
    `"status": "ok"` with `"driver_count": 51`, `"has_simulation": true` and
-   the release's commit.
-   Open the dashboard: the Shift Analysis shows the persisted run with its
-   2035 portfolio median of -5.6 percent. Ask everyone who had the dashboard
-   open to reload it: a page loaded before the deploy still runs the
-   previous dashboard, whose reads and saves the current service refuses.
+   the release's commit. Open the dashboard: the Shift Analysis shows the
+   persisted run with its 2035 portfolio median of -5.6 percent (on the
+   estimated cell weights). Ask everyone who had the dashboard open to
+   reload it: a page loaded before the deploy still runs the previous
+   dashboard, whose reads and saves the current service refuses.
 
 7. **Write a fresh run** so the served run carries the current names and
    labels. With the drivers unchanged since the last run, the numbers stay
@@ -313,7 +313,10 @@ ships: a description on the driver base's, a journey text on
 `shipped_journey_sha256.json`, that every journey text shipped since release
 2.11.0 (by its deployment and the two of 2.12.0) is either the current text
 or carried there by an entry, so a text changed without an entry fails the
-suite.
+suite. The migration carries nothing else from the bundled content, so the
+same test fails on any other change to a tile or a stage (a field, a tile
+added or removed, a new order): such a change waits until this migration is
+retired, and reaches a database through the Journey editor.
 
 ## Retiring this migration
 
@@ -331,7 +334,15 @@ driver field, a new tile shape):
 - move `previous_names.txt` to `tests/previous_names.txt` and, in
   `tests/test_repository.py`, point `_NAMES_FILE` at it and let
   `MAY_NAME_THE_PREVIOUS_RELEASE` name that file alone, so the test keeps
-  refusing the previous names everywhere else.
+  refusing the previous names everywhere else;
+- remove the two quotes of this README that `tests/test_documents.py`
+  checks (the driver count and the 2035 median);
+- remove or reword what refers to this folder: the documents table of
+  README.md, the model for later migrations in CLAUDE.md and
+  docs/OPERATIONS.md (describe it in words or name the next migration),
+  docs/ARCHITECTURE.md, the step for changed texts in docs/DRIVERS.md, and
+  the 503 message of `MigrationPendingError` in `prism/database.py`, which
+  then names the last commit that has this folder.
 
 A database found later on the previous schema is migrated from the last
 commit that has this folder, then by the migrations after it.
@@ -351,7 +362,7 @@ commit that has this folder, then by the migrations after it.
 | `migrate.py` | the migration |
 | `descriptions.json` | the current driver descriptions, each with the SHA-256 of the texts shipped before it since release 2.11.0 |
 | `journey_edits.json` | the current Consumer Journey tile texts and stage labels, each with the SHA-256 of the texts shipped before it since release 2.11.0 |
-| `shipped_journey_sha256.json` | the first 16 hexadecimal digits of the SHA-256 of every tile name, driver note, read and stage label shipped since release 2.11.0, for the check under When a shipped text changes |
+| `shipped_journey_sha256.json` | the first 16 hexadecimal digits of the SHA-256 of every tile name, driver note, read and stage label shipped since release 2.11.0, of everything else each tile and stage holds once migrated, and of the order of the stages, for the check under When a shipped text changes |
 | `previous_names.txt` | the names of the previous schema and code; `tests/test_repository.py` fails when one appears outside this folder and the migration's tests |
 | `archive/` | written by a live run: the dropped rows (git-ignored) |
 

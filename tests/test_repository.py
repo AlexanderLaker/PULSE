@@ -230,7 +230,7 @@ def test_no_script_imports_another():
                 called = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", None)
                 if called in DYNAMIC_LOADERS:
                     hits.append(f"{rel}:{node.lineno}: loads code with {called}()")
-    assert len(entry_points) >= 7 and hits == []
+    assert {p.name for p in entry_points} >= {"run_production.py", "generate_seed.py"} and hits == []
 
 
 #: Set by the platform, not by the operator: Vercel marks its deployments,

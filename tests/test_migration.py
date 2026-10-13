@@ -1051,25 +1051,46 @@ class TestShippedEditFiles:
             assert sha(e["text"]) not in e["previous_sha256"], (key, e["field"])
         assert len({(e.get("tile") or e["stage"], e["field"]) for e in edits}) == len(edits)
 
-    def test_no_text_a_release_shipped_is_left_behind(self):
-        """Every tile name, driver note, read and stage label shipped since release 2.11.0 (by its deployment
-        and the two of 2.12.0; shipped_journey_sha256.json holds their SHA-256 prefixes) is the text the
-        dashboard ships, or journey_edits.json carries it there: a text changed in data/consumerJourney.ts
-        without an entry would stay in a migrated database."""
+    def test_nothing_a_release_shipped_is_left_behind(self):
+        """Every tile and stage shipped since release 2.11.0 (by its deployment and the two of 2.12.0;
+        shipped_journey_sha256.json holds SHA-256 prefixes) ends as the dashboard ships it. Its texts (a
+        tile's name, driver note and read, a stage's label) are the current ones or journey_edits.json
+        carries them there; everything else it holds after the migration's own changes ("rest") already
+        equals the bundled item, because the migration carries nothing else. A text changed in
+        data/consumerJourney.ts without an entry, or any other change to a tile or stage, would stay
+        behind in a migrated database."""
         shipped = json.loads((MIGRATION_DIR / "shipped_journey_sha256.json").read_text(encoding="utf-8"))
         edits = {(e.get("tile") or e["stage"], e["field"]): e for e in json.loads(
             (MIGRATION_DIR / "journey_edits.json").read_text(encoding="utf-8"))["edits"]}
+        sides = ("benefiting", "negativelyImpacted")
         journeys = bundled_journey().values()
-        items = {s["id"]: s for journey in journeys for s in journey}
-        items.update({t["id"]: t for journey in journeys for stage in journey
-                      for side in ("benefiting", "negativelyImpacted") for t in stage.get(side, [])})
+        stages = {s["id"]: s for journey in journeys for s in journey}
+        tiles = {t["id"]: t for stage in stages.values() for side in sides for t in stage.get(side, [])}
         width = shipped["prefix_length"]
-        assert len(shipped["texts"]) == len(items) == 321
+
+        def digest(value) -> str:
+            return sha(json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":")))[:width]
+
+        def rest(item: dict, texts: tuple) -> str:
+            kept = {k: v for k, v in item.items() if k not in texts}
+            if "label" in texts:   # a stage: its tiles are items of their own, but their order is the stage's
+                kept["tile order"] = {side: [t["id"] for t in item.get(side, [])] for side in sides}
+            return digest(kept)
+
+        added_or_removed = sorted(set(shipped["items"]) ^ (set(stages) | set(tiles)))
+        assert added_or_removed == [], f"migration 0001 neither adds nor removes tiles or stages: {added_or_removed}"
+        order = digest({name: [s["id"] for s in journey] for name, journey in bundled_journey().items()})
+        assert shipped["stage_order"] == [order], "migration 0001 does not reorder the stages"
         left_behind = []
-        for item_id, fields in shipped["texts"].items():
-            assert item_id in items, item_id
+        for item_id, fields in shipped["items"].items():
+            item, texts = (stages[item_id], ("label",) + sides) if item_id in stages else \
+                (tiles[item_id], ("name", "driverNote", "analysis"))
             for field, prefixes in fields.items():
-                carried = {sha(items[item_id][field])[:width]}
+                if field == "rest":
+                    left_behind += [f"{item_id}: a field other than its texts" for p in prefixes
+                                    if p != rest(item, texts)]
+                    continue
+                carried = {sha(item[field])[:width]}
                 carried |= {h[:width] for h in edits.get((item_id, field), {}).get("previous_sha256", [])}
                 left_behind += [f"{item_id}.{field}" for prefix in prefixes if prefix not in carried]
         assert left_behind == []
