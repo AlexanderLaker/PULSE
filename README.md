@@ -59,11 +59,30 @@ npm run dev                                       # the dashboard on :3000, seco
 
 The dashboard proxies `/api/v1` to the API (next.config.js). On first use the
 API creates the tables and seeds the drivers. The Shift Analysis stays empty
-until a run exists; a short one takes seconds:
+until a run exists; a short one on the development database takes seconds
+(`--allow-test-size`, because a run stored in PostgreSQL is served at once):
 
 ```bash
-python3 scripts/run_production.py --iterations 2000
+python3 scripts/run_production.py --iterations 2000 --allow-test-size
 ```
+
+### Without Clerk or Neon
+
+Everything but the dashboard runs without either. On a fresh clone without a
+`.env` (or with both database URLs blanked in the shell, `POSTGRES_URL=
+DATABASE_URL=`):
+
+```bash
+python3 -m pytest -n auto                          # the Python suite, on throwaway SQLite files
+python3 scripts/run_production.py --allow-sqlite   # the full production run on data/prism.db, a minute or two
+uvicorn prism.api.app:app --port 8000              # the API, serving that run
+```
+
+The run seeds the file with the driver base, so its results are the
+production model's: `PRISM_FULL_RUN=1 python3 -m pytest
+tests/test_reference_run.py` checks them against the reference run behind
+the PRISM Analysis, to six decimals. The dashboard needs Clerk for sign-in
+and Neon for its role table.
 
 Roles come from a Clerk webhook, which cannot reach a development machine on
 its own; docs/OPERATIONS.md (Roles on a development machine) shows how to

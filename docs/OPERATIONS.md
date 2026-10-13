@@ -35,10 +35,11 @@ npm run dev
 and open http://localhost:3000. The Next.js dev server sends `/api/v1` to the
 API (`PRISM_LOCAL_API_URL` changes the target). On first use the API creates
 its tables and seeds the drivers. For a Shift Analysis to look at, write a
-short run:
+short run (`--allow-test-size`: a run stored in PostgreSQL is served at
+once, so a size other than the production one needs saying so):
 
 ```bash
-python3 scripts/run_production.py --iterations 2000
+python3 scripts/run_production.py --iterations 2000 --allow-test-size
 ```
 
 Keep the virtual environment active whenever you run Python: `npm run
@@ -188,7 +189,12 @@ start without one unless `--allow-sqlite` is given, and takes a few minutes
 at the default 3 x 50,000 iterations (`PRODUCTION_*` in `prism/config.py`). It
 writes a new row to `simulation_runs`; the API serves the newest row from its
 next request on, an open dashboard shows it within about a minute, and
-earlier rows stay for the drift comparison. It also writes the QA
+earlier rows stay for the drift comparison. Because a stored run is served at
+once, PostgreSQL takes only the production size unless `--allow-test-size`
+says otherwise. Every run records where its code came from: the commit and
+whether tracked files had uncommitted changes (`meta.source` in the stored
+bundle, the Code row of the workbook's Metadata sheet; both say so when the
+tree is not a git checkout). It also writes the QA
 workbook to `runs/` (git-ignored): the Shift Matrix with its percentiles, the
 regional medians, the cell weights (with the graded derivation when the
 estimate was used), the velocities and the run's metadata.
@@ -197,7 +203,8 @@ estimate was used), the velocities and the run's metadata.
 |---|---|
 | `--cell-weights FILE` | the finance cell weights instead of the estimate |
 | `--iterations N`, `--chains N` | iterations per chain (default 50,000; 100 to 1,000,000) and chains (default 3; 1 to 10) |
-| `--allow-sqlite` | use the local SQLite file when no database URL is set |
+| `--allow-sqlite` | use the local SQLite file when no database URL is set; a file without drivers is seeded with the driver base first |
+| `--allow-test-size` | on PostgreSQL, accept a size other than the production one (a development database) |
 | `--allow-nonpsd` | run although the correlation matrix is not positive definite on this driver mix; the engine repairs it and records an integrity event |
 
 The cell-weights file is JSON, kept outside the repository (the shares
@@ -226,10 +233,10 @@ mistaken for the estimate.
 |---|---|
 | 0 | the run is persisted (the workbook is best effort) |
 | 1 | no usable database: none configured (without `--allow-sqlite`), unreachable, or awaiting a migration (the message names it) |
-| 2 | the database holds no drivers (2 is also the code for a command line the script cannot read) |
+| 2 | the PostgreSQL database holds no drivers: a new database gets them when the API first uses it, a production database that lost them is restored from its backup (2 is also the code for a command line the script cannot read) |
 | 3 | the simulation ran but storing it failed; the dashboard keeps serving the previous run |
 | 4 | the correlation matrix is not positive definite on this driver mix |
-| 5 | the run size is outside its range, the configuration in `prism/config.py` is invalid, or the cell-weights file is missing or invalid |
+| 5 | the run size is outside its range, or other than the production one on PostgreSQL without `--allow-test-size`; the configuration in `prism/config.py` is invalid; or the cell-weights file is missing or invalid |
 | 6 | a driver cannot be simulated (an unknown force, direction, curve or value-chain stage, a missing score, a score outside its scale, a peak year not after the onset, a category or region without an exposure score, an exposure on a name outside the taxonomy, a duplicate id); every problem is listed. PRISM stores no such driver, so this points at a change made to the database outside PRISM; a start year or a force corrected there needs the driver's revision raised by one as well, so the service reloads it |
 
 Any other error stops the run with a traceback and exit code 1.
@@ -238,6 +245,13 @@ After a run, the Shift Analysis's "About this model" footer shows the new
 run's id, date, master and chain seeds, numerics, Monte Carlo standard
 error, seed stability and integrity events, including the input drift
 against the previous run.
+
+**Withdrawing a run.** A run that should not be shown (a test run stored in
+production by mistake, a run on wrong inputs) is removed from the database:
+take a Neon branch of production first, then delete its row,
+`DELETE FROM simulation_runs WHERE id = <id>;` (nothing else refers to it).
+The API serves the newest remaining run from its next request, and the next
+run's input-drift event compares with that one.
 
 When scores or model parameters changed, regenerate the PRISM Analysis
 readings after the run as docs/DRIVER_ANALYSIS.md describes. A run on the

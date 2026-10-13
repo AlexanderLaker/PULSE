@@ -1,5 +1,6 @@
 """Health and diagnostics. Both are anonymous and expose no credentials."""
 import logging
+import os
 
 from fastapi import APIRouter
 
@@ -12,9 +13,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def deployed_commit() -> str | None:
+    """The commit this deployment was built from (Vercel sets it at build time); None elsewhere."""
+    return (os.environ.get("VERCEL_GIT_COMMIT_SHA") or "")[:12] or None
+
+
 @router.get("/api/v1/health")
 def health():
-    """Liveness, the service version, the driver count and the newest run's id.
+    """Liveness, the service version and deployed commit, the driver count and the newest run's id.
 
     Cheap on purpose (the dashboard polls it and reloads when the run id
     changes): it reads the run's id, never its results. When the database
@@ -29,11 +35,12 @@ def health():
         latest = database.latest_run_summary()
     except Exception as e:  # noqa: BLE001 (reported as degraded, never raised)
         logger.warning("health: database unavailable: %s", e)
-        return {"status": "degraded", "version": __version__, "driver_count": 0, "has_simulation": False,
-                "simulation_reason": database.failure_reason(e), "latest_run_id": None}
+        return {"status": "degraded", "version": __version__, "commit": deployed_commit(), "driver_count": 0,
+                "has_simulation": False, "simulation_reason": database.failure_reason(e), "latest_run_id": None}
     return {
         "status": "ok",
         "version": __version__,
+        "commit": deployed_commit(),
         "driver_count": drivers.driver_count,
         "has_simulation": latest is not None,
         "simulation_reason": "ok" if latest else "no_rows",

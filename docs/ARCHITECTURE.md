@@ -90,7 +90,7 @@ engine.
 
 | Route | Access | Answer |
 |---|---|---|
-| `GET /api/v1/health` | anonymous | Status, version, driver count, whether a run exists and its id; when the database cannot be used, status `degraded` and the reason (`migration_pending`, `no_database` or `db_error`) |
+| `GET /api/v1/health` | anonymous | Status, version, the commit the deployment was built from, driver count, whether a run exists and its id; when the database cannot be used, status `degraded` and the reason (`migration_pending`, `no_database` or `db_error`) |
 | `GET /api/v1/diagnostics` | anonymous | Whether this instance reaches the database, how many runs it holds and whether the latest can be served; it names nothing about the database itself |
 | `GET /api/v1/drivers` | signed in | Every driver with its scores, sources, PRISM Analysis (from `prism/analysis_texts.py`, which ships with the code), baseline and a summary of the expert proposals |
 | `PUT /api/v1/drivers/{id}` | admin | An edit of the fields sent, made on the driver revision the request names (409 when the driver changed since); an exposure map changes only the cells it names; every changed field goes to the audit log. Name, force and onset are not edited here, and a peak year must fall after the onset |

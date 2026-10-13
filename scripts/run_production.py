@@ -2,11 +2,17 @@
 
     python3 scripts/run_production.py                              3 x 50,000 iterations against the database in .env
     python3 scripts/run_production.py --cell-weights FILE          the same, on the finance cell weights
-    python3 scripts/run_production.py --iterations 2000 --allow-sqlite   a quick local test run
+    python3 scripts/run_production.py --iterations 2000 --allow-sqlite   a quick local test run (no database URL set)
 
 The database comes from POSTGRES_URL or DATABASE_URL (the repository's .env
 is loaded; shell variables win). Without one the script refuses to run
-unless --allow-sqlite is passed, which uses the local SQLite file instead.
+unless --allow-sqlite is passed, which uses the local SQLite file instead
+and seeds it with the driver base when it holds no drivers. On PostgreSQL a
+run is served as soon as it is stored, so only the production size runs
+there unless --allow-test-size is passed (a development database).
+
+Every run records where its code came from: the commit and whether the
+working tree had uncommitted changes (git's view, tracked files only).
 
 Steps: load the drivers, check that every driver can be simulated and that
 the copula correlations are positive definite on this driver mix, run three
@@ -27,13 +33,14 @@ Exit codes
     0  the run is persisted (the QA workbook is best effort)
     1  no usable database: none configured (and no --allow-sqlite), unreachable,
        or still awaiting a migration (the message names it)
-    2  the database holds no drivers; also argparse's code for a command line
-       it cannot read
+    2  the PostgreSQL database holds no drivers; also argparse's code for a
+       command line it cannot read
     3  the simulation ran but persisting it failed; the dashboard keeps the previous run
     4  the correlation matrix is not positive definite on this driver mix (--allow-nonpsd overrides)
     5  the run size or the configuration is invalid: --iterations or --chains
-       outside their range (prism.config RUN_*_RANGE), or the --cell-weights
-       file missing or invalid
+       outside their range (prism.config RUN_*_RANGE), a size other than the
+       production one on PostgreSQL without --allow-test-size, or the
+       --cell-weights file missing or invalid
     6  a driver cannot be simulated (prism.drivers.simulation_problems: an
        unknown force, direction, curve or value-chain stage, a missing score, a
        score outside its scale, a peak year not after the onset, a category or
@@ -49,6 +56,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -62,12 +70,12 @@ from prism.config import (CATEGORIES, ESTIMATE_SOURCE_PREFIX, PRODUCTION_CHAINS,
                           PRODUCTION_SEED, REGIONS, ModelConfig, cell_weight_marginals)
 from prism.config_validation import correlation_lambda_min, validate_model_config, validate_run_size  # noqa: E402
 from prism.database import (POSTGRES_URL, USE_POSTGRES, MigrationPendingError, describe_error,  # noqa: E402
-                            init_db, load_drivers, load_latest_run, save_simulation_run)
+                            init_db, insert_drivers, load_drivers, load_latest_run, save_simulation_run)
 from prism.drivers import DriverSet, simulation_problems  # noqa: E402
 from prism.engine import MonteCarloEngine  # noqa: E402
 from prism.input_drift import compare_with_run, driver_fingerprint, not_compared_event  # noqa: E402
 from prism.numbers import finite_number  # noqa: E402
-from prism.seed_drivers import DRIVERS as BASE_DRIVERS  # noqa: E402
+from prism.seed_drivers import DRIVERS as BASE_DRIVERS, get_seed_drivers  # noqa: E402
 from prism.workbook import write_workbook  # noqa: E402
 
 log = logging.getLogger("run_production")
@@ -116,7 +124,31 @@ def load_cell_weights_file(path: Path) -> tuple:
     return shares, source
 
 
-def results_bundle(result: dict, config: ModelConfig, driver_count: int, fingerprint: dict) -> dict:
+def source_state() -> dict:
+    """The commit the code comes from and whether tracked files differ from it.
+
+    Both are None when git or the repository's history is not available (an
+    exported copy of the tree), so a run never fails for want of them.
+    """
+    def git(*args: str) -> str:
+        return subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True, check=True,
+                              timeout=30).stdout
+    try:
+        commit = git("rev-parse", "HEAD").strip()
+        dirty = bool(git("status", "--porcelain", "--untracked-files=no").strip())
+    except (OSError, subprocess.SubprocessError):
+        return {"commit": None, "dirty": None}
+    return {"commit": commit, "dirty": dirty}
+
+
+def describe_source(source: dict) -> str:
+    if not source.get("commit"):
+        return "not a git checkout"
+    return source["commit"][:12] + (" with uncommitted changes" if source.get("dirty") else "")
+
+
+def results_bundle(result: dict, config: ModelConfig, driver_count: int, fingerprint: dict,
+                   source: dict | None = None) -> dict:
     """The persisted form of a run: what GET /api/v1/simulation serves (prism/api/runs.py)."""
     return {
         "shift_matrix": result["shift_matrix"],
@@ -141,6 +173,8 @@ def results_bundle(result: dict, config: ModelConfig, driver_count: int, fingerp
             "overlap_correction_source": config.overlap_correction_source,
             # The next run compares its drivers with this fingerprint.
             "driver_fingerprint": fingerprint,
+            # Where the run's code came from (source_state).
+            "source": source or {"commit": None, "dirty": None},
         },
     }
 
@@ -156,6 +190,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--allow-sqlite", action="store_true",
                         help="run against the local SQLite file when no database is configured (local "
                              "development and tests)")
+    parser.add_argument("--allow-test-size", action="store_true",
+                        help="on PostgreSQL, accept a size other than the production one (a development "
+                             "database; the run is served at once)")
     parser.add_argument("--allow-nonpsd", action="store_true",
                         help="run even if the correlation matrix is not positive definite on this driver mix; "
                              "the engine then repairs it and records an integrity event")
@@ -171,9 +208,21 @@ def main(argv: list[str] | None = None) -> int:
         log.error("No POSTGRES_URL or DATABASE_URL is set; put the database URL in .env "
                   "(or pass --allow-sqlite for a local test run).")
         return 1
+    production_size = (args.iterations, args.chains) == (PRODUCTION_ITERATIONS, PRODUCTION_CHAINS)
+    if USE_POSTGRES and not production_size and not args.allow_test_size:
+        log.error("A run on PostgreSQL is served as soon as it is stored, so it runs at the production size "
+                  "(%d x %s iterations). For a development database pass --allow-test-size; for a local test "
+                  "run blank the database URLs and pass --allow-sqlite.", PRODUCTION_CHAINS,
+                  f"{PRODUCTION_ITERATIONS:,}")
+        return 5
     where = f"PostgreSQL at {urlparse(POSTGRES_URL).hostname}" if USE_POSTGRES else "the local SQLite file (test run)"
     log.info("PRISM production run, engine %s, %d x %s iterations, database: %s",
              MonteCarloEngine.MODEL_VERSION, args.chains, f"{args.iterations:,}", where)
+    source = source_state()
+    log.info("Code: %s", describe_source(source))
+    if source["dirty"] and USE_POSTGRES:
+        log.warning("The working tree has uncommitted changes: the run records the commit and that it was "
+                    "made with changes on top of it.")
 
     try:
         init_db()
@@ -184,8 +233,14 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as e:  # noqa: BLE001 (reported with exit code 1)
         log.error("Cannot read the database: %s", e)
         return 1
+    if not drivers and not USE_POSTGRES:
+        # A new local file: seeded with the driver base, as the API would on first use.
+        insert_drivers(get_seed_drivers())
+        drivers = load_drivers()
+        log.info("The local SQLite file held no drivers; seeded it with the %d of the driver base.", len(drivers))
     if not drivers:
-        log.error("The database holds no drivers.")
+        log.error("The database holds no drivers. PRISM seeds a new database when the API first uses it; "
+                  "a production database that lost its drivers is restored from its backup.")
         return 2
     problems = simulation_problems(drivers)
     if problems:
@@ -246,7 +301,8 @@ def main(argv: list[str] | None = None) -> int:
 
     run_id = None
     try:
-        run_id = save_simulation_run(args.iterations, results_bundle(result, config, len(drivers), fingerprint))
+        run_id = save_simulation_run(args.iterations,
+                                     results_bundle(result, config, len(drivers), fingerprint, source))
         log.info("Persisted as simulation run %s", run_id)
     except Exception as e:  # noqa: BLE001 (reported with exit code 3 after the workbook)
         log.error("PERSIST FAILED: %s", e)
@@ -254,7 +310,8 @@ def main(argv: list[str] | None = None) -> int:
     RUNS_DIR.mkdir(exist_ok=True)
     workbook = RUNS_DIR / f"prism_run_{run_id or 'unsaved'}_{datetime.now():%Y%m%d_%H%M}.xlsx"
     try:
-        write_workbook(str(workbook), result, config, run_id=run_id, driver_count=len(drivers))
+        write_workbook(str(workbook), result, config, run_id=run_id, driver_count=len(drivers),
+                       source=describe_source(source))
         log.info("QA workbook: %s", workbook)
     except Exception as e:  # noqa: BLE001 (the workbook is a by-product)
         log.warning("QA workbook not written: %s", e)

@@ -232,7 +232,7 @@ def test_no_script_imports_another():
 
 #: Set by the platform, not by the operator: Vercel marks its deployments,
 #: Node its mode.
-PLATFORM_VARIABLES = {"VERCEL", "VERCEL_ENV", "NODE_ENV"}
+PLATFORM_VARIABLES = {"VERCEL", "VERCEL_ENV", "VERCEL_GIT_COMMIT_SHA", "NODE_ENV"}
 #: Read by the Clerk library itself rather than by PRISM's own code.
 LIBRARY_VARIABLES = {"NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "CLERK_SECRET_KEY"}
 

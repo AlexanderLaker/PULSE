@@ -109,14 +109,14 @@ def reading_notes(config: ModelConfig) -> tuple:
 
 
 def write_workbook(output_path: str, result: dict, config: ModelConfig, *,
-                   run_id: int | None = None, driver_count: int | None = None) -> None:
+                   run_id: int | None = None, driver_count: int | None = None, source: str | None = None) -> None:
     """Write the QA workbook for an engine result (MonteCarloEngine.run)."""
     wb = openpyxl.Workbook()
     _shift_matrix(wb.active, result, config)
     _regional_shift(wb.create_sheet("Regional Shift"), result, config)
     _cell_weights(wb.create_sheet("Cell Weights"), result)
     _velocity(wb.create_sheet("Velocity"), result, config)
-    _metadata(wb.create_sheet("Metadata"), result, config, run_id, driver_count)
+    _metadata(wb.create_sheet("Metadata"), result, config, run_id, driver_count, source)
     wb.save(output_path)
     logger.debug("QA workbook written to %s", output_path)
 
@@ -326,7 +326,7 @@ def _velocity(ws, result: dict, config: ModelConfig) -> None:
 
 
 def _metadata(ws, result: dict, config: ModelConfig, run_id: int | None,
-              driver_count: int | None) -> None:
+              driver_count: int | None, source: str | None = None) -> None:
     """Label in column A, value in column B: the run's identity, then the reading notes."""
     attenuation = ", ".join(f"{f} {config.per_force_attenuation[f]:.3f}" for f in FORCES)
     regions = ", ".join(f"{r} {w * 100:.1f}%" for r, w in result["region_weights_used"].items())
@@ -336,6 +336,7 @@ def _metadata(ws, result: dict, config: ModelConfig, run_id: int | None,
         ("Model version", result["model_version"]),
         ("Engine", f"{result['engine_name']} (Beta priors, Gaussian copula)"),
         ("Numerics", result["numerics_backend"]),
+        ("Code", source or "not recorded"),
         ("Iterations per chain", result["iterations"]),
         ("Chains", result["chains"]),
         ("Pooled iterations", result["iterations"] * result["chains"]),

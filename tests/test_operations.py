@@ -40,11 +40,52 @@ class TestProductionRun:
         monkeypatch.setenv("PRISM_DB_PATH", str(awaiting))
         assert production.main(["--allow-sqlite"]) == 1
 
-    def test_refuses_an_empty_database(self, production, monkeypatch, tmp_path):
+    def test_an_empty_local_file_is_seeded_with_the_driver_base(self, production, monkeypatch, tmp_path):
         monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "empty.db"))
         import prism.database as dbm
         dbm.init_db()
-        assert production.main(["--allow-sqlite", "--iterations", "200"]) == 2
+        assert production.main(["--allow-sqlite", "--iterations", "200"]) == 0
+        assert len(dbm.load_drivers()) == 51
+        assert dbm.load_latest_run()["results"]["meta"]["driver_count"] == 51
+
+    def test_an_empty_postgresql_database_is_refused(self, production, monkeypatch, tmp_path):
+        """PostgreSQL is never seeded by the run: an empty one is a new database the API has not started
+        on, or a production database that lost its drivers and is restored from its backup."""
+        monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "empty.db"))
+        monkeypatch.setattr(production, "USE_POSTGRES", True)
+        import prism.database as dbm
+        dbm.init_db()
+        assert production.main(["--iterations", "200", "--allow-test-size"]) == 2
+        assert dbm.load_drivers() == []
+
+    def test_on_postgresql_only_the_production_size_runs(self, production, seeded, monkeypatch, caplog):
+        """A run on PostgreSQL is served as soon as it is stored, so a test size needs --allow-test-size."""
+        monkeypatch.setattr(production, "USE_POSTGRES", True)
+        for size in (["--iterations", "2000"], ["--chains", "2"]):
+            assert production.main(size) == 5
+        assert "--allow-test-size" in caplog.text
+        assert seeded.load_latest_run() is None
+        assert production.main(["--iterations", "300", "--allow-test-size"]) == 0
+        assert seeded.load_latest_run()["iterations"] == 300
+
+    def test_the_run_records_where_its_code_came_from(self, production, seeded, monkeypatch, tmp_path):
+        import re
+        import openpyxl
+        assert production.main(["--allow-sqlite", "--iterations", "200"]) == 0
+        run = seeded.load_latest_run()
+        source = run["results"]["meta"]["source"]
+        assert set(source) == {"commit", "dirty"}
+        if source["commit"] is not None:   # a git checkout
+            assert re.fullmatch(r"[0-9a-f]{40}", source["commit"]) and isinstance(source["dirty"], bool)
+        workbook = next((tmp_path / "runs").glob(f"prism_run_{run['id']}_*.xlsx"))
+        labels = {row[0]: row[1] for row in openpyxl.load_workbook(workbook)["Metadata"].iter_rows(values_only=True)}
+        assert labels["Code"] == production.describe_source(source)
+
+        def no_git(*args, **kwargs):
+            raise FileNotFoundError("git")
+        monkeypatch.setattr(production.subprocess, "run", no_git)
+        assert production.source_state() == {"commit": None, "dirty": None}
+        assert production.describe_source(production.source_state()) == "not a git checkout"
 
     def test_a_run_is_persisted_with_the_full_contract(self, production, seeded, tmp_path):
         from prism.api.runs import META_KEYS, REQUIRED_KEYS, run_status

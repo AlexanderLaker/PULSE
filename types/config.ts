@@ -30,6 +30,8 @@ export interface ModelConfig {
 export interface HealthStatus {
   status: 'ok' | 'degraded';
   version: string;
+  /** The commit the deployment was built from (first 12 characters); null outside Vercel. */
+  commit: string | null;
   driver_count: number;
   has_simulation: boolean;
   /** 'degraded' comes with migration_pending (the database needs a migration
