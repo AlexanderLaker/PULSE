@@ -39,7 +39,11 @@ pip install -r requirements-dev.txt
 cp .env.example .env
 ```
 
-Fill in `.env` (README.md lists every variable). Then, in two terminals:
+Fill in `.env` (README.md lists every variable), with the keys of your own
+Clerk development instance: without them, `npm run dev` starts Clerk's
+keyless mode, which creates a temporary instance over the internet and
+writes its keys to `.clerk/` (git-ignored, and never part of a handover).
+Then, in two terminals:
 
 ```bash
 uvicorn prism.api.app:app --reload --port 8000
