@@ -19,7 +19,7 @@ print which one that is; read it before you go on.
 ## Local development
 
 ```bash
-npm install
+npm ci
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 cp .env.example .env
@@ -143,6 +143,38 @@ A few rules the suite holds:
   records (a parameter, a table, a count, a tolerance), the design tokens and
   the security and session settings are computed in `tests/test_documents.py`,
   which fails until the document says the same.
+
+## Dependencies
+
+- **npm.** `package-lock.json` pins every package. Install with `npm ci`,
+  which installs exactly the lock; `npm install` may rewrite it.
+- **Python.** The ranges live in `requirements-dev.in` (the engine, the
+  production run, the API and the tests) and `api/requirements.in` (what the
+  Vercel function imports). `requirements-dev.txt` and `api/requirements.txt`
+  pin the exact versions resolved from them, and they are what developers,
+  CI and Vercel install. After changing a range, regenerate the pinned file
+  with uv (`pip install uv`) and commit both:
+
+  ```bash
+  uv pip compile requirements-dev.in --universal --python-version 3.11 -o requirements-dev.txt
+  uv pip compile api/requirements.in --python-version 3.12 -o api/requirements.txt
+  ```
+
+  `tests/test_repository.py` checks that every declared requirement is pinned
+  inside its range.
+- **The Python version** is the one in `.python-version` (3.12): Vercel reads
+  it for the function and CI installs it. The development pins also work on
+  3.11 and later.
+- **numpy and scipy** stay at the versions the golden pins and the reference
+  run were computed with. They move only with a model release, which
+  regenerates the pins and runs the full check (`PRISM_FULL_RUN=1`).
+- **Updates and audits.** Dependabot proposes weekly updates
+  (`.github/dependabot.yml`; major versions and numpy and scipy excluded),
+  each checked by CI. CI fails on a high or critical npm advisory in what the
+  dashboard ships (`npm audit --omit=dev --audit-level=high`) and on any known
+  vulnerability in the pinned Python packages (`pip-audit`). The remaining npm
+  advisories sit in development tools and need major upgrades (Tailwind 4);
+  they ship nothing to the browser.
 
 ## The production run
 

@@ -1,0 +1,12 @@
+# What the Vercel Python function (api/index.py) imports. It serves the API
+# from the persisted data and never simulates, so it needs neither numpy nor
+# scipy (tests/test_api.py runs the API with both blocked); keep this list to
+# what the API imports, since the function bundle has a size limit.
+#
+# This file holds the ranges; api/requirements.txt pins the exact versions
+# Vercel installs. After a change here, regenerate it (docs/OPERATIONS.md,
+# "Dependencies"):
+#   uv pip compile api/requirements.in --python-version 3.12 -o api/requirements.txt
+fastapi>=0.110,<1
+pydantic>=2.6,<3
+psycopg2-binary>=2.9,<3

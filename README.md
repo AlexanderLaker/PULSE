@@ -41,12 +41,14 @@ consumer moments and the drivers behind them), **Profit Pool Shift Analysis**
 
 ## Quick start
 
-Prerequisites: Node.js 22, Python 3.10 or later, a Clerk application (test
-keys are enough) and a Neon database for development. Never develop against
-the production database.
+Prerequisites: Node.js 22 and Python 3.12 (the version in `.python-version`,
+which Vercel and CI use; 3.11 works too). The dashboard also needs a Clerk
+application (test keys are enough) and a Neon database for development; the
+API, the engine and both test suites run without either. Never develop
+against the production database.
 
 ```bash
-npm install
+npm ci                            # installs exactly package-lock.json
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 cp .env.example .env              # fill in the values, see Configuration

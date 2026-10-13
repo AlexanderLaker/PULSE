@@ -1,7 +1,7 @@
 # Python lint settings (ruff): syntax errors, unused code, likely bugs, the line
 # length, imports below code, broad excepts, and noqa comments that no longer
 # suppress anything.
-target-version = "py310"
+target-version = "py311"
 line-length = 120
 
 [lint]

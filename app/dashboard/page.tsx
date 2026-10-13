@@ -148,11 +148,12 @@ export default function DashboardPage() {
   };
 
   // A session that ends while the page is open: the viewer cookie is expired
-  // (it is not tied to the Clerk session), then a full navigation to /sign-in,
-  // so proxy.ts runs again.
+  // (it is not tied to the Clerk session), then a full navigation to /sign-in
+  // that replaces this page, so proxy.ts runs again and Back does not return
+  // to a dashboard that can no longer load its data.
   useEffect(() => {
     if (!isLoaded || isSignedIn) return;
-    void api.clearViewerCookie().then(() => { window.location.href = '/sign-in'; });
+    void api.clearViewerCookie().then(() => { window.location.replace('/sign-in'); });
   }, [isLoaded, isSignedIn]);
 
   // Opening a tab mounts it for good and closes the mobile menu. The panes

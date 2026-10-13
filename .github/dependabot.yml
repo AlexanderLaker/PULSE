@@ -1,0 +1,39 @@
+# Weekly proposals for dependency updates, one pull request per ecosystem
+# and directory, each checked by CI before anyone merges it.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # A major upgrade (Tailwind 4, the next Next.js or React major) is its
+      # own piece of work, not a weekly bump.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # numpy and scipy move only with a model release, together with the
+      # golden pins (docs/adr/0014-versioning-and-golden-pins.md).
+      - dependency-name: numpy
+      - dependency-name: scipy
+  - package-ecosystem: pip
+    directory: /api
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

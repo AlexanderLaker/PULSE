@@ -117,9 +117,15 @@ class TestRoutes:
         assert result.returncode == 0, result.stderr[-2000:]
 
     def test_the_function_requirements_are_what_the_api_imports(self):
-        lines = (REPO / "api" / "requirements.txt").read_text(encoding="utf-8").splitlines()
-        packages = {re.split(r"[<>=]", line)[0] for line in lines if line.strip() and not line.startswith("#")}
-        assert packages == {"fastapi", "pydantic", "psycopg2-binary"}
+        """The function declares only what the API imports (api/requirements.in); api/requirements.txt pins
+        them with their own dependencies, and never numpy or scipy."""
+        def names(path):
+            lines = (REPO / "api" / path).read_text(encoding="utf-8").splitlines()
+            return {re.split(r"[<>=; ]", line)[0] for line in lines
+                    if line.strip() and not line.lstrip().startswith("#")}
+        assert names("requirements.in") == {"fastapi", "pydantic", "psycopg2-binary"}
+        assert names("requirements.in") <= names("requirements.txt")
+        assert not {"numpy", "scipy"} & names("requirements.txt")
 
 
 class TestAuthentication:

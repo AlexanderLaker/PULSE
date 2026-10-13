@@ -19,6 +19,10 @@
 - The tracked files pass the handover's scan for secret-shaped strings.
 - README.md's configuration table and .env.example name the same variables,
   and every variable the code reads is one of them.
+- The Python dependencies are pinned: every requirement of a range file
+  (requirements-dev.in, api/requirements.in) has an exact version in its
+  compiled file, inside the range.
+- `next dev` leaves the tracked files alone (Next.js's agent rules are off).
 """
 import ast
 import json
@@ -76,8 +80,16 @@ def american_forms(text: str) -> list:
 
 
 def text_files() -> list:
+    """The repository's text files: in a git checkout the tracked ones, so a
+    local file that is not part of the repository never adds or removes a
+    case; outside one, every file under the tree."""
+    paths = REPO.rglob("*")
+    if shutil.which("git") and (REPO / ".git").exists():
+        listed = subprocess.run(["git", "ls-files", "-z"], cwd=REPO, capture_output=True, text=True)
+        if listed.returncode == 0:
+            paths = [REPO / p for p in listed.stdout.split("\0") if p]
     out = []
-    for path in REPO.rglob("*"):
+    for path in paths:
         rel = path.relative_to(REPO)
         if any(part in SKIP_DIRS or part.startswith("_") for part in rel.parts[:-1]):
             continue
@@ -260,3 +272,31 @@ def test_the_tree_passes_the_handover_secret_scan():
     hits = [line.rsplit(":", 1)[0] for line in found.stdout.splitlines() if not re.search(local, line)]
     assert hits == []
     assert re.search(pattern.replace("[[:space:]]", r"\s"), "PRISM_JWT_SECRET=" + "k" * 40)   # the scan is live
+
+
+@pytest.mark.parametrize("ranges, pins", [("requirements-dev.in", "requirements-dev.txt"),
+                                          ("api/requirements.in", "api/requirements.txt")])
+def test_the_python_dependencies_are_pinned_inside_their_ranges(ranges, pins):
+    from packaging.requirements import Requirement
+    from packaging.utils import canonicalize_name
+
+    def requirements(path):
+        lines = (line.split("#", 1)[0].strip() for line in (REPO / path).read_text(encoding="utf-8").splitlines())
+        return [Requirement(line) for line in lines if line]
+
+    pinned = {}
+    for req in requirements(pins):
+        specs = list(req.specifier)
+        assert len(specs) == 1 and specs[0].operator == "==", f"{pins}: {req} is not an exact pin"
+        pinned[canonicalize_name(req.name)] = specs[0].version
+    for req in requirements(ranges):
+        name = canonicalize_name(req.name)
+        assert name in pinned, f"{req.name} is declared in {ranges} but not pinned in {pins}"
+        assert req.specifier.contains(pinned[name], prereleases=True), \
+            f"{pins} pins {req.name} {pinned[name]}, outside {ranges}'s {req.specifier}"
+
+
+def test_next_dev_leaves_the_tracked_files_alone():
+    """Next.js writes agent rules into CLAUDE.md on `next dev` unless told not to."""
+    assert re.search(r"^\s*agentRules:\s*false,", (REPO / "next.config.js").read_text(encoding="utf-8"), re.M)
+

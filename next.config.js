@@ -12,6 +12,10 @@ const LOCAL_API_URL = process.env.PRISM_LOCAL_API_URL || 'http://127.0.0.1:8000'
 
 const nextConfig = {
   reactStrictMode: true,
+  // Next.js would otherwise write a block of agent rules into the tracked
+  // CLAUDE.md on every `next dev`, which leaves the tree dirty and fails the
+  // repository's own copy tests.
+  agentRules: false,
   async rewrites() {
     if (process.env.NODE_ENV === 'production') return [];
     return [{ source: '/api/v1/:path*', destination: `${LOCAL_API_URL}/api/v1/:path*` }];
