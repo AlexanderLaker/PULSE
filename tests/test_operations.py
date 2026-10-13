@@ -61,6 +61,21 @@ class TestProductionRun:
         assert production.main(["--allow-sqlite", "--iterations", "200"]) == 2
         assert dbm.load_drivers() == []
 
+    def test_a_dropped_drivers_table_is_lost_drivers_too(self, production, monkeypatch, tmp_path, caplog):
+        """Dropped rather than emptied, with the drivers' exposure and source rows left behind: the run
+        says the drivers were lost (exit 2) instead of failing on rows whose driver is gone."""
+        monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "dropped.db"))
+        import prism.database as dbm
+        dbm.init_db()
+        assert production.main(["--allow-sqlite", "--iterations", "200"]) == 0
+        with dbm.get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA foreign_keys = OFF")
+            cursor.execute("DROP TABLE drivers")
+        caplog.clear()
+        assert production.main(["--allow-sqlite", "--iterations", "200"]) == 2
+        assert "restored from its backup" in caplog.text
+
     def test_an_empty_postgresql_database_is_refused(self, production, monkeypatch, tmp_path):
         """PostgreSQL is never seeded by the run: an empty one is a new database the API has not started
         on, or a production database that lost its drivers and is restored from its backup."""

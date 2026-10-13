@@ -75,8 +75,8 @@ from prism.config import (CATEGORIES, ESTIMATE_SOURCE_PREFIX, POSITIVE_DEFINITE_
                           PRODUCTION_ITERATIONS, PRODUCTION_SEED, REGIONS, ModelConfig, cell_weight_marginals)
 from prism.config_validation import correlation_lambda_min, validate_model_config, validate_run_size  # noqa: E402
 from prism.database import (POSTGRES_URL, USE_POSTGRES, MigrationPendingError, describe_error,  # noqa: E402
-                            holds_history, init_db, insert_drivers, load_drivers, load_latest_run,
-                            save_simulation_run)
+                            drivers_stamp, holds_history, init_db, insert_drivers, load_drivers,
+                            load_latest_run, save_simulation_run)
 from prism.drivers import DriverSet, simulation_problems  # noqa: E402
 from prism.engine import MonteCarloEngine  # noqa: E402
 from prism.input_drift import compare_with_run, driver_fingerprint, not_compared_event  # noqa: E402
@@ -239,14 +239,17 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         init_db()
-        drivers = load_drivers()
+        # Lost drivers (the drivers table emptied, or dropped and just created again by init_db) are not
+        # loaded: the exposure and source tables may still hold rows of the drivers that are gone.
+        lost = drivers_stamp()[0] == 0 and holds_history()
+        drivers = [] if lost else load_drivers()
     except MigrationPendingError as e:
         log.error("%s", e)
         return 1
     except Exception as e:  # noqa: BLE001 (reported with exit code 1)
         log.error("Cannot read the database: %s", e)
         return 1
-    if not drivers and not USE_POSTGRES and not holds_history():
+    if not drivers and not USE_POSTGRES and not lost:
         # A new local file: seeded with the driver base, as the API would on first use.
         insert_drivers(get_seed_drivers())
         drivers = load_drivers()
