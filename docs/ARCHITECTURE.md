@@ -47,8 +47,14 @@ scipy) and the database URL, and it:
 4. compares the drivers' scoring state with the fingerprint stored with the
    previous run and records the difference as an integrity event;
 5. stores the results bundle as a new row of `simulation_runs` (earlier rows
-   stay);
+   stay), with the commit its code came from and whether tracked files had
+   uncommitted changes;
 6. writes a QA workbook to `runs/` (git-ignored).
+
+On PostgreSQL a stored run is served at once, so only the production size
+runs there unless `--allow-test-size` is given; a local SQLite file
+(`--allow-sqlite`) that holds no drivers is seeded with the driver base
+first.
 
 Without `--cell-weights FILE` the run weights its cells with the estimated
 HCB mix of `prism/config.py`; with it, with the finance shares in the file.
@@ -73,7 +79,7 @@ change to the taxonomy or the horizon is reported rather than shown.
 | `mc_standard_error` | Bootstrap standard error of each category's terminal-year median, P10 and P90 |
 | `seed_stability` | The terminal-year portfolio median of each chain and their spread |
 | `integrity_events` | Everything the run repaired or clipped, and the input drift |
-| `meta` | Master seed, chain seeds and chain count, model version, engine, numerics backend (scipy and numpy versions), driver count, overlap-correction source, and the drivers' fingerprint for the next run |
+| `meta` | Master seed, chain seeds and chain count, model version, engine, numerics backend (scipy and numpy versions), driver count, overlap-correction source, the drivers' fingerprint for the next run, and `source`, the commit of the code and whether tracked files had uncommitted changes (both null outside a git checkout) |
 
 docs/MODEL.md explains each quantity.
 
