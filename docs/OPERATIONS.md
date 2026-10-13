@@ -195,19 +195,20 @@ A few rules the suite holds:
 - **numpy and scipy** stay at the versions the golden pins and the reference
   run were computed with. They move only with a model release, which
   regenerates the pins and runs the full check (`PRISM_FULL_RUN=1`).
-- **Updates and audits.** Dependabot proposes weekly updates
-  (`.github/dependabot.yml`), each checked by CI: for npm one pull request
-  with the minor and patch updates (a major version is a piece of work of its
-  own), for Python one per package, for both directories at once, numpy and
-  scipy excluded. CI fails on a high or critical npm advisory in what the
-  dashboard ships (`npm audit --omit=dev --audit-level=high`) and on any known
+- **Updates and audits.** Dependabot proposes updates
+  (`.github/dependabot.yml`), weekly for npm and Python and monthly for the CI
+  workflow's actions, each checked by CI: for npm one pull request with the
+  minor and patch updates (a major version is a piece of work of its own), for
+  Python one per package, for both directories at once, numpy and scipy
+  excluded. CI fails on a high or critical npm advisory in what the dashboard
+  ships (`npm audit --omit=dev --audit-level=high`) and on any known
   vulnerability in the pinned Python packages (`pip-audit`). The remaining npm
   advisories sit in development tools: Tailwind 3, whose fix is the move to
   Tailwind 4, and eslint-config-next, for which npm offers only a downgrade.
   They ship nothing to the browser (`npm audit --omit=dev` finds none). The CI
   workflow's actions are pinned to releases written for Node 20, which
-  GitHub's runners now run on Node 24; Dependabot proposes their current major
-  versions.
+  GitHub's runners now run on Node 24; Dependabot's monthly pull request
+  proposes their current major versions.
 
 ## The production run
 
@@ -406,7 +407,10 @@ admins are editing (the expert ratings exist nowhere else).
 
 **Restore drill**, at least once a quarter and at every handover: restore the
 newest dump into an empty database (a local one, as below, or an empty Neon
-database) and check that it serves the same run.
+database) and check that it serves the same run. A local one needs a
+PostgreSQL server of production's major version or newer, which libpq alone
+does not bring (on a Mac, Homebrew's `postgresql@<version>`, started with
+`brew services start postgresql@<version>`).
 
 ```bash
 createdb prism_restore
@@ -419,12 +423,18 @@ DATABASE_URL='postgresql://localhost/prism_restore?sslmode=disable' \
 In a second terminal, `curl -s http://127.0.0.1:8000/api/v1/health` must show
 the same `driver_count` and `latest_run_id` as production.
 
-**Restoring production.** Restore the production branch to an earlier point
-in Neon (within the history the plan keeps), or restore a branch from the
-backup branch of step 1 of a change. From a dump, restore into a new Neon
-branch or project, then point both database URLs in the Vercel project
-(Production) at it and redeploy: a deployment keeps the settings it was built
-with. Ask everyone to reload the dashboard afterwards.
+**Restoring production.** Restore the production branch to an earlier point in
+Neon (within the history the plan keeps), or restore a branch from the backup
+branch of step 1 of a change. From a dump, restore into a new Neon branch or
+project:
+
+```bash
+pg_restore --no-owner --no-privileges --dbname "<its direct connection string>" "prism_<date>.dump"
+```
+
+Then point both database URLs in the Vercel project (Production) at it and
+redeploy: a deployment keeps the settings it was built with. Ask everyone to
+reload the dashboard afterwards.
 
 ## Monitoring
 

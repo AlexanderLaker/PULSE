@@ -299,8 +299,9 @@ with the driver base, the first time a request needs the database.
   deployment in Vercel, or point every database URL the Vercel project sets
   (`POSTGRES_URL` and `DATABASE_URL`; the first wins where both are set) at
   that backup branch and redeploy the previous release: a deployment keeps
-  the settings it was built with. The archive file of step 5 holds the
-  dropped rows as well.
+  the settings it was built with. If Vercel holds that redeploy for the
+  Deployment Checks, which the previous release never ran, promote it with
+  Force Promote. The archive file of step 5 holds the dropped rows as well.
 
 Vercel puts no new push live after a rollback until it is undone (Undo
 Rollback on the project's production deployment tile).
@@ -343,11 +344,15 @@ driver field, a new tile shape):
 - remove the two quotes of this README that `tests/test_documents.py`
   checks (the driver count and the 2035 median);
 - remove or reword what refers to this folder: the documents table of
-  README.md, the model for later migrations in CLAUDE.md and
-  docs/OPERATIONS.md (describe it in words or name the next migration),
-  docs/ARCHITECTURE.md, the step for changed texts in docs/DRIVERS.md, and
-  the 503 message of `MigrationPendingError` in `prism/database.py`, which
-  then names the last commit that has this folder.
+  README.md; the model for later migrations in CLAUDE.md and in
+  docs/OPERATIONS.md (The database), described in words or by the next
+  migration; the deploy order in docs/OPERATIONS.md (Deploying);
+  docs/ARCHITECTURE.md; in docs/DRIVERS.md the step for changed texts and
+  the model for a driver migration; the docstrings of `schema` in
+  `prism/database.py` and of `prism/journey.py`; and the 503 message of
+  `MigrationPendingError` in `prism/database.py`, which then names the last
+  commit that has this folder, together with the two tests that look for the
+  folder in it (`tests/test_api.py`, `tests/test_database.py`).
 
 A database found later on the previous schema is migrated from the last
 commit that has this folder, then by the migrations after it.

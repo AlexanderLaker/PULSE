@@ -1,6 +1,7 @@
-# Weekly proposals for dependency updates, each checked by CI before anyone
-# merges it: for npm one pull request with the minor and patch updates, for
-# Python one per package, covering both directories that pin it.
+# Proposals for dependency updates, each checked by CI before anyone merges
+# it: weekly for npm (one pull request with the minor and patch updates) and
+# for Python (one per package, covering both directories that pin it),
+# monthly for the CI workflow's actions.
 version: 2
 updates:
   - package-ecosystem: npm
