@@ -37,17 +37,27 @@ def bearer(role="viewer", **kw) -> dict:
     return {"Authorization": f"Bearer {token(role, **kw)}"}
 
 
-def persist(results: dict, iterations: int = 200) -> int:
-    """Store a run the way the production job does (it creates the schema first)."""
-    from prism.database import init_db, save_simulation_run
+def ready_for_a_run() -> None:
+    """What the production job finds or makes before it stores a run: the schema, and drivers (it seeds
+    an empty SQLite file with the driver base)."""
+    from prism.database import drivers_stamp, init_db, insert_drivers
+    from prism.seed_drivers import get_seed_drivers
     init_db()
+    if drivers_stamp()[0] == 0:
+        insert_drivers(get_seed_drivers())
+
+
+def persist(results: dict, iterations: int = 200) -> int:
+    """Store a run the way the production job does."""
+    from prism.database import save_simulation_run
+    ready_for_a_run()
     return save_simulation_run(iterations, results)
 
 
 def persist_text(results: str) -> int:
     """Store a run whose results column holds this text, which no production job writes."""
-    from prism.database import get_db_connection, init_db
-    init_db()
+    from prism.database import get_db_connection
+    ready_for_a_run()
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("INSERT INTO simulation_runs (iterations, results) VALUES (200, ?)", (results,))
@@ -87,14 +97,23 @@ class TestRoutes:
             ("GET", "/api/v1/config"), ("GET", "/api/v1/journey"), ("PUT", "/api/v1/journey"),
         }
 
-    def test_the_interactive_documentation_is_local_only(self, monkeypatch, tmp_path):
+    def test_the_interactive_documentation_is_served_only_when_asked_for(self, monkeypatch, tmp_path):
+        """Off by default, so a deployment on any host describes no route; PRISM_API_DOCS=1 turns it on
+        on a development machine, never on Vercel."""
         monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "prism.db"))
-        monkeypatch.delenv("VERCEL", raising=False)
-        assert TestClient(create_app()).get("/openapi.json").status_code == 200
-        monkeypatch.setenv("VERCEL", "1")
-        deployed = TestClient(create_app())
-        for path in ("/docs", "/redoc", "/openapi.json"):
-            assert deployed.get(path).status_code == 404, path
+        for name in ("VERCEL", "VERCEL_ENV", "PRISM_API_DOCS"):
+            monkeypatch.delenv(name, raising=False)
+
+        def served(path: str) -> bool:
+            return TestClient(create_app()).get(path).status_code == 200
+
+        assert not any(served(path) for path in ("/docs", "/redoc", "/openapi.json"))
+        monkeypatch.setenv("PRISM_API_DOCS", "1")
+        assert all(served(path) for path in ("/docs", "/redoc", "/openapi.json"))
+        for name in ("VERCEL", "VERCEL_ENV"):
+            monkeypatch.setenv(name, "1" if name == "VERCEL" else "production")
+            assert not any(served(path) for path in ("/docs", "/redoc", "/openapi.json")), name
+            monkeypatch.delenv(name)
 
     def test_the_vercel_entry_point_serves_the_same_app(self):
         module = load_module("api/index.py", "vercel_index")
@@ -193,6 +212,34 @@ class TestHealthAndDiagnostics:
         monkeypatch.setattr(dbm, "insert_drivers", the_other_instance_first)
         state.reset()
         assert state.driver_set().driver_count == 51 and len(dbm.load_drivers()) == 51
+
+    def test_a_database_that_lost_its_drivers_is_not_reseeded(self, api, valid_run):
+        """A stored run shows that the database once held drivers: an empty drivers table there is lost
+        data, restored from the backup, never replaced by the driver base."""
+        import prism.database as dbm
+        assert api.get("/api/v1/health").json()["driver_count"] == 51
+        persist(valid_run)
+        with dbm.get_db_connection() as conn:
+            for table in ("driver_sources", "driver_regional_exposure", "driver_category_exposure", "drivers"):
+                conn.cursor().execute(f"DELETE FROM {table}")
+        state.reset()
+        response = api.get("/api/v1/drivers", headers=bearer())
+        assert response.status_code == 503 and "restore it from its backup" in response.json()["detail"]
+        health = api.get("/api/v1/health").json()
+        assert health["status"] == "degraded" and health["simulation_reason"] == "drivers_missing"
+        assert dbm.load_drivers() == []
+
+    @pytest.mark.parametrize("entity_type, seeded", [("driver", False), ("user", True)])
+    def test_of_the_audit_log_only_a_driver_edit_counts_as_history(self, api, entity_type, seeded):
+        """A role change can precede the first driver request on a new database; it says nothing
+        about the drivers, so the database is still seeded."""
+        import prism.database as dbm
+        dbm.init_db()
+        with dbm.get_db_connection() as conn:
+            dbm.insert_audit(conn.cursor(), [dbm.AuditEntry("an_action", entity_type, "an_id", "someone")])
+        state.reset()
+        assert dbm.holds_history() is not seeded
+        assert api.get("/api/v1/health").json()["driver_count"] == (51 if seeded else 0)
 
     def test_a_persisted_run_is_reported(self, api, valid_run):
         run_id = persist(valid_run)

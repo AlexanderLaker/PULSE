@@ -133,8 +133,11 @@ longer the one held. A production run, a migration or an edit made through
 another instance is therefore visible on the next such request.
 
 On an empty database the API creates the tables and seeds the driver base
-(`prism/seed_drivers.py`). On a database that still needs a migration it
-creates nothing and answers 503 naming the migration
+(`prism/seed_drivers.py`). It seeds only a new database: one that stores a
+run or an audited driver edit but no drivers has lost them, so the API
+answers 503 (`drivers_missing` in `/health`) until it is restored from its
+backup, never filling it with the base. On a database that still needs a
+migration it creates nothing and answers 503 naming the migration
 (`migrations/0001_driver_schema`, run with its README as the runbook); on
 Vercel without a database URL it answers 503 too, rather than writing to a
 SQLite file that would vanish with the instance.
@@ -287,7 +290,9 @@ deployment. `vercel.json` sets security headers on every response, the
 API's included: no page may be framed (`frame-ancestors 'none'`,
 `X-Frame-Options: DENY`), no response is sniffed for another content type,
 the referrer leaves the site as its origin only, the camera, microphone and
-location are switched off, and search engines are asked not to index. On
-Vercel the API serves no interactive documentation. The production run, the
-generators and the migrations run on a developer machine with the full
-Python environment. docs/OPERATIONS.md has the procedures.
+location are switched off, and search engines are asked not to index. The
+API serves its interactive documentation (`/docs`, `/redoc`,
+`/openapi.json`) only where `PRISM_API_DOCS=1` asks for it, on a development
+machine, and never on Vercel. The production run, the generators and the
+migrations run on a developer machine with the full Python environment.
+docs/OPERATIONS.md has the procedures.

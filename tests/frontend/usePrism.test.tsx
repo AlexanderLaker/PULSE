@@ -262,6 +262,16 @@ describe('usePrism', () => {
     expect(screen.getByTestId('drivers-error').textContent).toContain('needs migration');
   });
 
+  it('names a database that lost its drivers', async () => {
+    vi.mocked(api.getHealth).mockResolvedValue(makeHealth({
+      status: 'degraded', has_simulation: false, simulation_reason: 'drivers_missing', driver_count: 0,
+    }));
+    vi.mocked(api.getDrivers).mockRejectedValue(new Error('This database stores runs or driver edits but no drivers'));
+    mount();
+    await loaded();
+    expect(screen.getByTestId('database').textContent).toBe('drivers_missing');
+  });
+
   it('loads again by itself once the database can be used', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {

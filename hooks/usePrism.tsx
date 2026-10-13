@@ -240,7 +240,7 @@ function usePrismStore(): PrismStore {
 
   const databaseFailure: DatabaseFailure | null = health?.status === 'degraded'
     && (health.simulation_reason === 'migration_pending' || health.simulation_reason === 'no_database'
-      || health.simulation_reason === 'db_error')
+      || health.simulation_reason === 'drivers_missing' || health.simulation_reason === 'db_error')
     ? health.simulation_reason
     : null;
 

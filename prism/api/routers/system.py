@@ -26,9 +26,10 @@ def health():
     changes): it reads the run's id, never its results. When the database
     fails, status is "degraded" and simulation_reason says why
     (migration_pending: it needs a migration from migrations/ first;
-    no_database: no URL is configured; db_error: anything else). A run that
-    exists but cannot be served shows up in /api/v1/diagnostics and
-    /api/v1/simulation.
+    no_database: no URL is configured; drivers_missing: a database in use
+    lost its drivers and is restored from its backup; db_error: anything
+    else). A run that exists but cannot be served shows up in
+    /api/v1/diagnostics and /api/v1/simulation.
     """
     try:
         drivers = state.driver_set()

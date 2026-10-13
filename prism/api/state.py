@@ -40,16 +40,21 @@ def ensure_schema() -> None:
 def driver_set() -> DriverSet:
     """The current drivers, reloaded if the database has changed.
 
-    An empty drivers table is seeded from prism.seed_drivers, so a new
-    database starts with the driver base. Two instances starting on a new
-    database at the same moment may both try: the second insert fails as a
-    whole (one transaction), and the drivers the first stored are used.
+    A new database starts with the driver base: its empty drivers table is
+    seeded from prism.seed_drivers. Two instances starting on a new database at
+    the same moment may both try: the second insert fails as a whole (one
+    transaction), and the drivers the first stored are used. A database that
+    once held drivers (database.holds_history) and has none lost them; it is
+    restored from its backup, never reseeded, so this raises
+    DriversMissingError (503) until then.
     """
     with _lock:
         ensure_schema()
         stamp = database.drivers_stamp()
         if stamp[0] == 0:
-            logger.warning("The drivers table is empty; seeding it with the driver base")
+            if database.holds_history():
+                raise database.DriversMissingError()
+            logger.warning("The drivers table of this new database is empty; seeding it with the driver base")
             try:
                 database.insert_drivers(get_seed_drivers())
             except Exception:

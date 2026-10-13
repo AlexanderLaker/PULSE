@@ -35,13 +35,15 @@ export interface HealthStatus {
   driver_count: number;
   has_simulation: boolean;
   /** 'degraded' comes with migration_pending (the database needs a migration
-   *  from migrations/), no_database (no database URL configured) or db_error. */
+   *  from migrations/), no_database (no database URL configured),
+   *  drivers_missing (a database in use lost its drivers) or db_error. */
   simulation_reason: 'ok' | 'no_rows' | DatabaseFailure;
   latest_run_id: number | null;
 }
 
-/** Why the database cannot be used: it needs a migration, none is configured, or anything else. */
-export type DatabaseFailure = 'migration_pending' | 'no_database' | 'db_error';
+/** Why the database cannot be used: it needs a migration, none is configured, it lost its drivers, or
+ *  anything else. */
+export type DatabaseFailure = 'migration_pending' | 'no_database' | 'drivers_missing' | 'db_error';
 
 /** Why a run cannot be shown: no run yet, a run missing part of its contract, or a database failure. */
 export type SimulationReason = 'ok' | 'no_rows' | 'malformed' | DatabaseFailure;

@@ -3,7 +3,8 @@
  * Two pieces of the dashboard shell:
  *
  *   - the service notice under the navigation says why nothing new loads
- *     while the database cannot be used (migration, no database, outage);
+ *     while the database cannot be used (migration, no database, lost
+ *     drivers, outage);
  *   - an overlay inside a hidden dashboard pane lets go of the page: the
  *     scroll lock and its keys come back when the pane shows again, and
  *     focus returns to the element that opened it when it closes.
@@ -24,7 +25,7 @@ import useOverlay, { PaneActiveContext } from '@/hooks/useOverlay';
 afterEach(() => cleanup());
 
 describe('the service notice', () => {
-  it.each(['migration_pending', 'no_database', 'db_error'] as DatabaseFailure[])('explains %s', (failure) => {
+  it.each(['migration_pending', 'no_database', 'drivers_missing', 'db_error'] as DatabaseFailure[])('explains %s', (failure) => {
     STORE.current = makeStore({ databaseFailure: failure });
     render(<ServiceNotice />);
     expect(screen.getByRole('status').textContent).toContain(SERVICE_NOTICES[failure]);

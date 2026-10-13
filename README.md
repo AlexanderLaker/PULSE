@@ -81,7 +81,11 @@ uvicorn prism.api.app:app --port 8000              # the API, serving that run
 The run seeds the file with the driver base, so its results are the
 production model's: `PRISM_FULL_RUN=1 python3 -m pytest
 tests/test_reference_run.py` checks them against the reference run behind
-the PRISM Analysis, to six decimals. The dashboard needs Clerk for sign-in
+the PRISM Analysis, to six decimals, and the run's QA workbook in `runs/`
+shows them. The API's data routes answer only with the token the dashboard
+gives a signed-in user, so without Clerk only `/api/v1/health` and
+`/api/v1/diagnostics` answer; `PRISM_API_DOCS=1` in the shell adds the
+interactive documentation at `/docs`. The dashboard needs Clerk for sign-in
 and Neon for its role table.
 
 Roles come from a Clerk webhook, which cannot reach a development machine on
@@ -139,6 +143,7 @@ effect with the next deployment.
 | `PRISM_API_ORIGIN` | dashboard (optional) | The origin the admin routes call the API on; without it, the host the request came in on. On Vercel set it for Production only, so a preview deployment never writes to the production API |
 | `PRISM_LOCAL_API_URL` | local dashboard | Where the dev server sends `/api/v1` (default `http://127.0.0.1:8000`) |
 | `PRISM_DB_PATH` | API, scripts | The SQLite file used when neither database URL is set (default `data/prism.db`); the production run uses it only with `--allow-sqlite` |
+| `PRISM_API_DOCS` | local API | `1` serves the API's interactive documentation (`/docs`, `/redoc`, `/openapi.json`); unset, as on every deployment, it serves none, and on Vercel never |
 
 Variables set in the shell take precedence over `.env`, so one command can be
 pointed at another database. Set both URLs, because `POSTGRES_URL` wins when

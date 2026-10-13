@@ -5,8 +5,9 @@ database: the latest persisted simulation run, the drivers, the model
 configuration and the Consumer Journey content. The only writes it accepts
 are an admin's driver edit, an expert's score proposal and an admin's
 journey content save; on a new, empty database it also creates the tables
-and seeds the driver base on first use. It never runs the simulation; runs
-come from scripts/run_production.py.
+and seeds the driver base on first use (a database that lost its drivers is
+restored from its backup, never reseeded). It never runs the simulation;
+runs come from scripts/run_production.py.
 
 The dashboard reaches the API on its own origin (a Vercel rewrite in
 production, the Next.js dev server's rewrite locally), so no CORS policy is
@@ -22,16 +23,18 @@ from fastapi.responses import JSONResponse
 
 from prism import __version__
 from prism.api.routers import config, drivers, journey, simulation, system
-from prism.database import DatabaseNotConfiguredError, DatabaseUnavailableError, MigrationPendingError
+from prism.database import (DatabaseNotConfiguredError, DatabaseUnavailableError, DriversMissingError,
+                            MigrationPendingError, on_vercel)
 
 logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
-    # The interactive documentation (/docs, /redoc, /openapi.json) is for local
-    # development; on Vercel it is switched off, so no deployment describes the
-    # API to whoever asks.
-    docs = not os.environ.get("VERCEL")
+    # The interactive documentation (/docs, /redoc, /openapi.json) describes
+    # every route to whoever asks. It is served only where PRISM_API_DOCS=1
+    # asks for it (a development machine), whatever the host, and never on
+    # Vercel.
+    docs = os.environ.get("PRISM_API_DOCS") == "1" and not on_vercel()
     app = FastAPI(
         title="PRISM API",
         version=__version__,
@@ -45,9 +48,11 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(MigrationPendingError)
     @app.exception_handler(DatabaseNotConfiguredError)
+    @app.exception_handler(DriversMissingError)
     def _not_ready(request: Request, exc: Exception) -> JSONResponse:
-        # The database needs a migration, or no database is configured:
-        # nothing is served and nothing is written until that is fixed.
+        # The database needs a migration, no database is configured, or the
+        # database lost its drivers: nothing is served and nothing is written
+        # until that is fixed.
         return JSONResponse(status_code=503, content={"detail": str(exc)})
 
     @app.exception_handler(DatabaseUnavailableError)

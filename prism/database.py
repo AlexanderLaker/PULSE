@@ -58,6 +58,20 @@ class MigrationPendingError(RuntimeError):
                          f"migrations/{migration}/migrate.py (its README is the runbook).")
 
 
+class DriversMissingError(RuntimeError):
+    """The drivers table is empty in a database that once held drivers (holds_history).
+
+    A new database is seeded with the driver base; one that stores runs or
+    driver edits but no drivers has lost them, and lost drivers are restored
+    from the backup, never replaced by the base.
+    """
+
+    def __init__(self):
+        super().__init__("This database stores runs or driver edits but no drivers, so its drivers were lost: "
+                         "restore it from its backup (docs/OPERATIONS.md, Backups and restore). PRISM seeds "
+                         "only a new database with the driver base.")
+
+
 class DatabaseNotConfiguredError(RuntimeError):
     """No database URL is set where one is required (a Vercel deployment)."""
 
@@ -367,11 +381,14 @@ def init_db() -> None:
 
 def failure_reason(e: BaseException) -> str:
     """migration_pending (the database needs a migration), no_database (no URL
-    where one is required) or db_error (anything else)."""
+    where one is required), drivers_missing (a database in use lost its
+    drivers) or db_error (anything else)."""
     if isinstance(e, MigrationPendingError):
         return "migration_pending"
     if isinstance(e, DatabaseNotConfiguredError):
         return "no_database"
+    if isinstance(e, DriversMissingError):
+        return "drivers_missing"
     return "db_error"
 
 
@@ -382,7 +399,7 @@ def describe_error(e: BaseException) -> str:
     string (a malformed percent-escape echoes part of the password), so the
     log, the 503 answers and /api/v1/diagnostics give this category instead.
     """
-    if isinstance(e, MigrationPendingError):
+    if isinstance(e, (MigrationPendingError, DriversMissingError)):
         return str(e)
     if isinstance(e, DatabaseNotConfiguredError):
         return "no database URL is set for this deployment"
@@ -666,6 +683,25 @@ def drivers_stamp() -> tuple:
         cursor.execute("SELECT COUNT(*) AS n, COALESCE(SUM(revision), 0) AS revisions FROM drivers")
         r = _row(cursor.fetchone())
     return int(r["n"] or 0), int(r["revisions"] or 0)
+
+
+def holds_history() -> bool:
+    """Whether the database once held drivers: it stores a run or an audited driver edit.
+
+    Both need drivers (the production run refuses a PostgreSQL database
+    without them and seeds a SQLite file first). A new database has neither,
+    so the API seeds its empty drivers table; one that has either and no
+    drivers lost them (state.driver_set raises DriversMissingError). Other
+    audit entries, such as a role change, say nothing about the drivers.
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        for sql in ("SELECT 1 FROM simulation_runs LIMIT 1",
+                    "SELECT 1 FROM audit_log WHERE entity_type = 'driver' LIMIT 1"):
+            cursor.execute(sql)
+            if cursor.fetchone() is not None:
+                return True
+    return False
 
 
 # ── Simulation runs ─────────────────────────────────────────────────────────
