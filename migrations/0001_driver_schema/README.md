@@ -75,13 +75,20 @@ shows nothing to commit: a working tree that still holds files of an earlier
 release is put aside first, with `git stash` or a fresh clone), the Python
 environment from `requirements-dev.txt` and a `.env` whose `POSTGRES_URL`
 (or, when that is not set, `DATABASE_URL`) is the Neon production database.
-Vercel deploys `main` to production (Settings, Git).
+Vercel deploys `main` to production (Settings, Git). While that `.env` points
+at production, every script in the checkout writes there: run the commands
+of this runbook only, not the development ones of README.md (a run with
+`--allow-test-size` would be stored in production and served at once).
 
 0. **Compare the settings.** The Vercel project's environment variables
    (Production) must be the ones README.md's table lists. Delete any that
    this release no longer reads, such as `BACKEND_URL`, `PRISM_BACKEND_URL`
    and `FORCE_DEV_PROXY`; the database URLs, `PRISM_JWT_SECRET` and the Clerk
-   keys keep their names.
+   keys keep their names. In the Clerk dashboard, check that sign-up is
+   restricted (the Restricted mode, or an allowlist of the company's email
+   domain; docs/OPERATIONS.md, Setting up Clerk): every signed-in user can
+   read PRISM and propose scores, and the sign-up page's access code is
+   readable in the browser, so it keeps nobody out.
 
 1. **Back up.** In the Neon console, create a branch of the production branch
    (Branches, Create branch, from the current state). It is an instant
@@ -182,11 +189,13 @@ Vercel deploys `main` to production (Settings, Git).
    a quiet moment; it takes about a minute.
 
 4. **Deploy.** Merge the release into `main` and push. Vercel builds and
-   promotes it in about two minutes (watch it in the Vercel dashboard). From
-   now until step 5 the dashboard reports that PRISM is being updated, and
-   `/api/v1/health` answers `"status": "degraded"` with
-   `"simulation_reason": "migration_pending"` and the release's commit in
-   `commit`: the release is live and waits for the migration.
+   promotes it in about two minutes, or once CI has passed where the project's
+   Deployment Checks ask for that (docs/OPERATIONS.md, Deploying); watch it in
+   the Vercel dashboard. From now until step 5 the dashboard reports that
+   PRISM is being updated, and `/api/v1/health` answers `"status": "degraded"`
+   with `"simulation_reason": "migration_pending"` and the release's commit in
+   `commit`, its first 12 characters (`git rev-parse --short=12 HEAD` in the
+   checkout prints the same): the release is live and waits for the migration.
 
 5. **Migrate** as soon as the deployment is live:
 
@@ -234,6 +243,12 @@ Vercel deploys `main` to production (Settings, Git).
    cell-weight sources, for example): the migration renames keys, not
    values. They stay for the drift comparison and are no longer served once
    this run exists.
+
+8. **Retire the previous checkout.** Any checkout of the previous release
+   with a `.env` that points at production can still write there in the
+   previous schema (its production run, its scripts). Remove the database
+   URLs from that `.env`, or delete the checkout, so that only this release's
+   checkout reaches production.
 
 A second `migrate.py --dry-run` now answers that the database is already on
 the driver schema.

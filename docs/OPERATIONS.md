@@ -186,7 +186,9 @@ A few rules the suite holds:
   ```
 
   `tests/test_repository.py` checks that every declared requirement is pinned
-  inside its range.
+  inside its range, and that every package the function installs is pinned at
+  the same version in `requirements-dev.txt`, so the API runs on the versions
+  the suite tested. An update by hand therefore regenerates both files.
 - **The Python version** is the one in `.python-version` (3.12): Vercel reads
   it for the function and CI installs it. The development pins also work on
   3.11 and later.
@@ -194,12 +196,15 @@ A few rules the suite holds:
   run were computed with. They move only with a model release, which
   regenerates the pins and runs the full check (`PRISM_FULL_RUN=1`).
 - **Updates and audits.** Dependabot proposes weekly updates
-  (`.github/dependabot.yml`; major versions and numpy and scipy excluded),
-  each checked by CI. CI fails on a high or critical npm advisory in what the
+  (`.github/dependabot.yml`), each checked by CI: for npm one pull request
+  with the minor and patch updates (a major version is a piece of work of its
+  own), for Python one per package, for both directories at once, numpy and
+  scipy excluded. CI fails on a high or critical npm advisory in what the
   dashboard ships (`npm audit --omit=dev --audit-level=high`) and on any known
   vulnerability in the pinned Python packages (`pip-audit`). The remaining npm
-  advisories sit in development tools and need major upgrades (Tailwind 4);
-  they ship nothing to the browser.
+  advisories sit in development tools: Tailwind 3, whose fix is the move to
+  Tailwind 4, and eslint-config-next, for which npm offers only a downgrade.
+  They ship nothing to the browser (`npm audit --omit=dev` finds none).
 
 ## The production run
 
@@ -209,19 +214,22 @@ python3 scripts/run_production.py --cell-weights /path/outside/the/repo/cell_wei
 ```
 
 The run reads the database in `POSTGRES_URL` or `DATABASE_URL`, refuses to
-start without one unless `--allow-sqlite` is given, and takes a few minutes
-at the default 3 x 50,000 iterations (`PRODUCTION_*` in `prism/config.py`). It
+start without one unless `--allow-sqlite` is given, and takes a few minutes at
+the default 3 x 50,000 iterations (`PRODUCTION_*` in `prism/config.py`). It
 writes a new row to `simulation_runs`; the API serves the newest row from its
-next request on, an open dashboard shows it within about a minute, and
-earlier rows stay for the drift comparison. Because a stored run is served at
-once, PostgreSQL takes only the production size unless `--allow-test-size`
-says otherwise. Every run records where its code came from: the commit and
-whether tracked files had uncommitted changes (`meta.source` in the stored
-bundle, the Code row of the workbook's Metadata sheet; both say so when the
-tree is not a git checkout). It also writes the QA
-workbook to `runs/` (git-ignored): the Shift Matrix with its percentiles, the
-regional medians, the cell weights (with the graded derivation when the
-estimate was used), the velocities and the run's metadata.
+next request on, an open dashboard shows it within about a minute, and earlier
+rows stay for the drift comparison. Because a stored run is served at once,
+PostgreSQL takes only the production size unless `--allow-test-size` says
+otherwise. Every run records where its code came from: the commit and whether
+tracked files had uncommitted changes (`meta.source` in the stored bundle, the
+Code row of the workbook's Metadata sheet; both say so when the tree is not a
+git checkout). On PostgreSQL, uncommitted changes bring a warning, not a
+refusal, because a release makes its production run before the commit that
+carries it (docs/DRIVER_ANALYSIS.md, Regeneration): the run then records the
+commit it started from, with changes on top, and the release commit follows.
+It also writes the QA workbook to `runs/` (git-ignored): the Shift Matrix with
+its percentiles, the regional medians, the cell weights (with the graded
+derivation when the estimate was used), the velocities and the run's metadata.
 
 | Option | Effect |
 |---|---|
@@ -287,17 +295,20 @@ need rewritten templates first (the same document, "On the finance shares").
 ## Deploying
 
 Push to `main`: Vercel builds the dashboard and the Python function and
-promotes the build to production in about two minutes. Other branches get
-preview deployments. The environment variables live in the Vercel project
-settings (Production and Preview). Vercel applies a change to any of them
-only to deployments made after it, so redeploy after every change
-(Deployments, the latest deployment, Redeploy);
-`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `NEXT_PUBLIC_SIGNUP_CODE` are also
-built into the dashboard's code. `PRISM_API_ORIGIN`, if used, belongs to
-Production only: set for Preview as well, a preview deployment's admin
-writes would go to the production API. A database that still needs
-migration 0001 (the API answers 503 and names it) is moved in the order that
-migration's runbook gives, the deploy first
+promotes the build to production in about two minutes, whether or not CI has
+passed on that commit. To hold a build until it has, add the CI checks
+`dashboard` and `python` under Deployment Checks in the project settings
+(Build and Deployment): Vercel then promotes it once both pass, and Force
+Promote overrides that in an emergency. Other branches get preview
+deployments. The environment variables live in the Vercel project settings
+(Production and Preview). Vercel applies a change to any of them only to
+deployments made after it, so redeploy after every change (Deployments, the
+latest deployment, Redeploy); `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and
+`NEXT_PUBLIC_SIGNUP_CODE` are also built into the dashboard's code.
+`PRISM_API_ORIGIN`, if used, belongs to Production only: set for Preview as
+well, a preview deployment's admin writes would go to the production API. A
+database that still needs migration 0001 (the API answers 503 and names it) is
+moved in the order that migration's runbook gives, the deploy first
 (`migrations/0001_driver_schema/README.md`).
 
 After a deploy:
@@ -485,7 +496,7 @@ sign-up.
 | Symptom | Cause and remedy |
 |---|---|
 | Every data request answers 401 | The dashboard and the API see different `PRISM_JWT_SECRET` values, or the value is shorter than 32 characters. Set the same value everywhere and redeploy |
-| The dashboard says the service is unavailable, or a notice under the navigation says the data cannot be loaded | Check `/api/v1/health` and `/api/v1/diagnostics`. `simulation_reason` names the cause: `migration_pending` (the database needs a migration; the `error` field of `/diagnostics` names it), `no_database` (neither `DATABASE_URL` nor `POSTGRES_URL` is set in this Vercel deployment) or `db_error` (the API cannot reach the database or a query failed; the `error` field of `/diagnostics` says why) |
+| The dashboard says the service is unavailable, or a notice under the navigation says the data cannot be loaded | Check `/api/v1/health` and `/api/v1/diagnostics`. `simulation_reason` names the cause: `migration_pending` (the database needs a migration; the `error` field of `/diagnostics` names it), `no_database` (neither `DATABASE_URL` nor `POSTGRES_URL` is set in this Vercel deployment), `drivers_missing` in `/health` (the database stores runs or driver edits but no drivers, so they were lost: restore it as under Backups and restore; PRISM seeds only a new database) or `db_error` (the API cannot reach the database or a query failed; the `error` field of `/diagnostics` says why) |
 | The Shift Analysis is empty | `simulation_reason` in `/api/v1/diagnostics` is `no_rows` (write a run) or `malformed` (the newest run lacks a part the dashboard needs, such as a key, a category, region or year, a gross-profit share, its run metadata or a complete driver fingerprint; the `error` field lists them; write a new run) |
 | Nobody is admin | The webhook did not reach the dashboard: check its deliveries in the Clerk dashboard, then set the role as described under Roles |
 | The production run exits with 4 | The correlation settings are not positive definite on the current driver mix; lower the cross-force correlations in `prism/config.py` |
@@ -514,11 +525,14 @@ travel separately:
 
 The services themselves belong to the owner's accounts today: the GitHub
 repository, the Vercel project `prism-profit-pool`, the Neon project and the
-Clerk application. Move each into an account the receiving organisation
+Clerk application. The repository is not moved: the receiving organisation
+creates a repository of its own from the archive, so the history stays with
+the owner. Move the other three into accounts the receiving organisation
 controls, through the service's own transfer where it offers one, or by
-creating it anew (a new Clerk application means new keys and a new webhook; a
-new Neon project is restored from the dump). Rotate the credentials after the
-move, and check the deployment against the list under Deploying.
+creating them anew (a new Clerk application means new keys and a new
+webhook; a new Neon project is restored from the dump), and connect the
+Vercel project to the new repository. Rotate the credentials after the move,
+and check the deployment against the list under Deploying.
 
 ## Hosting elsewhere
 
@@ -541,3 +555,9 @@ PRISM needs four things, which Vercel, Neon and Clerk provide today:
 The production run needs a machine or a job runner with the full Python
 environment and access to the database. It must keep scipy: there is no
 approximate engine.
+
+On another host, set the security headers of `vercel.json` (listed in
+docs/ARCHITECTURE.md, Deployment) at its proxy or web server: Vercel applies
+them today, and nothing else in PRISM does. The API's interactive
+documentation stays off there as on Vercel, since only `PRISM_API_DOCS=1`
+turns it on.
