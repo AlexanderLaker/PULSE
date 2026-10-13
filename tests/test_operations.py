@@ -87,6 +87,27 @@ class TestProductionRun:
         assert production.source_state() == {"commit": None, "dirty": None}
         assert production.describe_source(production.source_state()) == "not a git checkout"
 
+    def test_an_exported_tree_inside_another_repository_records_no_commit(self, production, monkeypatch,
+                                                                          tmp_path):
+        """git, asked from an exported tree that sits inside another work tree, answers with that
+        repository's commit, which is not this code's."""
+        import shutil
+        import subprocess
+        if shutil.which("git") is None:
+            pytest.skip("git is not installed")
+        outer = tmp_path / "outer"
+        (outer / "export").mkdir(parents=True)
+        (outer / "notes.txt").write_text("outer\n", encoding="utf-8")
+        for args in (["init", "-q"], ["add", "notes.txt"],
+                     ["-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
+                      "commit", "-q", "-m", "outer"]):
+            subprocess.run(["git", *args], cwd=outer, check=True, capture_output=True)
+        monkeypatch.setattr(production, "REPO", outer / "export")
+        assert production.source_state() == {"commit": None, "dirty": None}
+        monkeypatch.setattr(production, "REPO", outer)
+        state = production.source_state()
+        assert len(state["commit"]) == 40 and state["dirty"] is False
+
     def test_a_run_is_persisted_with_the_full_contract(self, production, seeded, tmp_path):
         from prism.api.runs import META_KEYS, REQUIRED_KEYS, run_status
         assert production.main(["--allow-sqlite", "--iterations", "300", "--chains", "2"]) == 0
@@ -139,9 +160,10 @@ class TestProductionRun:
         assert "driver technology_r01: peak year" in caplog.text
         assert seeded.load_latest_run() is None
 
-    @pytest.mark.parametrize("lam_min", [-0.01, 0.0], ids=["negative", "zero"])
+    @pytest.mark.parametrize("lam_min", [-0.01, 0.0, 9.2e-18], ids=["negative", "zero", "rounded-singular"])
     def test_the_correlation_check_stops_the_run(self, production, seeded, monkeypatch, lam_min):
-        """The copula needs a positive definite matrix: a smallest eigenvalue of zero stops the run too."""
+        """The copula needs a positive definite matrix: a smallest eigenvalue of zero stops the run too,
+        and so does a singular matrix whose eigenvalue computes as a tiny positive number."""
         monkeypatch.setattr(production, "correlation_lambda_min", lambda *a: lam_min)
         assert production.main(["--allow-sqlite", "--iterations", "200"]) == 4
         assert seeded.load_latest_run() is None
@@ -156,6 +178,24 @@ class TestProductionRun:
         bad = tmp_path / "weights.json"
         bad.write_text(json.dumps({"cells": {}}), encoding="utf-8")
         assert production.main(["--allow-sqlite", "--cell-weights", str(bad)]) == 5
+
+    def test_a_finance_file_run_keeps_its_label_and_its_code_apart(self, production, seeded, tmp_path):
+        """The file's label is stored with the weights; where the code came from stays in meta.source and
+        on the workbook's Code row."""
+        import openpyxl
+        from prism.config import CATEGORIES, REGIONS
+        path = tmp_path / "weights.json"
+        cells = {c: {r: 1.0 / 52 for r in REGIONS} for c in CATEGORIES}
+        path.write_text(json.dumps({"source": "Finance FY2025", "basis": "gp1_share", "cells": cells}),
+                        encoding="utf-8")
+        assert production.main(["--allow-sqlite", "--iterations", "200", "--cell-weights", str(path)]) == 0
+        run = seeded.load_latest_run()
+        assert run["results"]["cell_weights_source"] == "Finance FY2025"
+        source = run["results"]["meta"]["source"]
+        assert set(source) == {"commit", "dirty"}
+        workbook = next((tmp_path / "runs").glob(f"prism_run_{run['id']}_*.xlsx"))
+        labels = {row[0]: row[1] for row in openpyxl.load_workbook(workbook)["Metadata"].iter_rows(values_only=True)}
+        assert labels["Code"] == production.describe_source(source)
 
 
 class TestCellWeightsFile:

@@ -97,7 +97,7 @@ class TestCopula:
         R = C.build_driver_correlation_matrix([d.force for d in DRIVERS], C.DEFAULT_WITHIN_FORCE_RHO,
                                               C.DEFAULT_FORCE_CORRELATIONS)
         lam = float(np.linalg.eigvalsh(np.asarray(R)).min())
-        assert lam > 0.0
+        assert lam > C.POSITIVE_DEFINITE_FLOOR
         assert lam == pytest.approx(record["correlation_lambda_min"], abs=1e-6)
 
     def test_the_default_configuration_validates(self):

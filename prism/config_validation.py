@@ -7,13 +7,13 @@ unit-diagonal, positive definite force correlation matrix.
 ``validate_run_size`` checks the iterations and chains.
 ``correlation_lambda_min`` adds the check that only the loaded driver mix can
 answer: whether the driver-level correlation matrix built from the settings
-is positive definite (its smallest eigenvalue above zero), so the engine
-never has to weaken the configured correlations to repair it.
+is positive definite (its smallest eigenvalue above POSITIVE_DEFINITE_FLOOR),
+so the engine never has to weaken the configured correlations to repair it.
 """
 import numpy as np
 
-from prism.config import (CATEGORIES, FORCES, REGIONS, RUN_CHAINS_RANGE, RUN_ITERATIONS_RANGE, ModelConfig,
-                          build_driver_correlation_matrix)
+from prism.config import (CATEGORIES, FORCES, POSITIVE_DEFINITE_FLOOR, REGIONS, RUN_CHAINS_RANGE,
+                          RUN_ITERATIONS_RANGE, ModelConfig, build_driver_correlation_matrix)
 from prism.numbers import finite_number
 
 SUM_TOLERANCE = 0.01
@@ -55,7 +55,7 @@ def _correlation_problems(matrix: dict) -> list:
     if out:
         return out
     lam_min = float(np.linalg.eigvalsh(np.array([[matrix[f][g] for g in FORCES] for f in FORCES])).min())
-    if lam_min <= 0:
+    if lam_min <= POSITIVE_DEFINITE_FLOOR:
         out.append(f"force_correlation_matrix is not positive definite (minimum eigenvalue {lam_min:.4f}); "
                    "lower the cross-force correlations")
     return out
@@ -124,7 +124,7 @@ def correlation_lambda_min(force_correlation_matrix: dict,
                            driver_forces: list) -> float:
     """Minimum eigenvalue of the driver-level correlation matrix for a driver mix.
 
-    A value at or below zero means the settings give no positive definite
+    A value at or below POSITIVE_DEFINITE_FLOOR means the settings give no positive definite
     correlation matrix for these drivers; the engine would then have to shrink
     every correlation to repair it, so the configured dependence would not be
     the one simulated.

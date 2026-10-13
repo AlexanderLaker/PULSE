@@ -22,7 +22,8 @@ from prism import attribution, engine, readings
 from prism.config import (BASE_YEAR, BETA_PRIOR_FLOOR, CATEGORIES, DEFAULT_CELL_WEIGHTS, DEFAULT_FORCE_CORRELATIONS,
                           DEFAULT_FORCE_OVERLAP_MATRIX, DEFAULT_FORCE_WEIGHTS, DEFAULT_PATH_YEARS,
                           DEFAULT_PER_FORCE_ATTENUATION, DEFAULT_WITHIN_FORCE_OVERLAP, DEFAULT_WITHIN_FORCE_RHO,
-                          FORCES, PRODUCTION_CHAINS, PRODUCTION_ITERATIONS, PRODUCTION_SEED, REGIONS,
+                          FORCES, POSITIVE_DEFINITE_FLOOR, PRODUCTION_CHAINS, PRODUCTION_ITERATIONS,
+                          PRODUCTION_SEED, REGIONS,
                           RUN_CHAINS_RANGE, RUN_ITERATIONS_RANGE, UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER,
                           VALID_DIFFUSION_CURVES, ModelConfig, beta_prior_for, cell_weight_marginals,
                           compute_materialization_schedule)
@@ -199,7 +200,8 @@ def test_the_probability_draw():
     clip = engine.UNIFORM_CLIP
     assert_quotes("docs/MODEL.md",
                   f"alpha = max({BETA_PRIOR_FLOOR:g}, kappa x p / 6) beta = max({BETA_PRIOR_FLOOR:g}, kappa - alpha)",
-                  f"clipped to [{sci(clip)}, 1 - {sci(clip)}]")
+                  f"clipped to [{sci(clip)}, 1 - {sci(clip)}]",
+                  f"smallest eigenvalue lies above {sci(POSITIVE_DEFINITE_FLOOR)} (`POSITIVE_DEFINITE_FLOOR`)")
 
 
 def test_the_diffusion_curves():

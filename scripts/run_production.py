@@ -66,8 +66,8 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 import prism.env_loader  # noqa: E402,F401  (loads .env before prism.database reads the URL)
-from prism.config import (CATEGORIES, ESTIMATE_SOURCE_PREFIX, PRODUCTION_CHAINS, PRODUCTION_ITERATIONS,  # noqa: E402
-                          PRODUCTION_SEED, REGIONS, ModelConfig, cell_weight_marginals)
+from prism.config import (CATEGORIES, ESTIMATE_SOURCE_PREFIX, POSITIVE_DEFINITE_FLOOR, PRODUCTION_CHAINS,  # noqa: E402
+                          PRODUCTION_ITERATIONS, PRODUCTION_SEED, REGIONS, ModelConfig, cell_weight_marginals)
 from prism.config_validation import correlation_lambda_min, validate_model_config, validate_run_size  # noqa: E402
 from prism.database import (POSTGRES_URL, USE_POSTGRES, MigrationPendingError, describe_error,  # noqa: E402
                             init_db, insert_drivers, load_drivers, load_latest_run, save_simulation_run)
@@ -127,13 +127,17 @@ def load_cell_weights_file(path: Path) -> tuple:
 def source_state() -> dict:
     """The commit the code comes from and whether tracked files differ from it.
 
-    Both are None when git or the repository's history is not available (an
-    exported copy of the tree), so a run never fails for want of them.
+    Both are None when git or the repository's own history is not available:
+    an exported copy of the tree, also one that sits inside another git work
+    tree, whose commit would not be this code's. A run never fails for want
+    of them.
     """
     def git(*args: str) -> str:
         return subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True, check=True,
                               timeout=30).stdout
     try:
+        if Path(git("rev-parse", "--show-toplevel").strip()).resolve() != REPO.resolve():
+            return {"commit": None, "dirty": None}
         commit = git("rev-parse", "HEAD").strip()
         dirty = bool(git("status", "--porcelain", "--untracked-files=no").strip())
     except (OSError, subprocess.SubprocessError):
@@ -218,9 +222,9 @@ def main(argv: list[str] | None = None) -> int:
     where = f"PostgreSQL at {urlparse(POSTGRES_URL).hostname}" if USE_POSTGRES else "the local SQLite file (test run)"
     log.info("PRISM production run, engine %s, %d x %s iterations, database: %s",
              MonteCarloEngine.MODEL_VERSION, args.chains, f"{args.iterations:,}", where)
-    source = source_state()
-    log.info("Code: %s", describe_source(source))
-    if source["dirty"] and USE_POSTGRES:
+    code_origin = source_state()
+    log.info("Code: %s", describe_source(code_origin))
+    if code_origin["dirty"] and USE_POSTGRES:
         log.warning("The working tree has uncommitted changes: the run records the commit and that it was "
                     "made with changes on top of it.")
 
@@ -276,7 +280,7 @@ def main(argv: list[str] | None = None) -> int:
     lam_min = correlation_lambda_min(config.force_correlation_matrix, config.within_force_rho,
                                      [d.force for d in drivers])
     log.info("Copula correlations on these %d drivers: minimum eigenvalue %+.4f", len(drivers), lam_min)
-    if lam_min <= 0 and not args.allow_nonpsd:
+    if lam_min <= POSITIVE_DEFINITE_FLOOR and not args.allow_nonpsd:
         log.error("The correlation matrix is not positive definite on this driver mix. The engine would "
                   "have to repair it, so the correlations it uses would differ from the configured ones. "
                   "Lower the cross-force correlations in prism/config.py, or pass --allow-nonpsd.")
@@ -302,7 +306,7 @@ def main(argv: list[str] | None = None) -> int:
     run_id = None
     try:
         run_id = save_simulation_run(args.iterations,
-                                     results_bundle(result, config, len(drivers), fingerprint, source))
+                                     results_bundle(result, config, len(drivers), fingerprint, code_origin))
         log.info("Persisted as simulation run %s", run_id)
     except Exception as e:  # noqa: BLE001 (reported with exit code 3 after the workbook)
         log.error("PERSIST FAILED: %s", e)
@@ -311,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
     workbook = RUNS_DIR / f"prism_run_{run_id or 'unsaved'}_{datetime.now():%Y%m%d_%H%M}.xlsx"
     try:
         write_workbook(str(workbook), result, config, run_id=run_id, driver_count=len(drivers),
-                       source=describe_source(source))
+                       source=describe_source(code_origin))
         log.info("QA workbook: %s", workbook)
     except Exception as e:  # noqa: BLE001 (the workbook is a by-product)
         log.warning("QA workbook not written: %s", e)

@@ -26,7 +26,7 @@ import scipy as _scipy
 from scipy.linalg import cholesky
 from scipy.stats import beta as _beta_dist, norm as _norm_dist
 
-from prism.config import (BASE_YEAR, CATEGORIES, FORCES, REGIONS, VC_STAGES, ModelConfig,
+from prism.config import (BASE_YEAR, CATEGORIES, FORCES, REGIONS, VC_STAGES, ModelConfig, POSITIVE_DEFINITE_FLOOR,
                           build_driver_correlation_matrix, compute_materialization_schedule, peak_jitter_for)
 from prism.drivers import DriverSet, InvalidDriversError, simulation_problems
 
@@ -269,10 +269,10 @@ class MonteCarloEngine:
         eigvals = np.linalg.eigvalsh(R)
         # The same test as the production run's gate and the configuration
         # check (prism/config_validation.py): positive definite means a
-        # smallest eigenvalue above zero. The shift lifts it to at least 0.01
-        # and the renormalisation restores the unit diagonal, so the Cholesky
-        # factor below always exists.
-        if eigvals.min() <= 0:
+        # smallest eigenvalue above POSITIVE_DEFINITE_FLOOR. The shift lifts it
+        # to at least 0.01 and the renormalisation restores the unit diagonal,
+        # so the Cholesky factor below exists.
+        if eigvals.min() <= POSITIVE_DEFINITE_FLOOR:
             self._integrity_events.append({
                 "type": "correlation_pd_repair",
                 "severity": "warning",

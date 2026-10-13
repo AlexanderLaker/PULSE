@@ -78,11 +78,14 @@ same force and the force-pair value otherwise. Then
 Z ~ N(0, R)      U = Phi(Z), clipped to [1e-12, 1 - 1e-12]      p_j = BetaInv(U_j; alpha_j, beta_j)
 ```
 
-The clip is float safety only, so the Beta tails are not cut off. If `R` is
-not positive definite the engine repairs it, which weakens every correlation,
-and records an integrity event. The production run checks `R` on the loaded
-drivers first and refuses to start in that case unless told to go ahead
-(`--allow-nonpsd`).
+The clip is float safety only, so the Beta tails are not cut off. `R` counts
+as positive definite when its smallest eigenvalue lies above 1e-10
+(`POSITIVE_DEFINITE_FLOOR`), not merely above zero: an exactly singular matrix
+computes as a tiny number of either sign, which the Cholesky factorisation
+refuses. If `R` is not positive definite the engine repairs it, which weakens
+every correlation, and records an integrity event. The production run checks
+`R` on the loaded drivers first and refuses to start in that case unless told
+to go ahead (`--allow-nonpsd`).
 
 ### 2. The signed effect
 

@@ -230,6 +230,13 @@ DEFAULT_FORCE_OVERLAP_MATRIX = overlap_correction.FORCE_OVERLAP_MATRIX
 
 DEFAULT_WITHIN_FORCE_RHO = 0.3
 
+#: A correlation matrix counts as positive definite only when its smallest
+#: eigenvalue lies above this floor. An exactly singular matrix computes as a
+#: tiny number of either sign (about 1e-17), which a Cholesky factorisation
+#: may refuse, so "above zero" alone is not a safe test. The configuration
+#: check, the production run's gate and the engine's repair all use it.
+POSITIVE_DEFINITE_FLOOR = 1e-10
+
 # Rows and columns in FORCES order: Consumer, Customer, Technology, Government,
 # Environmental, Competitive.
 _FORCE_CORRELATION_ROWS = (

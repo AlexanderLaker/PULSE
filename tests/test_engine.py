@@ -213,7 +213,8 @@ class TestDriverChecks:
 class TestCorrelationRepair:
     """A run reaches a correlation matrix that is not positive definite only with --allow-nonpsd (the
     production run and the configuration check refuse one otherwise). The engine then repairs it with
-    the same test, a smallest eigenvalue at or below zero, keeps the unit diagonal, and says so."""
+    the same test, a smallest eigenvalue at or below POSITIVE_DEFINITE_FLOOR, keeps the unit diagonal,
+    and says so."""
 
     @staticmethod
     def _config(base, rho, cross=None):
@@ -225,6 +226,9 @@ class TestCorrelationRepair:
     @pytest.mark.parametrize("rho, cross, forces", [
         (1.0, None, ("Consumer", "Consumer")),                          # smallest eigenvalue exactly 0
         (0.0, 0.6, ("Consumer",) * 3 + ("Government",) * 3),           # smallest eigenvalue -0.8
+        # Singular too (two drivers move as one), but the eigenvalue computes as a tiny number that
+        # can come out above zero; a Cholesky factorisation refuses the matrix all the same.
+        (1.0, None, ("Consumer", "Customer", "Customer", "Environmental")),
     ])
     def test_it_is_repaired_and_reported(self, mock_model_config, rho, cross, forces):
         from scipy.linalg import cholesky
@@ -234,6 +238,18 @@ class TestCorrelationRepair:
         assert np.linalg.eigvalsh(R).min() > 0
         cholesky(R, lower=True)
         assert [e["type"] for e in engine._integrity_events] == ["correlation_pd_repair"]
+
+    def test_the_gate_and_the_repair_share_the_floor(self, mock_model_config):
+        """The production run's gate (correlation_lambda_min) sees the singular mix within the floor of
+        zero, whichever way the rounding falls, so it stops the run before the engine would repair."""
+        from prism.config import POSITIVE_DEFINITE_FLOOR
+        from prism.config_validation import correlation_lambda_min
+        config = self._config(mock_model_config, 1.0)
+        forces = ["Consumer", "Customer", "Customer", "Environmental"]
+        lam = correlation_lambda_min(config.force_correlation_matrix, config.within_force_rho, forces)
+        assert abs(lam) <= POSITIVE_DEFINITE_FLOOR
+        assert correlation_lambda_min(mock_model_config.force_correlation_matrix,
+                                      mock_model_config.within_force_rho, forces) > POSITIVE_DEFINITE_FLOOR
 
     def test_a_run_on_a_repaired_matrix_completes_and_records_it(self, mock_model_config):
         drivers = DriverSet(drivers=[_global_driver("a", "Contraction", 0.1, 4),
