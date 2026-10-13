@@ -100,26 +100,38 @@ class TestProductionRun:
         assert production.source_state() == {"commit": None, "dirty": None}
         assert production.describe_source(production.source_state()) == "not a git checkout"
 
-    def test_an_exported_tree_inside_another_repository_records_no_commit(self, production, monkeypatch,
-                                                                          tmp_path):
-        """git, asked from an exported tree that sits inside another work tree, answers with that
-        repository's commit, which is not this code's."""
+    def test_the_commit_is_recorded_only_where_git_tracks_this_code(self, production, monkeypatch, tmp_path):
+        """An exported tree that sits untracked inside another work tree has no commit of its own (git
+        would answer with the other repository's). A larger repository that tracks PRISM in a folder is the
+        code's own history: its commit is recorded, and only that folder counts for uncommitted changes."""
         import shutil
         import subprocess
         if shutil.which("git") is None:
             pytest.skip("git is not installed")
         outer = tmp_path / "outer"
-        (outer / "export").mkdir(parents=True)
+        export = outer / "prism"
+        (export / "scripts").mkdir(parents=True)
+        (export / "scripts" / "run_production.py").write_text("# the run\n", encoding="utf-8")
         (outer / "notes.txt").write_text("outer\n", encoding="utf-8")
-        for args in (["init", "-q"], ["add", "notes.txt"],
-                     ["-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
-                      "commit", "-q", "-m", "outer"]):
-            subprocess.run(["git", *args], cwd=outer, check=True, capture_output=True)
-        monkeypatch.setattr(production, "REPO", outer / "export")
-        assert production.source_state() == {"commit": None, "dirty": None}
-        monkeypatch.setattr(production, "REPO", outer)
+
+        def git(*args):
+            subprocess.run(["git", "-c", "user.name=Test", "-c", "user.email=test@example.com",
+                            "-c", "commit.gpgsign=false", *args], cwd=outer, check=True, capture_output=True)
+
+        git("init", "-q")
+        git("add", "notes.txt")
+        git("commit", "-q", "-m", "outer")
+        monkeypatch.setattr(production, "REPO", export)
+        assert production.source_state() == {"commit": None, "dirty": None}   # untracked inside it
+
+        git("add", "prism")
+        git("commit", "-q", "-m", "prism in a folder")
         state = production.source_state()
         assert len(state["commit"]) == 40 and state["dirty"] is False
+        (outer / "notes.txt").write_text("changed outside the folder\n", encoding="utf-8")
+        assert production.source_state()["dirty"] is False
+        (export / "scripts" / "run_production.py").write_text("# changed\n", encoding="utf-8")
+        assert production.source_state()["dirty"] is True
 
     def test_a_run_is_persisted_with_the_full_contract(self, production, seeded, tmp_path):
         from prism.api.runs import META_KEYS, REQUIRED_KEYS, run_status

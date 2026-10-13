@@ -126,21 +126,22 @@ def load_cell_weights_file(path: Path) -> tuple:
 
 
 def source_state() -> dict:
-    """The commit the code comes from and whether tracked files differ from it.
+    """The commit the code comes from and whether its tracked files differ from it.
 
-    Both are None when git or the repository's own history is not available:
-    an exported copy of the tree, also one that sits inside another git work
-    tree, whose commit would not be this code's. A run never fails for want
-    of them.
+    The commit is the code's only when the repository that git finds tracks
+    this code: PRISM's own repository, or a larger one that holds PRISM in a
+    folder (then only that folder counts for uncommitted changes). An
+    exported copy of the tree, also one that sits untracked inside another
+    work tree, has no commit of its own: both values are then None, and a
+    run never fails for want of them.
     """
     def git(*args: str) -> str:
         return subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True, check=True,
                               timeout=30).stdout
     try:
-        if Path(git("rev-parse", "--show-toplevel").strip()).resolve() != REPO.resolve():
-            return {"commit": None, "dirty": None}
+        git("ls-files", "--error-unmatch", "--", "scripts/run_production.py")   # fails unless tracked here
         commit = git("rev-parse", "HEAD").strip()
-        dirty = bool(git("status", "--porcelain", "--untracked-files=no").strip())
+        dirty = bool(git("status", "--porcelain", "--untracked-files=no", "--", ".").strip())
     except (OSError, subprocess.SubprocessError):
         return {"commit": None, "dirty": None}
     return {"commit": commit, "dirty": dirty}
@@ -228,6 +229,8 @@ def main(argv: list[str] | None = None) -> int:
     if code_origin["dirty"] and USE_POSTGRES:
         log.warning("The working tree has uncommitted changes: the run records the commit and that it was "
                     "made with changes on top of it.")
+    if code_origin["commit"] is None and USE_POSTGRES:
+        log.warning("This tree is not a git checkout of PRISM, so the run records no commit for its code.")
 
     try:
         init_db()
