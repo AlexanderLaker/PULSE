@@ -468,3 +468,8 @@ def test_the_security_and_session_settings():
     code = re.search(r"NEXT_PUBLIC_SIGNUP_CODE \|\| '([^']+)'",
                      source("app/(auth)/sign-up/[[...sign-up]]/page.tsx")).group(1)
     assert_quotes("README.md", f"the page asks for `{code}`")
+
+
+def test_the_database_connection_timeout():
+    from prism.database import CONNECT_TIMEOUT_SECONDS as seconds
+    assert_quotes("docs/ARCHITECTURE.md", f"each of which waits at most {WORDS[seconds]} seconds for the server")

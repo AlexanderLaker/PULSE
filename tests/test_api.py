@@ -266,17 +266,20 @@ class TestHealthAndDiagnostics:
         response = api.get("/api/v1/drivers", headers=bearer())
         assert response.status_code == 503 and "restore it from its backup" in response.json()["detail"]
 
-    def test_an_unreachable_database_is_not_probed_for_a_lost_table(self, api, monkeypatch):
-        """A database out of reach is db_error at once: no second connection, with its own retries, to look
-        for a dropped table."""
+    @pytest.mark.parametrize("failure", ["unreachable", "dropped-mid-query"])
+    def test_only_a_missing_table_is_probed_for_lost_drivers(self, api, monkeypatch, failure):
+        """A database out of reach, or a connection lost in the middle of the query, is db_error at once: no
+        second connection, with its own retries, to look for a dropped table."""
         import prism.database as dbm
         assert api.get("/api/v1/health").json()["status"] == "ok"
 
-        def unreachable():
-            raise dbm.DatabaseUnavailableError("Failed to connect to the database after 3 attempts")
+        def fails():
+            if failure == "unreachable":
+                raise dbm.DatabaseUnavailableError("Failed to connect to the database after 3 attempts")
+            raise RuntimeError("server closed the connection unexpectedly")
 
         probes = []
-        monkeypatch.setattr(dbm, "drivers_stamp", unreachable)
+        monkeypatch.setattr(dbm, "drivers_stamp", fails)
         monkeypatch.setattr(dbm, "drivers_table_lost", lambda: probes.append(1) or False)
         body = api.get("/api/v1/health").json()
         assert body["status"] == "degraded" and body["simulation_reason"] == "db_error"

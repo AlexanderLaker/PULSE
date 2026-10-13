@@ -47,6 +47,11 @@ SCHEMA_MIGRATIONS = ("0001_driver_schema",)
 #: bytes of "prism" as a number), so that instances starting on a new database
 #: at the same moment create it one after the other.
 SCHEMA_LOCK = int.from_bytes(b"prism", "big")
+#: How long one attempt to connect to PostgreSQL waits for the server, in
+#: seconds, unless the URL sets its own connect_timeout. Without it a host
+#: that drops packets would hold each attempt for the operating system's TCP
+#: timeout, minutes, while requests queue behind the API's lock.
+CONNECT_TIMEOUT_SECONDS = 10
 
 
 class MigrationPendingError(RuntimeError):
@@ -130,10 +135,22 @@ def sqlite_path() -> Path:
     return Path(os.environ.get("PRISM_DB_PATH") or Path(__file__).resolve().parents[1] / "data" / "prism.db")
 
 
+def postgres_connect_options(url: str) -> dict:
+    """What every PostgreSQL connection adds to its URL: TLS is required (a
+    local server for tests says sslmode=disable) and an attempt gives up after
+    CONNECT_TIMEOUT_SECONDS, unless the URL sets either itself. The API, the
+    scripts and the migration connect with these."""
+    options: dict = {}
+    if "sslmode=" not in url:
+        options["sslmode"] = "require"
+    if "connect_timeout=" not in url:
+        options["connect_timeout"] = CONNECT_TIMEOUT_SECONDS
+    return options
+
+
 def _connect():
     if USE_POSTGRES:
-        # TLS is required unless the URL says otherwise (a local server for tests).
-        conn = psycopg2.connect(POSTGRES_URL, **({} if "sslmode=" in POSTGRES_URL else {"sslmode": "require"}))
+        conn = psycopg2.connect(POSTGRES_URL, **postgres_connect_options(POSTGRES_URL))
         conn.autocommit = False
         conn.cursor_factory = psycopg2.extras.RealDictCursor
         return conn
@@ -390,6 +407,12 @@ def failure_reason(e: BaseException) -> str:
     if isinstance(e, DriversMissingError):
         return "drivers_missing"
     return "db_error"
+
+
+def is_missing_table(e: BaseException) -> bool:
+    """Whether a database error says that a table does not exist: PostgreSQL's
+    undefined_table (SQLSTATE 42P01) or SQLite's "no such table"."""
+    return getattr(e, "pgcode", None) == "42P01" or "no such table" in str(e).lower()
 
 
 def describe_error(e: BaseException) -> str:

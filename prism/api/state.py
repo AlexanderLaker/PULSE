@@ -55,7 +55,9 @@ def driver_set() -> DriverSet:
         except (database.DatabaseUnavailableError, database.DatabaseNotConfiguredError):
             raise   # the database is out of reach, not missing a table: no second round of retries
         except Exception as e:
-            if database.drivers_table_lost():
+            # Only a missing table can mean lost drivers; any other failure
+            # (a connection dropped mid-query) is reported as it is.
+            if database.is_missing_table(e) and database.drivers_table_lost():
                 raise database.DriversMissingError() from e
             raise
         if stamp[0] == 0:

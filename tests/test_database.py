@@ -491,6 +491,29 @@ class TestRunsJourneyAudit:
         for text in (error, str(refused.value), caplog.text):
             assert not any(secret in text for secret in ("owner", "s3cr", "ep-secret")), text
 
+    def test_a_missing_table_is_told_from_other_failures(self, db):
+        """state.driver_set looks for lost drivers only after an error that names a missing table, on
+        either backend; a connection lost in the middle of a query is not one."""
+        with pytest.raises(Exception) as missing:
+            with db.get_db_connection() as conn:
+                conn.cursor().execute("SELECT 1 FROM no_such_table_here")
+        assert db.is_missing_table(missing.value)
+        assert not db.is_missing_table(RuntimeError("server closed the connection unexpectedly"))
+        assert not db.is_missing_table(db.DatabaseUnavailableError("Failed to connect to the database"))
+
+    @pytest.mark.skipif(not ON_POSTGRES, reason="PostgreSQL connections only")
+    def test_every_postgres_connection_carries_the_options(self, db, monkeypatch):
+        seen = {}
+        connect = db.psycopg2.connect
+
+        def spy(url, **options):
+            seen.update(options)
+            return connect(url, **options)
+        monkeypatch.setattr(db.psycopg2, "connect", spy)
+        with db.get_db_connection():
+            pass
+        assert seen == db.postgres_connect_options(db.POSTGRES_URL) and seen["connect_timeout"] > 0
+
     @pytest.mark.skipif(ON_POSTGRES, reason="the refusal concerns the SQLite fallback")
     def test_on_vercel_without_a_database_url_nothing_falls_back_to_sqlite(self, db, monkeypatch):
         monkeypatch.setenv("VERCEL", "1")
@@ -498,6 +521,20 @@ class TestRunsJourneyAudit:
             db.load_drivers()
         diag = db.diagnose_connection()
         assert diag["reason"] == "no_database" and diag["error"] == "no database URL is set for this deployment"
+
+
+@pytest.mark.parametrize("url, sslmode, timeout", [
+    ("postgresql://u@db.example.org/prism", "require", True),
+    ("postgresql://u@localhost/prism_test?sslmode=disable", None, True),
+    ("postgresql://u@db.example.org/prism?connect_timeout=3", "require", False),
+])
+def test_a_postgres_connection_requires_tls_and_gives_up_in_time(url, sslmode, timeout):
+    """Unless the URL says otherwise: TLS, and an attempt that waits CONNECT_TIMEOUT_SECONDS at most, so a
+    host that drops packets cannot hold the API's requests for minutes."""
+    from prism.database import CONNECT_TIMEOUT_SECONDS, postgres_connect_options
+    expected = {**({"sslmode": sslmode} if sslmode else {}),
+                **({"connect_timeout": CONNECT_TIMEOUT_SECONDS} if timeout else {})}
+    assert postgres_connect_options(url) == expected
 
 
 @pytest.mark.skipif(not POSTGRES_URL or ON_POSTGRES, reason="PRISM_TEST_POSTGRES_URL is not set")

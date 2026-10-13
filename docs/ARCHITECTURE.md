@@ -118,8 +118,8 @@ for the stored version before the next save. While the database cannot be used
 the routes that read or write it answer 503: with the migration to run when
 the schema is older than the code, with the missing setting when no database
 is configured, and with "try again in a moment" when the database cannot be
-reached after three attempts (the details go to the log, never to the
-browser). `/health` and `/diagnostics` answer 200 even then and say what is
+reached after three attempts, each of which waits at most ten seconds for
+the server (the details go to the log, never to the browser). `/health` and `/diagnostics` answer 200 even then and say what is
 wrong (`/health` with status `degraded`, both with the reason). Any other
 database error is logged and answered 500.
 

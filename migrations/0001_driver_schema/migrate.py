@@ -141,7 +141,7 @@ sys.path.insert(0, str(REPO))
 import prism.env_loader  # noqa: E402,F401  (loads .env; shell variables win)
 from prism.config import (BASE_YEAR, CATEGORIES, DEFAULT_PATH_YEARS, REGIONS,  # noqa: E402
                           VALID_DIFFUSION_CURVES, VC_STAGES)
-from prism.database import describe_error, schema  # noqa: E402
+from prism.database import describe_error, postgres_connect_options, schema  # noqa: E402
 from prism.drivers import (CONFIDENCE_LEVELS, SCORE_FIELDS, SOURCE_TIERS,  # noqa: E402
                            SOURCE_URL_PATTERN, Driver, simulation_problems)
 from prism.input_drift import FINGERPRINT_KEYS  # noqa: E402
@@ -353,7 +353,7 @@ class Database:
             # (prism/database.py imports it only for PostgreSQL too).
             import psycopg2
             import psycopg2.extras
-            self.conn = psycopg2.connect(url, **({} if "sslmode=" in url else {"sslmode": "require"}))
+            self.conn = psycopg2.connect(url, **postgres_connect_options(url))
             self.conn.autocommit = False
             self.conn.cursor_factory = psycopg2.extras.RealDictCursor
             self.label = f"postgres-{urlparse(url).hostname}"

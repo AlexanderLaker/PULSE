@@ -375,7 +375,8 @@ def test_the_admin_script_imports():
     assert callable(module.main)
 
 
-def test_the_admin_script_requires_tls_unless_the_url_says_otherwise(monkeypatch, capsys):
+def test_the_admin_script_requires_tls_and_a_timeout_unless_the_url_says_otherwise(monkeypatch, capsys):
+    from prism.database import CONNECT_TIMEOUT_SECONDS as seconds
     module = load_module("scripts/promote_admin.py")
     calls = []
 
@@ -386,7 +387,7 @@ def test_the_admin_script_requires_tls_unless_the_url_says_otherwise(monkeypatch
     for dsn in ("postgresql://user@db.example.org/prism", "postgresql://user@localhost/prism?sslmode=disable"):
         with pytest.raises(RuntimeError):
             module.main(["ana@example.com", "--dsn", dsn])
-    assert calls == [{"sslmode": "require"}, {}]
+    assert calls == [{"sslmode": "require", "connect_timeout": seconds}, {"connect_timeout": seconds}]
 
 
 def test_the_admin_script_names_a_failed_connection_by_its_category_only(capsys):
