@@ -551,12 +551,14 @@ and check the deployment against the list under Deploying.
 PRISM needs four things, which Vercel, Neon and Clerk provide today:
 
 - a Node.js 22 host for the Next.js dashboard;
-- a Python host for the ASGI app `prism.api.app:app`, reachable on the
-  dashboard's origin under `/api/v1`: the browser's reads carry a cookie
-  scoped to that path. The dashboard's admin routes call it on
-  `PRISM_API_ORIGIN` when that is set, else on the same origin. It needs
-  `api/requirements.txt` and an ASGI server such as uvicorn (Vercel brings
-  its own);
+- a Python host for the ASGI app `api.index:app`, the entry point Vercel
+  uses (`uvicorn api.index:app`, started in the repository's root), reachable
+  on the dashboard's origin under `/api/v1`: the browser's reads carry a
+  cookie scoped to that path. The entry point sets up the log as Monitoring
+  describes; `prism.api.app:app` is the same app without that. The
+  dashboard's admin routes call it on `PRISM_API_ORIGIN` when that is set,
+  else on the same origin. It needs `api/requirements.txt` and an ASGI
+  server such as uvicorn (Vercel brings its own);
 - PostgreSQL. The dashboard reaches it through Neon's serverless driver
   (`lib/db.ts`); another PostgreSQL service means replacing that driver;
 - an identity provider. Clerk is used in `lib/roles.ts`, `proxy.ts`,

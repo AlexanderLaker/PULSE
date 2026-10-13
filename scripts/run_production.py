@@ -7,9 +7,11 @@
 The database comes from POSTGRES_URL or DATABASE_URL (the repository's .env
 is loaded; shell variables win). Without one the script refuses to run
 unless --allow-sqlite is passed, which uses the local SQLite file instead
-and seeds it with the driver base when it holds no drivers. On PostgreSQL a
-run is served as soon as it is stored, so only the production size runs
-there unless --allow-test-size is passed (a development database).
+and seeds a new file with the driver base first; a file that stores runs or
+driver edits but no drivers lost them and is refused, as the API refuses
+it. On PostgreSQL a run is served as soon as it is stored, so only the
+production size runs there unless --allow-test-size is passed (a
+development database).
 
 Every run records where its code came from: the commit and whether the
 working tree had uncommitted changes (git's view, tracked files only).
@@ -33,8 +35,10 @@ Exit codes
     0  the run is persisted (the QA workbook is best effort)
     1  no usable database: none configured (and no --allow-sqlite), unreachable,
        or still awaiting a migration (the message names it)
-    2  the PostgreSQL database holds no drivers; also argparse's code for a
-       command line it cannot read
+    2  the database holds no drivers: a new PostgreSQL database gets them when
+       the API first uses it; one that lost them (it stores runs or driver
+       edits) is restored from its backup, or, a local file, deleted to start
+       afresh; also argparse's code for a command line it cannot read
     3  the simulation ran but persisting it failed; the dashboard keeps the previous run
     4  the correlation matrix is not positive definite on this driver mix (--allow-nonpsd overrides)
     5  the run size or the configuration is invalid: --iterations or --chains
@@ -44,8 +48,9 @@ Exit codes
     6  a driver cannot be simulated (prism.drivers.simulation_problems: an
        unknown force, direction, curve or value-chain stage, a missing score, a
        score outside its scale, a peak year not after the onset, a category or
-       region without an exposure score, an exposure on a name outside the
-       taxonomy, a duplicate id); every problem is listed. PRISM stores no such
+       region without an exposure score, exposure 0 in every category or every
+       region, an exposure on a name outside the taxonomy, a duplicate id);
+       every problem is listed. PRISM stores no such
        driver, so this points at a change made to the database outside PRISM;
        a start year or a force corrected there needs its revision raised as
        well, so the service reloads the driver
