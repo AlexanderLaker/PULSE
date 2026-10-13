@@ -116,8 +116,11 @@ class TestRoutes:
             monkeypatch.delenv(name)
 
     def test_the_vercel_entry_point_serves_the_same_app(self):
+        import logging
         module = load_module("api/index.py", "vercel_index")
         assert module.app.title == "PRISM API"
+        # PRISM's own messages from INFO up reach the function's log.
+        assert logging.getLogger("prism").getEffectiveLevel() == logging.INFO
 
     def test_the_api_needs_neither_numpy_nor_scipy(self, api, valid_run):
         """The Vercel function installs api/requirements.txt only, so every route,

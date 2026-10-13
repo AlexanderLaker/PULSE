@@ -59,25 +59,36 @@ export async function getRole(clerkUserId: string): Promise<Role | null> {
 
 /**
  * Add a user, or refresh the email of a known one, and return the role the
- * table holds for them. A new user becomes admin when the table is empty and
- * viewer otherwise; a known user keeps their role. Two sign-ups in the same
- * instant could both see an empty table; the worst case is two admins, which
- * an admin can undo.
+ * table holds for them and whether the row is new (a role granted now, which
+ * the caller writes to the audit log). A new user becomes admin when the
+ * table is empty and viewer otherwise; a known user keeps their role. Two
+ * sign-ups in the same instant could both see an empty table; the worst case
+ * is two admins, which an admin can undo.
  */
-export async function upsertUserRole(clerkUserId: string, email: string): Promise<Role> {
+export async function upsertUserRole(
+  clerkUserId: string, email: string,
+): Promise<{ role: Role; created: boolean }> {
   await ensureUserRolesTable();
   const sql = getSQL();
   const existing = (await sql`SELECT COUNT(*)::int AS n FROM user_roles`) as Array<{ n: number }>;
   const roleIfNew: Role = existing[0].n === 0 ? 'admin' : 'viewer';
-  const rows = (await sql`
+  const inserted = (await sql`
     INSERT INTO user_roles (clerk_user_id, email, role)
     VALUES (${clerkUserId}, ${email.toLowerCase()}, ${roleIfNew})
-    ON CONFLICT (clerk_user_id) DO UPDATE
-      SET email = EXCLUDED.email,
-          updated_at = NOW()
+    ON CONFLICT (clerk_user_id) DO NOTHING
     RETURNING role
   `) as Array<{ role: Role }>;
-  return rows[0].role;
+  if (inserted.length > 0) return { role: inserted[0].role, created: true };
+  const updated = (await sql`
+    UPDATE user_roles
+       SET email = ${email.toLowerCase()}, updated_at = NOW()
+     WHERE clerk_user_id = ${clerkUserId}
+    RETURNING role
+  `) as Array<{ role: Role }>;
+  // Gone between the two statements (the user deleted at that moment): the
+  // caller fails, and Clerk sends the event again.
+  if (updated.length === 0) throw new Error(`the user_roles row of ${clerkUserId} vanished during the update`);
+  return { role: updated[0].role, created: false };
 }
 
 /** Change a user's role. The caller must already have checked that it is an admin. */
@@ -91,11 +102,14 @@ export async function setRole(clerkUserId: string, role: Role): Promise<void> {
   `;
 }
 
-/** Remove a deleted user's row (Clerk webhook). */
-export async function deleteUserRole(clerkUserId: string): Promise<void> {
+/** Remove a deleted user's row (Clerk webhook); the role it held, or null when there was none. */
+export async function deleteUserRole(clerkUserId: string): Promise<Role | null> {
   await ensureUserRolesTable();
   const sql = getSQL();
-  await sql`DELETE FROM user_roles WHERE clerk_user_id = ${clerkUserId}`;
+  const rows = (await sql`
+    DELETE FROM user_roles WHERE clerk_user_id = ${clerkUserId} RETURNING role
+  `) as Array<{ role: Role }>;
+  return rows[0]?.role ?? null;
 }
 
 /** The signed-in user from the Clerk session alone; UnauthorizedError without one. */

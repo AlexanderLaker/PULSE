@@ -3,13 +3,15 @@
  *
  *   - upsertUserRole: the first user becomes admin, everyone after that
  *     viewer, and a known user keeps the role the table holds (an update from
- *     Clerk refreshes the email only). It returns the stored role.
+ *     Clerk refreshes the email only). It returns the stored role and whether
+ *     the row is new, which the webhook writes to the audit log.
+ *   - deleteUserRole returns the role the removed row held.
  *   - The table is created once per server instance, again after a failure,
  *     and a collision with another instance creating it is no failure.
  *
- * The fake database below plays the statement it is sent: an insert adds the
- * row, and on a conflict it applies only the assignments the statement's
- * DO UPDATE SET clause names, as PostgreSQL does.
+ * The fake database below plays the statement it is sent: an insert adds a
+ * row unless the id is known, and an update applies only the assignments its
+ * SET clause names, as PostgreSQL does.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -34,43 +36,65 @@ vi.mock('@/lib/db', () => ({
     }
     if (query.startsWith('SELECT COUNT(*)')) return Promise.resolve([{ n: db.table.size }]);
     if (query.startsWith('INSERT INTO user_roles')) {
+      // ON CONFLICT DO NOTHING: a known id is left as it is and returns no row.
+      if (!query.includes('ON CONFLICT (clerk_user_id) DO NOTHING')) throw new Error(`unexpected insert: ${query}`);
       const [id, email, role] = values as [string, string, string];
-      const existing = db.table.get(id);
-      if (!existing) {
-        db.table.set(id, { email, role });
-      } else {
-        const assignments = query.split(/DO UPDATE SET/i)[1]?.split(/RETURNING/i)[0] ?? '';
-        if (/\bemail\s*=/.test(assignments)) existing.email = email;
-        if (/\brole\s*=/.test(assignments)) existing.role = role;
-      }
-      return Promise.resolve(/RETURNING role/i.test(query) ? [{ role: db.table.get(id)!.role }] : []);
+      if (db.table.has(id)) return Promise.resolve([]);
+      db.table.set(id, { email, role });
+      return Promise.resolve([{ role }]);
+    }
+    if (query.startsWith('UPDATE user_roles SET')) {
+      // Only the assignments the statement names change, as in PostgreSQL.
+      const assignments = query.split(/\bSET\b/i)[1].split(/\bWHERE\b/i)[0];
+      const id = values[values.length - 1] as string;
+      const row = db.table.get(id);
+      if (!row) return Promise.resolve([]);
+      if (/\bemail\s*=/.test(assignments)) row.email = values[0] as string;
+      if (/\brole\s*=/.test(assignments)) row.role = values[0] as string;
+      return Promise.resolve(/RETURNING role/i.test(query) ? [{ role: row.role }] : []);
+    }
+    if (query.startsWith('DELETE FROM user_roles')) {
+      const id = values[0] as string;
+      const row = db.table.get(id);
+      db.table.delete(id);
+      return Promise.resolve(row ? [{ role: row.role }] : []);
     }
     return Promise.resolve([]);
   },
 }));
 vi.mock('@clerk/nextjs/server', () => ({ auth: vi.fn(), currentUser: vi.fn() }));
 
-import { upsertUserRole } from '@/lib/roles';
+import { deleteUserRole, upsertUserRole } from '@/lib/roles';
 
 beforeEach(() => { db.table.clear(); });
 
 describe('upsertUserRole', () => {
   it('makes the first user admin and stores the email in lower case', async () => {
-    await expect(upsertUserRole('user_1', 'First@Example.com')).resolves.toBe('admin');
+    await expect(upsertUserRole('user_1', 'First@Example.com')).resolves.toEqual({ role: 'admin', created: true });
     expect(db.table.get('user_1')).toEqual({ email: 'first@example.com', role: 'admin' });
   });
 
   it('makes a later user viewer', async () => {
     await upsertUserRole('user_1', 'first@example.com');
-    await expect(upsertUserRole('user_2', 'second@example.com')).resolves.toBe('viewer');
+    await expect(upsertUserRole('user_2', 'second@example.com')).resolves.toEqual({ role: 'viewer', created: true });
   });
 
   it('keeps the role of a known user and refreshes the email only', async () => {
     await upsertUserRole('user_1', 'first@example.com');
     await upsertUserRole('user_2', 'second@example.com');
     db.table.get('user_2')!.role = 'admin';   // promoted in Settings
-    await expect(upsertUserRole('user_2', 'New-Address@Example.com')).resolves.toBe('admin');
+    await expect(upsertUserRole('user_2', 'New-Address@Example.com'))
+      .resolves.toEqual({ role: 'admin', created: false });
     expect(db.table.get('user_2')).toEqual({ email: 'new-address@example.com', role: 'admin' });
+  });
+});
+
+describe('deleteUserRole', () => {
+  it('removes the row and returns the role it held, or null for an unknown user', async () => {
+    await upsertUserRole('user_1', 'first@example.com');
+    await expect(deleteUserRole('user_1')).resolves.toBe('admin');
+    expect(db.table.has('user_1')).toBe(false);
+    await expect(deleteUserRole('user_1')).resolves.toBeNull();
   });
 });
 

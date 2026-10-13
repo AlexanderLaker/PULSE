@@ -3,7 +3,8 @@
  *
  * Clerk calls this route when a user is created, updated or deleted, and the
  * role table in PRISM's database follows (lib/roles.ts): the first user ever
- * becomes admin, everyone after that viewer.
+ * becomes admin, everyone after that viewer. A role granted to a new row, and
+ * one removed with a deleted user, go to the audit log (lib/audit.ts).
  *
  * Every request is verified against CLERK_WEBHOOK_SIGNING_SECRET (Svix)
  * before the body is read; without the check anyone could forge a
@@ -15,6 +16,7 @@ import { headers } from 'next/headers';
 import { Webhook } from 'svix';
 import type { WebhookEvent } from '@clerk/nextjs/server';
 import { deleteUserRole, upsertUserRole } from '@/lib/roles';
+import { recordRoleChange } from '@/lib/audit';
 
 // Svix verifies with Node's crypto, and the Neon driver expects Node too.
 export const runtime = 'nodejs';
@@ -78,7 +80,12 @@ export async function POST(req: Request) {
           console.warn(`[clerk-webhook] ${event.type} without email for ${id}`);
           break;
         }
-        const role = await upsertUserRole(id, email);
+        const { role, created } = await upsertUserRole(id, email);
+        if (created) {
+          await recordRoleChange({
+            userId: id, from: null, to: role, via: `via the Clerk webhook (${event.type})`, actor: 'clerk-webhook',
+          });
+        }
         console.log(`[clerk-webhook] ${event.type}: ${id} is ${role}`);
         break;
       }
@@ -86,7 +93,13 @@ export async function POST(req: Request) {
       case 'user.deleted': {
         const { id } = event.data;
         if (id) {
-          await deleteUserRole(id);
+          const removed = await deleteUserRole(id);
+          if (removed) {
+            await recordRoleChange({
+              userId: id, from: removed, to: null, via: 'via the Clerk webhook (user.deleted)',
+              actor: 'clerk-webhook',
+            });
+          }
           console.log(`[clerk-webhook] user.deleted: ${id}`);
         }
         break;
