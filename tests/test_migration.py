@@ -1051,6 +1051,29 @@ class TestShippedEditFiles:
             assert sha(e["text"]) not in e["previous_sha256"], (key, e["field"])
         assert len({(e.get("tile") or e["stage"], e["field"]) for e in edits}) == len(edits)
 
+    def test_no_text_a_release_shipped_is_left_behind(self):
+        """Every tile name, driver note, read and stage label shipped since release 2.11.0 (by its deployment
+        and the two of 2.12.0; shipped_journey_sha256.json holds their SHA-256 prefixes) is the text the
+        dashboard ships, or journey_edits.json carries it there: a text changed in data/consumerJourney.ts
+        without an entry would stay in a migrated database."""
+        shipped = json.loads((MIGRATION_DIR / "shipped_journey_sha256.json").read_text(encoding="utf-8"))
+        edits = {(e.get("tile") or e["stage"], e["field"]): e for e in json.loads(
+            (MIGRATION_DIR / "journey_edits.json").read_text(encoding="utf-8"))["edits"]}
+        journeys = bundled_journey().values()
+        items = {s["id"]: s for journey in journeys for s in journey}
+        items.update({t["id"]: t for journey in journeys for stage in journey
+                      for side in ("benefiting", "negativelyImpacted") for t in stage.get(side, [])})
+        width = shipped["prefix_length"]
+        assert len(shipped["texts"]) == len(items) == 321
+        left_behind = []
+        for item_id, fields in shipped["texts"].items():
+            assert item_id in items, item_id
+            for field, prefixes in fields.items():
+                carried = {sha(items[item_id][field])[:width]}
+                carried |= {h[:width] for h in edits.get((item_id, field), {}).get("previous_sha256", [])}
+                left_behind += [f"{item_id}.{field}" for prefix in prefixes if prefix not in carried]
+        assert left_behind == []
+
     def test_the_shipped_tiles_write_their_paragraph_breaks_out(self):
         """A Strategist Read separates its paragraphs with a blank line, never with
         an escaped one; the stored copy follows through journey_edits.json."""

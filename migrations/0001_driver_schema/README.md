@@ -309,7 +309,11 @@ them. The new text becomes the `text` of the entry in `descriptions.json`
 and the SHA-256 of the text it replaces joins the entry's `previous_sha256`.
 `tests/test_migration.py` checks that every entry ends on the text the code
 ships: a description on the driver base's, a journey text on
-`data/consumerJourney.ts`.
+`data/consumerJourney.ts`. It also checks, against the SHA-256 prefixes in
+`shipped_journey_sha256.json`, that every journey text shipped since release
+2.11.0 (by its deployment and the two of 2.12.0) is either the current text
+or carried there by an entry, so a text changed without an entry fails the
+suite.
 
 ## Retiring this migration
 
@@ -347,6 +351,7 @@ commit that has this folder, then by the migrations after it.
 | `migrate.py` | the migration |
 | `descriptions.json` | the current driver descriptions, each with the SHA-256 of the texts shipped before it since release 2.11.0 |
 | `journey_edits.json` | the current Consumer Journey tile texts and stage labels, each with the SHA-256 of the texts shipped before it since release 2.11.0 |
+| `shipped_journey_sha256.json` | the first 16 hexadecimal digits of the SHA-256 of every tile name, driver note, read and stage label shipped since release 2.11.0, for the check under When a shipped text changes |
 | `previous_names.txt` | the names of the previous schema and code; `tests/test_repository.py` fails when one appears outside this folder and the migration's tests |
 | `archive/` | written by a live run: the dropped rows (git-ignored) |
 
