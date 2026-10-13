@@ -485,9 +485,11 @@ sign-up.
    events `user.created`, `user.updated` and `user.deleted`, and copy its
    signing secret into `CLERK_WEBHOOK_SIGNING_SECRET`. The route rejects any
    request without a valid signature.
-4. Restrict who may sign up, in the Clerk dashboard: the Restricted sign-up
-   mode (users join by invitation) or an allowlist of email addresses or
-   domains. The access code the sign-up page asks for
+4. Restrict who may sign up, in the Clerk dashboard (Access mode): the
+   Invite-only sign-up mode (`restricted` in Clerk's API; users join by
+   invitation) or an allowlist of email addresses or domains, which needs a
+   paid Clerk plan in production. Every signed-in user can read PRISM and
+   propose scores. The access code the sign-up page asks for
    (`NEXT_PUBLIC_SIGNUP_CODE`) is fixed at build time and readable in the
    browser, so it only keeps casual visitors out.
 5. Deploy, sign up, and check that `user_roles` holds your row with the
