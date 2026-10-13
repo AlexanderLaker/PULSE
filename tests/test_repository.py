@@ -159,7 +159,8 @@ def test_the_deployment_leaves_out_exactly_what_it_does_not_run(tmp_path):
     left_out = ("tests/", "docs/", "migrations/", "scripts/", "data/drivers/", "data/parameters/")
     assert ignored(tracked) == {p for p in tracked if p.startswith(left_out)} | {".env.example"}
     secrets_and_outputs = [".env", ".env.production.local", "data/prism.db", "runs/prism_run_1.xlsx",
-                           "_NOT_FOR_HANDOVER/notes.md", "prism/__pycache__/config.cpython-312.pyc"]
+                           "prism_20261015.dump", "_NOT_FOR_HANDOVER/notes.md",
+                           "prism/__pycache__/config.cpython-312.pyc"]
     assert ignored(secrets_and_outputs) == set(secrets_and_outputs)
 
 
@@ -330,9 +331,11 @@ def test_the_image_optimiser_stays_off():
     """The dashboard uses no next/image, so the optimiser's endpoint stays switched off."""
     assert re.search(r"^\s*images:\s*\{\s*unoptimized:\s*true\s*\},", (REPO / "next.config.js").read_text(
         encoding="utf-8"), re.M)
-    uses = [p for p in (REPO / "app").rglob("*.tsx") if "next/image" in p.read_text(encoding="utf-8")]
-    uses += [p for p in (REPO / "components").rglob("*.tsx") if "next/image" in p.read_text(encoding="utf-8")]
-    assert uses == []
+    sources = [path for folder in ("app", "components", "hooks", "lib", "types")
+               for pattern in ("*.ts", "*.tsx") for path in (REPO / folder).rglob(pattern)]
+    sources += [REPO / "proxy.ts"]
+    assert [path.relative_to(REPO).as_posix() for path in sources
+            if "next/image" in path.read_text(encoding="utf-8")] == []
 
 
 def test_every_response_carries_the_security_headers():

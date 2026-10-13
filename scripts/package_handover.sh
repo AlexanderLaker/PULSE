@@ -38,8 +38,8 @@ while IFS= read -r path; do
 done < <(find "$STAGE" -name '.env*' ! -path "$STAGE/.env.example")
 # Local state: at the root, Clerk's folder and the local working folders (a
 # leading underscore); anywhere in the tree, the folders .gitignore keeps out
-# at every depth (run outputs and migration archives), database files and
-# workbooks, which can hold confidential figures.
+# at every depth (run outputs and migration archives), database files, dumps
+# and workbooks, which can hold confidential figures or personal data.
 for path in "$STAGE"/.clerk "$STAGE"/_*; do
   [ -e "$path" ] || continue
   echo "Forbidden path in the archive: ${path#"$STAGE"/}" >&2
@@ -53,7 +53,7 @@ while IFS= read -r path; do
   echo "Forbidden file in the archive: ${path#"$STAGE"/}" >&2
   fail=1
 done < <(find "$STAGE" -type f \( -name '*.db' -o -name '*.db-*' -o -name '*.sqlite' -o -name '*.sqlite3' \
-                                  -o -name '*.xlsx' \))
+                                  -o -name '*.dump' -o -name '*.xlsx' \))
 # A Clerk secret key or webhook secret, a value assigned to one of PRISM's
 # secrets (the token secret, the bootstrap secret), or a connection string
 # with a password. The test database on localhost (CI and docs/OPERATIONS.md)
@@ -68,7 +68,7 @@ if [ -n "$hits" ]; then
   fail=1
 fi
 [ "$fail" -ne 0 ] && exit 1
-echo "Safety check passed: no secrets, no local databases or workbooks, no run outputs"
+echo "Safety check passed: no secrets, no local databases, dumps or workbooks, no run outputs"
 
 (
   cd "$STAGE"

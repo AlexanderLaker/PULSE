@@ -24,10 +24,11 @@ __pycache__/
 *.db-shm
 
 # Outputs that can hold confidential figures or personal data: production run
-# workbooks, and the archives the migrations write
+# workbooks, the archives the migrations write, and database dumps
 runs/
 *.xlsx
 archive/
+*.dump
 
 # Handover package (scripts/package_handover.sh)
 PRISM_HANDOVER_*.zip

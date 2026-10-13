@@ -11,6 +11,7 @@ __pycache__
 *.pyc
 *.db
 *.xlsx
+*.dump
 /runs/
 /tests/
 /docs/
