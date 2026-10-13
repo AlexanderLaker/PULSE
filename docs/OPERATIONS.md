@@ -301,9 +301,10 @@ Push to `main`: Vercel builds the dashboard and the Python function and
 promotes the build to production in about two minutes, whether or not CI has
 passed on that commit. To hold a build until it has, add the CI checks
 `dashboard` and `python` under Deployment Checks in the project settings
-(Build and Deployment): Vercel then promotes it once both pass, and Force
-Promote overrides that in an emergency. Other branches get preview
-deployments. The environment variables live in the Vercel project settings
+(Build and Deployment, Add Checks, GitHub): Vercel then promotes it once both
+pass, and Force Promote overrides that in an emergency. If Vercel does not
+offer the two checks yet, let CI run on GitHub first, on a pull request for
+example. Other branches get preview deployments. The environment variables live in the Vercel project settings
 (Production and Preview). Vercel applies a change to any of them only to
 deployments made after it, so redeploy after every change (Deployments, the
 latest deployment, Redeploy); `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and

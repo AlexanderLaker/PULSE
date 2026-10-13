@@ -80,6 +80,12 @@ at production, every script in the checkout writes there: run the commands
 of this runbook only, not the development ones of README.md (a run with
 `--allow-test-size` would be stored in production and served at once).
 
+CI must have passed on that commit on GitHub before the day: push the
+release's branch and open a pull request into `main` without merging it. CI
+runs both jobs on the commit, Vercel builds a preview deployment of it with
+the Preview settings, and the project's Deployment Checks can then be set
+before step 4 (docs/OPERATIONS.md, Deploying).
+
 Ask the admins and experts not to edit from step 1 until step 6: an edit made
 after the backup of step 1 would be lost if you roll back to it. Set a limit
 for steps 4 to 6 before you start, half an hour for example: if step 6 has
