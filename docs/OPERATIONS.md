@@ -415,12 +415,13 @@ Nothing in PRISM raises an alarm by itself. Set up two checks:
   the status code alone stays green;
 - Vercel's notification of a failed deployment (Settings, Notifications).
 
-The API writes its messages to the function's log, each with its level and
-source (`api/index.py` sets this up): from INFO up for PRISM's own (a new
-database seeded, a failed database connection, a run that cannot be read),
-from WARNING up for the libraries'. In Vercel they are under the project's
-Logs, the function `api/index.py`. Vercel keeps runtime logs for a limited
-time that depends on the plan; a log drain keeps them longer.
+PRISM's own messages reach the function's log from INFO up (a new database
+seeded, a failed database connection, a run that cannot be read; `api/index.py`
+sets the level). Vercel's runtime formats the lines; on a host that sets up no
+logging, `api/index.py` gives each its level and source and lets the
+libraries' messages through from WARNING up. In Vercel they are under the
+project's Logs, the function `api/index.py`. Vercel keeps runtime logs for a
+limited time that depends on the plan; a log drain keeps them longer.
 
 ## Credentials
 

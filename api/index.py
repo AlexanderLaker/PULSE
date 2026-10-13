@@ -9,9 +9,11 @@ from pathlib import Path
 # Vercel loads this file from api/; the package lives at the repository root.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# The function's log (Vercel's runtime logs) gets PRISM's own messages from
-# INFO up and everything else from WARNING up, each with its level and source;
-# without this, only warnings would reach it, as bare text.
+# PRISM's own messages reach the function's log from INFO up (a new database
+# seeded, a failed connection). Vercel's Python runtime sets up the log
+# handler before it loads this module, and basicConfig then leaves it alone;
+# a host that sets up none gets lines with their level and source, and the
+# libraries' messages from WARNING up.
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 logging.getLogger("prism").setLevel(logging.INFO)
 
