@@ -15,7 +15,9 @@
  *   4. Render checks on the entry gate and the Drivers page: the labels are
  *      there and no readable text or accessible attribute says trend.
  *   5. The journey content describes the model as it is: it names the drivers
- *      behind a moment and never lists what the model leaves out.
+ *      behind a moment and may state what a driver covers or what is not
+ *      modelled, in the present tense, but it never narrates how the model
+ *      got there and never names an author.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
@@ -156,14 +158,60 @@ describe('British spelling', () => {
 });
 
 describe('the journey content', () => {
-  // The content names the drivers behind each moment and never lists what the
-  // model leaves out; the dialog of a tile without a driver says none is linked.
-  const LEFT_OUT = /\bnot (?:a )?modell?ed\b|\bunmodell?ed\b|\bstrategist['’]s (?:read|view)\b|\bleft the model\b|\bno longer modell?ed\b/i;
-  it('never says what the model leaves out', () => {
+  // The content names the drivers behind each moment and may say, in the
+  // present tense, what a driver covers or what is not modelled ("K-04 is
+  // modelled for hair only", "no modelled driver covers X"). It never narrates
+  // the model's history (a review, a driver that left, a version, a re-basing)
+  // and never names an author: every tile is the strategist's. The dialog of a
+  // tile without a driver says none is linked.
+  const HISTORY_OR_AUTHOR = [
+    /\bleft the (?:modell?ed )?(?:model|base)\b/i,
+    /\bsince the [\w ]*review\b/i,
+    /\b(?:January|February|March|April|May|June|July|August|September|October|November|December) \d{4} review\b/i,
+    /\bno longer (?:a )?modell?ed\b/i,
+    /\bonce cited\b/i,
+    /\bthe old [\w-]+(?: [\w-]+)? driver/i,
+    /\bwatch list\b/i,
+    /\bre-based\b/i,
+    /\bin v\d+\.\d+\b/i,
+    /\(Entries? \d/,
+    /\bstrategist(?:['’]s (?:read|view)| reads?\b)/i,
+  ];
+  const narratesHistoryOrNamesAuthor = (text: string): boolean => HISTORY_OR_AUTHOR.some((rx) => rx.test(text));
+
+  it('never narrates history or names an author', () => {
     const hits = readableStrings(path.join(REPO, 'data', 'consumerJourney.ts'))
-      .filter((r) => LEFT_OUT.test(r.text))
+      .filter((r) => narratesHistoryOrNamesAuthor(r.text))
       .map((r) => `${r.where} ${JSON.stringify(r.text.slice(0, 100))}`);
     expect(hits).toEqual([]);
+  });
+
+  it('the check finds history and authorship and spares present-tense scope facts', () => {
+    const history = [
+      'No modelled driver since the September 2026 review (C-15 left the base)',
+      'the neuro-scent driver left the model in the September 2026 review (watch list)',
+      'conscious consumption left the modelled base',
+      'the social-commerce driver once cited here',
+      'the old personalisation driver\'s diagnostics point',
+      'no longer a modelled driver',
+      'Re-based June 2026 and again September 2026',
+      'split out from generic premiumisation in v3.3',
+      'multi-step routine architecture (Entries 7, 8)',
+      'social commerce is the strategist\'s read',
+      'read here as the strategist\'s view',
+      'which the strategist reads as durable sentiment',
+    ];
+    const scope = [
+      'G-02 EU microplastics restriction (the EU PFAS restriction is modelled for cosmetics only, G-03)',
+      'K-04 is modelled for hair only',
+      'social commerce is not a modelled laundry driver',
+      'No modelled driver covers cleaning fluency.',
+      'this restraint is not modelled (C-04 covers only clinical-efficacy premiumisation)',
+      'the between-wash occasion is unmodelled',
+      'the consumer no longer chooses; the platform does',
+    ];
+    expect(history.filter((t) => !narratesHistoryOrNamesAuthor(t))).toEqual([]);
+    expect(scope.filter((t) => narratesHistoryOrNamesAuthor(t))).toEqual([]);
   });
 });
 
