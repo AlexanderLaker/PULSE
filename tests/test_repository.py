@@ -23,6 +23,7 @@
   (requirements-dev.in, api/requirements.in) has an exact version in its
   compiled file, inside the range.
 - `next dev` leaves the tracked files alone (Next.js's agent rules are off).
+- Every response carries the security headers of vercel.json.
 """
 import ast
 import json
@@ -300,3 +301,19 @@ def test_next_dev_leaves_the_tracked_files_alone():
     """Next.js writes agent rules into CLAUDE.md on `next dev` unless told not to."""
     assert re.search(r"^\s*agentRules:\s*false,", (REPO / "next.config.js").read_text(encoding="utf-8"), re.M)
 
+
+def test_every_response_carries_the_security_headers():
+    """vercel.json sets them on every path, the API's included: no page may be framed, no response is
+    sniffed, the referrer leaves as the origin only, and search engines are asked not to index."""
+    config = json.loads((REPO / "vercel.json").read_text(encoding="utf-8"))
+    rules = [rule for rule in config.get("headers", []) if rule["source"] == "/(.*)"]
+    assert len(rules) == 1
+    headers = {h["key"]: h["value"] for h in rules[0]["headers"]}
+    assert headers == {
+        "Content-Security-Policy": "frame-ancestors 'none'",
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+        "X-Robots-Tag": "noindex, nofollow",
+    }

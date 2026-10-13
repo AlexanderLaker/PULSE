@@ -15,6 +15,7 @@ repository's .env is loaded first, so the database URL there applies.
 """
 import prism.env_loader  # noqa: F401  (before prism.database reads the database URL)
 import logging
+import os
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -27,12 +28,19 @@ logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
+    # The interactive documentation (/docs, /redoc, /openapi.json) is for local
+    # development; on Vercel it is switched off, so no deployment describes the
+    # API to whoever asks.
+    docs = not os.environ.get("VERCEL")
     app = FastAPI(
         title="PRISM API",
         version=__version__,
         description="The persisted PRISM run, the drivers with their expert proposals, the model configuration "
                     "and the Consumer Journey content; admin edits of the drivers and the journey arrive through "
                     "the dashboard's server routes.",
+        docs_url="/docs" if docs else None,
+        redoc_url="/redoc" if docs else None,
+        openapi_url="/openapi.json" if docs else None,
     )
 
     @app.exception_handler(MigrationPendingError)

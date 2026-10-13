@@ -2,16 +2,23 @@
  * POST /api/admin/bootstrap: the first admin, set up with a shared secret. The
  * route does not exist while ADMIN_BOOTSTRAP_SECRET is unset, does not work
  * with a secret under 32 characters, refuses a wrong secret, never creates a
- * user, and writes the promotion to the audit log.
+ * user, refuses once an admin exists, and writes the promotion to the audit
+ * log.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const db = vi.hoisted(() => ({ rows: [] as Array<{ clerk_user_id: string; role: string }>, queries: [] as string[] }));
+const db = vi.hoisted(() => ({
+  rows: [] as Array<{ clerk_user_id: string; role: string }>,
+  admins: [] as unknown[],
+  queries: [] as string[],
+}));
 vi.mock('@/lib/db', () => ({
   getSQL: () => (strings: TemplateStringsArray) => {
     const query = strings.join('?').replace(/\s+/g, ' ').trim();
     db.queries.push(query);
-    return Promise.resolve(query.startsWith('SELECT clerk_user_id') ? db.rows : []);
+    if (query.startsWith('SELECT clerk_user_id')) return Promise.resolve(db.rows);
+    if (query.startsWith("SELECT 1 FROM user_roles WHERE role = 'admin'")) return Promise.resolve(db.admins);
+    return Promise.resolve([]);
   },
 }));
 vi.mock('@/lib/roles', () => ({ ensureUserRolesTable: vi.fn(async () => undefined) }));
@@ -30,6 +37,7 @@ const call = (secret: string | null, body: unknown = { email: 'First.Admin@Examp
 
 beforeEach(() => {
   db.rows = [];
+  db.admins = [];
   db.queries = [];
   process.env.ADMIN_BOOTSTRAP_SECRET = SECRET;
 });
@@ -69,5 +77,15 @@ describe('/api/admin/bootstrap', () => {
     expect(res.status).toBe(200);
     expect(db.queries.some((q) => q.startsWith("UPDATE user_roles SET role = 'admin'"))).toBe(true);
     expect(db.queries.some((q) => q.startsWith('INSERT INTO audit_log'))).toBe(true);
+  });
+
+  it('refuses once an admin exists, and changes nothing', async () => {
+    db.rows = [{ clerk_user_id: 'user_8', role: 'viewer' }];
+    db.admins = [{ '?column?': 1 }];
+    const res = await call(SECRET);
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toContain('An admin exists already');
+    expect(db.queries.some((q) => q.startsWith('UPDATE user_roles'))).toBe(false);
+    expect(db.queries.some((q) => q.startsWith('INSERT INTO audit_log'))).toBe(false);
   });
 });

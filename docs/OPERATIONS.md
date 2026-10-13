@@ -269,7 +269,9 @@ curl -s https://prism-hcb.vercel.app/api/v1/health
 ```
 
 must answer `"status": "ok"` with the driver count and `"has_simulation":
-true`. Then open the dashboard and check that the Shift Analysis shows the
+true`, and `curl -sI https://prism-hcb.vercel.app/` must show the security
+headers of `vercel.json` (`content-security-policy: frame-ancestors 'none'`
+among them). Then open the dashboard and check that the Shift Analysis shows the
 expected run. `/api/v1/diagnostics` explains a problem (see Troubleshooting).
 
 A deploy never needs a restart for data to appear: each API instance checks
@@ -324,9 +326,10 @@ role without an admin session:
   with database access. It can change any role, the last admin's included;
 - `POST /api/admin/bootstrap` with the header `x-bootstrap-secret` equal to
   `ADMIN_BOOTSTRAP_SECRET` and the body `{"email": "..."}` makes the user
-  admin; it never takes a role away. The route exists only while the
-  variable is set, and works only with a secret of at least 32 characters:
-  set it, redeploy, call the route, then remove it and redeploy again.
+  admin while no admin exists (409 otherwise); it never takes a role away.
+  The route exists only while the variable is set, and works only with a
+  secret of at least 32 characters: set it, redeploy, call the route, then
+  remove it and redeploy again.
 
 Both need the user's row in `user_roles`, which the Clerk webhook adds at
 sign-up.

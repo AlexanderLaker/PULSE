@@ -87,6 +87,15 @@ class TestRoutes:
             ("GET", "/api/v1/config"), ("GET", "/api/v1/journey"), ("PUT", "/api/v1/journey"),
         }
 
+    def test_the_interactive_documentation_is_local_only(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "prism.db"))
+        monkeypatch.delenv("VERCEL", raising=False)
+        assert TestClient(create_app()).get("/openapi.json").status_code == 200
+        monkeypatch.setenv("VERCEL", "1")
+        deployed = TestClient(create_app())
+        for path in ("/docs", "/redoc", "/openapi.json"):
+            assert deployed.get(path).status_code == 404, path
+
     def test_the_vercel_entry_point_serves_the_same_app(self):
         module = load_module("api/index.py", "vercel_index")
         assert module.app.title == "PRISM API"

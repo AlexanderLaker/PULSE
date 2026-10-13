@@ -12,6 +12,10 @@
  *   - wrong or missing header: 403
  *   - no user_roles row for the email (the Clerk webhook adds one when a
  *     user signs up; it has not added this user): 404
+ *   - an admin exists already: 409, and nothing changes. Once there is an
+ *     admin, roles are set in Settings (User management) or with
+ *     scripts/promote_admin.py, so a forgotten secret cannot make anyone else
+ *     admin
  *
  * Set the secret in the Vercel project and redeploy (Vercel applies a changed
  * variable to new deployments only), call the route with { "email": "..." },
@@ -100,6 +104,14 @@ export async function POST(req: Request) {
       changed: false,
       note: 'User was already admin',
     });
+  }
+
+  const admins = (await sql`SELECT 1 FROM user_roles WHERE role = 'admin' LIMIT 1`) as unknown[];
+  if (admins.length > 0) {
+    return NextResponse.json(
+      { error: 'An admin exists already: set roles in Settings (User management) or with scripts/promote_admin.py' },
+      { status: 409 },
+    );
   }
 
   await sql`

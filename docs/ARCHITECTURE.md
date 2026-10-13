@@ -186,7 +186,7 @@ The dashboard's server routes (`app/api`):
 | `GET /api/users` | admin | The Clerk users (up to 500, newest first) with their roles, for the user list in Settings |
 | `PATCH /api/users/{userId}/role` | admin | Changes a role (never the caller's own) and writes it to the audit log where possible; a failed audit write does not undo the change. A user the webhook has not added yet gets their row first, with the email Clerk holds (409 while it holds none, as the webhook skips such a user) |
 | `POST /api/webhooks/clerk` | Svix signature | Adds, updates or removes a user's row in `user_roles` |
-| `POST /api/admin/bootstrap` | shared secret | Makes a signed-up user admin; exists only while `ADMIN_BOOTSTRAP_SECRET` is set |
+| `POST /api/admin/bootstrap` | shared secret | Makes a signed-up user admin while no admin exists; exists only while `ADMIN_BOOTSTRAP_SECRET` is set |
 
 ## The dashboard
 
@@ -277,6 +277,11 @@ Vercel builds the Next.js app (`next build`) and the Python function from the
 same repository; pushing to `main` deploys to production. `.vercelignore`
 keeps the tests, scripts, migrations, documentation, the driver base and the
 generated records (`data/drivers/`, `data/parameters/`) out of the
-deployment. The production run, the generators and the migrations run
-on a developer machine with the full Python environment. docs/OPERATIONS.md
-has the procedures.
+deployment. `vercel.json` sets security headers on every response, the
+API's included: no page may be framed (`frame-ancestors 'none'`,
+`X-Frame-Options: DENY`), no response is sniffed for another content type,
+the referrer leaves the site as its origin only, the camera, microphone and
+location are switched off, and search engines are asked not to index. On
+Vercel the API serves no interactive documentation. The production run, the
+generators and the migrations run on a developer machine with the full
+Python environment. docs/OPERATIONS.md has the procedures.
