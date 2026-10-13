@@ -279,6 +279,23 @@ def test_the_tree_passes_the_handover_secret_scan():
     assert re.search(pattern.replace("[[:space:]]", r"\s"), "PRISM_JWT_SECRET=" + "k" * 40)   # the scan is live
 
 
+def test_the_handover_refuses_an_archive_holding_a_dump(tmp_path):
+    """A database dump forced past .gitignore into the tree stops the handover before anything is
+    written: it holds users' emails."""
+    if shutil.which("git") is None or not (REPO / ".git").exists():
+        pytest.skip("not a git checkout")
+    clone = tmp_path / "clone"
+    subprocess.run(["git", "clone", "-q", str(REPO), str(clone)], check=True)
+    (clone / "notes").mkdir()
+    (clone / "notes" / "prism_20261015.dump").write_bytes(b"PGDMP")
+    subprocess.run(["git", "add", "-f", "notes/prism_20261015.dump"], cwd=clone, check=True)
+    subprocess.run(["git", "-c", "user.name=Test", "-c", "user.email=test@example.org", "commit", "-q", "-m",
+                    "a dump"], cwd=clone, check=True)
+    result = subprocess.run(["bash", "scripts/package_handover.sh"], cwd=clone, capture_output=True, text=True)
+    assert result.returncode == 1 and "Forbidden file in the archive: notes/prism_20261015.dump" in result.stderr
+    assert not list(clone.glob("PRISM_HANDOVER_*.zip"))
+
+
 @pytest.mark.parametrize("ranges, pins", [("requirements-dev.in", "requirements-dev.txt"),
                                           ("api/requirements.in", "api/requirements.txt")])
 def test_the_python_dependencies_are_pinned_inside_their_ranges(ranges, pins):
@@ -331,11 +348,11 @@ def test_the_image_optimiser_stays_off():
     """The dashboard uses no next/image, so the optimiser's endpoint stays switched off."""
     assert re.search(r"^\s*images:\s*\{\s*unoptimized:\s*true\s*\},", (REPO / "next.config.js").read_text(
         encoding="utf-8"), re.M)
-    sources = [path for folder in ("app", "components", "hooks", "lib", "types")
+    sources = [path for folder in ("app", "components", "data", "hooks", "lib", "types")
                for pattern in ("*.ts", "*.tsx") for path in (REPO / folder).rglob(pattern)]
     sources += [REPO / "proxy.ts"]
     assert [path.relative_to(REPO).as_posix() for path in sources
-            if "next/image" in path.read_text(encoding="utf-8")] == []
+            if re.search(r"next/(legacy/)?image", path.read_text(encoding="utf-8"))] == []
 
 
 def test_every_response_carries_the_security_headers():
