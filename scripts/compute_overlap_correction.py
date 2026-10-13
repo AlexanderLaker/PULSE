@@ -45,7 +45,7 @@ import numpy as np
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from prism.config import (FORCES, CATEGORIES, build_driver_correlation_matrix,  # noqa: E402
+from prism.config import (FORCES, CATEGORIES, POSITIVE_DEFINITE_FLOOR, build_driver_correlation_matrix,  # noqa: E402
                           DEFAULT_FORCE_CORRELATIONS, DEFAULT_WITHIN_FORCE_RHO)
 from prism.driver_base import base_drivers  # noqa: E402
 
@@ -216,8 +216,9 @@ def compute(out_json: Path = OUT_JSON, verbose: bool = True) -> dict:
     for f in FORCES:
         say(f"  {f:14s} row mean {row_means[f]:.4f}  attenuation {per_force_att[f]:.3f}")
     say(f"\nDriver-weighted mean attenuation: {dw_mean:.4f}")
-    say(f"Copula correlation matrix on the {len(drivers)} drivers: lambda_min = {lambda_min:+.4f} "
-        f"({'positive definite' if lambda_min > 0 else 'NOT positive definite: rescale DEFAULT_FORCE_CORRELATIONS'})")
+    verdict = ("positive definite" if lambda_min > POSITIVE_DEFINITE_FLOOR
+               else "NOT positive definite: rescale DEFAULT_FORCE_CORRELATIONS")
+    say(f"Copula correlation matrix on the {len(drivers)} drivers: lambda_min = {lambda_min:+.4f} ({verdict})")
 
     out = {
         "generated_by": "scripts/compute_overlap_correction.py",

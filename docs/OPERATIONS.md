@@ -114,12 +114,12 @@ tests.
 The generated files each have a check that regenerates them in memory and
 compares:
 
-```bash
-python3 scripts/generate_seed.py --check               # prism/seed_drivers.py, data/driverCodeMap.ts
-python3 scripts/build_cell_weights.py --check          # the cell-weight record, lib/cellWeightProvenance.ts, prism/cell_weight_estimate.py
-python3 scripts/compute_overlap_correction.py --check  # the overlap-correction record, prism/overlap_correction.py
-python3 scripts/build_driver_analysis.py --check       # the attribution record, the PRISM Analysis texts (prism/analysis_texts.py), the parity fixture
-```
+| Command | Files it checks |
+|---|---|
+| `python3 scripts/generate_seed.py --check` | `prism/seed_drivers.py`, `data/driverCodeMap.ts` |
+| `python3 scripts/build_cell_weights.py --check` | the cell-weight record, `lib/cellWeightProvenance.ts`, `prism/cell_weight_estimate.py` |
+| `python3 scripts/compute_overlap_correction.py --check` | the overlap-correction record, `prism/overlap_correction.py` |
+| `python3 scripts/build_driver_analysis.py --check` | the attribution record, the PRISM Analysis texts (`prism/analysis_texts.py`), the parity fixture |
 
 CI (`.github/workflows/ci.yml`) runs two jobs on every push to `main` and on
 every pull request: the dashboard checks and a production build, and the
@@ -204,7 +204,10 @@ A few rules the suite holds:
   vulnerability in the pinned Python packages (`pip-audit`). The remaining npm
   advisories sit in development tools: Tailwind 3, whose fix is the move to
   Tailwind 4, and eslint-config-next, for which npm offers only a downgrade.
-  They ship nothing to the browser (`npm audit --omit=dev` finds none).
+  They ship nothing to the browser (`npm audit --omit=dev` finds none). The CI
+  workflow's actions are pinned to releases written for Node 20, which
+  GitHub's runners now run on Node 24; Dependabot proposes their current major
+  versions.
 
 ## The production run
 
@@ -385,16 +388,19 @@ script that writes to production, and once a night while experts and admins
 are editing (the expert ratings exist nowhere else).
 
 **Restore drill**, at least once a quarter and at every handover: restore the
-newest dump into an empty database and check that it serves the same run.
+newest dump into an empty database (a local one, as below, or an empty Neon
+database) and check that it serves the same run.
 
 ```bash
-createdb prism_restore                        # or an empty Neon database
+createdb prism_restore
 pg_restore --no-owner --no-privileges --dbname postgresql://localhost/prism_restore "prism_<date>.dump"
 POSTGRES_URL='postgresql://localhost/prism_restore?sslmode=disable' \
 DATABASE_URL='postgresql://localhost/prism_restore?sslmode=disable' \
   uvicorn prism.api.app:app --port 8000
-curl -s http://127.0.0.1:8000/api/v1/health    # the same driver_count and latest_run_id as production
 ```
+
+In a second terminal, `curl -s http://127.0.0.1:8000/api/v1/health` must show
+the same `driver_count` and `latest_run_id` as production.
 
 **Restoring production.** Restore the production branch to an earlier point
 in Neon (within the history the plan keeps), or restore a branch from the

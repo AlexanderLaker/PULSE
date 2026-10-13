@@ -12,8 +12,8 @@ docstring; in short:
 - every driver is checked first. The driver schema stores only drivers the
   engine can simulate: a known force, direction, curve, confidence and
   value-chain stage, every score present and on its scale, a peak year after
-  the onset and at least one region with an exposure.
-  While a driver fails a check the migration changes nothing and lists every
+  the onset, and at least one category and one region with an exposure above
+  0. While a driver fails a check the migration changes nothing and lists every
   problem (see step 2 of the runbook). The newest Consumer Journey content is
   checked at the same time (the last point below);
 - the driver tables are created and filled from the previous ones, every row
@@ -79,6 +79,12 @@ Vercel deploys `main` to production (Settings, Git). While that `.env` points
 at production, every script in the checkout writes there: run the commands
 of this runbook only, not the development ones of README.md (a run with
 `--allow-test-size` would be stored in production and served at once).
+
+Ask the admins and experts not to edit from step 1 until step 6: an edit made
+after the backup of step 1 would be lost if you roll back to it. Set a limit
+for steps 4 to 6 before you start, half an hour for example: if step 6 has
+not confirmed the migrated service by then, roll back as Rollback describes
+and try again another day.
 
 0. **Compare the settings.** The Vercel project's environment variables
    (Production) must be the ones README.md's table lists. Delete any that

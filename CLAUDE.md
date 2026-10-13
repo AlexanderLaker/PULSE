@@ -127,14 +127,14 @@ README.md; the documents in `docs/` explain everything below in full.
 
 ## Commands
 
-```bash
-uvicorn prism.api.app:app --reload --port 8000   # the API
-npm run dev                                      # the dashboard
-npm run verify                                   # types, lint, both test suites
-python3 -m pytest -n auto                        # the Python suite
-python3 scripts/generate_seed.py --check         # and the other three generators
-python3 scripts/run_production.py                # the production run (database in .env)
-```
+| Command | What it does |
+|---|---|
+| `uvicorn prism.api.app:app --reload --port 8000` | the API |
+| `npm run dev` | the dashboard |
+| `npm run verify` | types, lint, both test suites |
+| `python3 -m pytest -n auto` | the Python suite |
+| `python3 scripts/generate_seed.py --check` | one of the four generator checks (docs/OPERATIONS.md lists them) |
+| `python3 scripts/run_production.py` | the production run (database in `.env`) |
 
 With `PRISM_TEST_POSTGRES_URL` set, the migration and the database layer are
 also tested on PostgreSQL. The Python suite never touches the database in

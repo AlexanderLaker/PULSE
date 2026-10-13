@@ -48,13 +48,23 @@ API, the engine and both test suites run without either. Never develop
 against the production database.
 
 ```bash
-npm ci                            # installs exactly package-lock.json
+npm ci
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-cp .env.example .env              # fill in the values, see Configuration
+cp .env.example .env
+```
 
-uvicorn prism.api.app:app --reload --port 8000    # the API, first terminal
-npm run dev                                       # the dashboard on :3000, second terminal
+`npm ci` installs exactly what `package-lock.json` pins; fill in `.env` as
+Configuration describes. Then start the API in one terminal:
+
+```bash
+uvicorn prism.api.app:app --reload --port 8000
+```
+
+and the dashboard, on http://localhost:3000, in a second:
+
+```bash
+npm run dev
 ```
 
 The dashboard proxies `/api/v1` to the API (next.config.js). On first use the
@@ -70,12 +80,14 @@ python3 scripts/run_production.py --iterations 2000 --allow-test-size
 
 Everything but the dashboard runs without either. On a fresh clone without a
 `.env` (or with both database URLs blanked in the shell, `POSTGRES_URL=
-DATABASE_URL=`):
+DATABASE_URL=`), these run the Python suite on throwaway SQLite files, the
+full production run on `data/prism.db` (a minute or two) and the API serving
+that run:
 
 ```bash
-python3 -m pytest -n auto                          # the Python suite, on throwaway SQLite files
-python3 scripts/run_production.py --allow-sqlite   # the full production run on data/prism.db, a minute or two
-uvicorn prism.api.app:app --port 8000              # the API, serving that run
+python3 -m pytest -n auto
+python3 scripts/run_production.py --allow-sqlite
+uvicorn prism.api.app:app --port 8000
 ```
 
 The run seeds the file with the driver base, so its results are the
