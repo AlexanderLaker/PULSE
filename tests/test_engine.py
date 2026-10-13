@@ -210,6 +210,46 @@ class TestDriverChecks:
         assert simulation_problems(get_seed_drivers()) == []
 
 
+class TestCorrelationRepair:
+    """A run reaches a correlation matrix that is not positive definite only with --allow-nonpsd (the
+    production run and the configuration check refuse one otherwise). The engine then repairs it with
+    the same test, a smallest eigenvalue at or below zero, keeps the unit diagonal, and says so."""
+
+    @staticmethod
+    def _config(base, rho, cross=None):
+        matrix = base.force_correlation_matrix
+        if cross is not None:
+            matrix = {f: {g: 1.0 if f == g else cross for g in matrix} for f in matrix}
+        return base.copy_with(within_force_rho=rho, force_correlation_matrix=matrix)
+
+    @pytest.mark.parametrize("rho, cross, forces", [
+        (1.0, None, ("Consumer", "Consumer")),                          # smallest eigenvalue exactly 0
+        (0.0, 0.6, ("Consumer",) * 3 + ("Government",) * 3),           # smallest eigenvalue -0.8
+    ])
+    def test_it_is_repaired_and_reported(self, mock_model_config, rho, cross, forces):
+        from scipy.linalg import cholesky
+        engine = MonteCarloEngine(self._config(mock_model_config, rho, cross))
+        R = engine.build_correlation_matrix([Driver(id=f"d{i}", force=f) for i, f in enumerate(forces)])
+        assert np.allclose(np.diag(R), 1.0)
+        assert np.linalg.eigvalsh(R).min() > 0
+        cholesky(R, lower=True)
+        assert [e["type"] for e in engine._integrity_events] == ["correlation_pd_repair"]
+
+    def test_a_run_on_a_repaired_matrix_completes_and_records_it(self, mock_model_config):
+        drivers = DriverSet(drivers=[_global_driver("a", "Contraction", 0.1, 4),
+                                     _global_driver("b", "Contraction", 0.1, 3)])
+        r = MonteCarloEngine(self._config(mock_model_config, 1.0)).run(drivers, iterations=200)
+        assert [e["type"] for e in r["integrity_events"]] == ["correlation_pd_repair"]
+        assert r["shift_matrix"]["Hair: Color"]["path"][2030]["median"] < 0
+
+    def test_a_positive_definite_matrix_is_left_alone(self, mock_model_config):
+        engine = MonteCarloEngine(mock_model_config)
+        forces = ("Consumer", "Consumer", "Government")
+        R = engine.build_correlation_matrix([Driver(id=f"d{i}", force=f) for i, f in enumerate(forces)])
+        assert R[0, 1] == pytest.approx(mock_model_config.within_force_rho)
+        assert engine._integrity_events == []
+
+
 class TestOverlapDampening:
     def test_a_small_tailwind_never_worsens_the_outlook(self, mock_model_config):
         """The within-force dampening uses the magnitude-weighted effective number

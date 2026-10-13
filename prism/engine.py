@@ -267,7 +267,12 @@ class MonteCarloEngine:
             [d.force for d in drivers], self.config.within_force_rho, self.config.force_correlation_matrix,
         )
         eigvals = np.linalg.eigvalsh(R)
-        if eigvals.min() < 0:
+        # The same test as the production run's gate and the configuration
+        # check (prism/config_validation.py): positive definite means a
+        # smallest eigenvalue above zero. The shift lifts it to at least 0.01
+        # and the renormalisation restores the unit diagonal, so the Cholesky
+        # factor below always exists.
+        if eigvals.min() <= 0:
             self._integrity_events.append({
                 "type": "correlation_pd_repair",
                 "severity": "warning",
@@ -291,21 +296,7 @@ class MonteCarloEngine:
         if n_drivers == 0:
             return np.zeros((n_iter, 0))
 
-        try:
-            L = cholesky(R, lower=True)
-        except (np.linalg.LinAlgError, ValueError):
-            self._integrity_events.append({
-                "type": "cholesky_repair",
-                "severity": "warning",
-                "message": "The Cholesky decomposition failed; the correlation matrix was "
-                           "repaired by clipping its eigenvalues at 1e-6.",
-            })
-            logger.warning("Correlation matrix not positive definite; repairing via eigenvalue clipping")
-            eigvals, eigvecs = np.linalg.eigh(R)
-            eigvals = np.maximum(eigvals, 1e-6)
-            R = eigvecs @ np.diag(eigvals) @ eigvecs.T
-            L = cholesky(R, lower=True)
-
+        L = cholesky(R, lower=True)
         Z = self.rng.standard_normal((n_iter, n_drivers))
         Z_correlated = Z @ L.T
         U = _norm_dist.cdf(Z_correlated)

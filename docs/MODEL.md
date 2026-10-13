@@ -133,7 +133,9 @@ x_jcr = (category exposure_jc / 5) x (regional exposure_jr / 5)
 
 Exposure describes the mechanism: where the driver acts and how strongly.
 Whether HCB has business in a cell enters only through the cell weights
-(step 7). A score of 0 means the driver does not act there.
+(step 7). A score of 0 means the driver does not act there, so a driver
+scored 0 in every region, or in every category, acts nowhere and moves
+nothing.
 
 ### 5. The force sum and the within-force overlap
 
@@ -240,7 +242,7 @@ and the dashboard shows the list next to the run.
 | Event | Raised when |
 |---|---|
 | `input_drift` | on every production run after the first: how the drivers' scores changed since the previous run, or that nothing changed; a warning that the two were not compared when the previous run stored no complete driver fingerprint |
-| `correlation_pd_repair`, `cholesky_repair` | the correlation matrix had to be repaired |
+| `correlation_pd_repair` | the correlation matrix was not positive definite and had to be repaired (only with `--allow-nonpsd`) |
 | `compounding_floor` | a compounding factor was floored at -100 percent |
 | `cell_weight_zero_row` | a category has a zero gross-profit share in every region |
 
