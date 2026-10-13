@@ -207,8 +207,8 @@ A few rules the suite holds:
   Tailwind 4, and eslint-config-next, for which npm offers only a downgrade.
   They ship nothing to the browser (`npm audit --omit=dev` finds none). The CI
   workflow's actions are pinned to releases written for Node 20, which
-  GitHub's runners now run on Node 24; Dependabot's monthly pull request
-  proposes their current major versions.
+  GitHub's runners now run on Node 24; once a month Dependabot proposes their
+  current major versions, in one pull request per action.
 
 ## The production run
 
@@ -425,16 +425,17 @@ the same `driver_count` and `latest_run_id` as production.
 
 **Restoring production.** Restore the production branch to an earlier point in
 Neon (within the history the plan keeps), or restore a branch from the backup
-branch of step 1 of a change. From a dump, restore into a new Neon branch or
-project:
+branch of step 1 of a change. From a dump, restore into an empty database,
+such as a new Neon project (a branch of production already holds the tables,
+and a restore into it fails on them):
 
 ```bash
 pg_restore --no-owner --no-privileges --dbname "<its direct connection string>" "prism_<date>.dump"
 ```
 
-Then point both database URLs in the Vercel project (Production) at it and
-redeploy: a deployment keeps the settings it was built with. Ask everyone to
-reload the dashboard afterwards.
+It must end without an error. Then point both database URLs in the Vercel
+project (Production) at it and redeploy: a deployment keeps the settings it was
+built with. Ask everyone to reload the dashboard afterwards.
 
 ## Monitoring
 
@@ -445,7 +446,9 @@ Nothing in PRISM raises an alarm by itself. Set up two checks:
   minutes, alerting the owner and the provider when the answer is not 200 or
   does not contain `"simulation_reason":"ok"`. `/api/v1/health` answers 200
   even when the database fails (with `"status": "degraded"`), so a check on
-  the status code alone stays green;
+  the status code alone stays green. Give the check a timeout of 30 seconds:
+  when the database cannot be reached, the answer can take up to about 15
+  seconds;
 - Vercel's notification of a failed deployment (Settings, Notifications).
 
 PRISM's own messages reach the function's log from INFO up (a new database

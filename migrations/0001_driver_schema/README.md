@@ -148,15 +148,17 @@ as Rollback describes and try again another day.
 
    The dry run also refuses a column of `journey_content` or `audit_log`
    that the driver schema does not know (no release has had one), since only
-   the owner can say whether its values matter. Copy them out and drop the
-   column in production, then take step 1 again and start this step again
+   the owner can say whether its values matter. Copy them out (into this
+   folder's `archive/`, which git ignores) and drop the column in production,
+   then take step 1 again and start this step again
    (a kept table that lacks one of its columns is refused too; every release
    has had them all, so such a database was changed by hand and needs the
    owner's look first):
 
    ```bash
    export PRODUCTION='<the production branch connection string>'
-   psql "$PRODUCTION" -c "\copy (SELECT id, <column> FROM <table>) TO '<table>-<column>.csv' CSV HEADER"
+   mkdir -p migrations/0001_driver_schema/archive
+   psql "$PRODUCTION" -c "\copy (SELECT id, <column> FROM <table>) TO 'migrations/0001_driver_schema/archive/<table>-<column>.csv' CSV HEADER"
    psql "$PRODUCTION" -c "ALTER TABLE <table> DROP COLUMN <column>"
    ```
 
@@ -349,10 +351,18 @@ driver field, a new tile shape):
   migration; the deploy order in docs/OPERATIONS.md (Deploying);
   docs/ARCHITECTURE.md; in docs/DRIVERS.md the step for changed texts and
   the model for a driver migration; the docstrings of `schema` in
-  `prism/database.py` and of `prism/journey.py`; and the 503 message of
-  `MigrationPendingError` in `prism/database.py`, which then names the last
-  commit that has this folder, together with the two tests that look for the
-  folder in it (`tests/test_api.py`, `tests/test_database.py`).
+  `prism/database.py`, of `prism/journey.py` and of
+  `tests/test_repository.py`; and the 503 message of `MigrationPendingError`
+  in `prism/database.py`, which then names the last commit that has this
+  folder, together with the two tests that check that message
+  (`tests/test_api.py`, `tests/test_database.py`);
+- then reword every other sentence that still speaks of the migration as
+  present; this lists them (most say that the API, the scripts and the
+  migration do something):
+
+  ```bash
+  git grep -n -i -E 'migration 0001|0001_driver_schema|the migration|migrate\.py'
+  ```
 
 A database found later on the previous schema is migrated from the last
 commit that has this folder, then by the migrations after it.
