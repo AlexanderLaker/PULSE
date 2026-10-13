@@ -986,7 +986,7 @@ def main(argv: list | None = None) -> int:
         db.rollback()
         print(f"{db.where}: nothing changed; {e}")
         print("Correct drivers and journey content in the previous release's dashboard (after the deploy, "
-              "promote the previous production deployment in Vercel first). For a column the driver schema "
+              "roll back to the previous production deployment in Vercel first). For a column the driver schema "
               "does not know, or one a kept table lacks, see README.md, step 2. Then run the dry run again.")
         return 1
     except Exception as e:  # noqa: BLE001 (rolled back and reported)

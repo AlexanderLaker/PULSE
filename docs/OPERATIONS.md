@@ -332,10 +332,13 @@ the database on every request that reads the drivers or the run, and reloads
 them when the drivers' stamp or the newest run's id has changed. A deploy
 also brings the PRISM Analysis texts, which ship with the code.
 
-**Rollback**: in the Vercel dashboard, promote the previous production
-deployment (Deployments, the deployment, Promote to Production), or revert
-the commit and push. A deploy that came with a database migration is rolled
-back as that migration's runbook says.
+**Rollback**: in the Vercel dashboard, use Instant Rollback (on the project's
+production deployment tile, or in the menu of a deployment under
+Deployments); on the Hobby plan it goes back to the previous production
+deployment only. Vercel then puts no new push live until the rollback is
+undone: Undo Rollback, on the same tile, promotes the deployment you choose.
+The other way is to revert the commit and push. A deploy that came with a
+database migration is rolled back as that migration's runbook says.
 
 ## The database
 
@@ -452,8 +455,8 @@ A new value takes effect with the next deployment.
 1. **See what is wrong.** `/api/v1/health` and `/api/v1/diagnostics` name the
    cause (Troubleshooting below); the Vercel project's Deployments and Logs
    show the latest deploy and the function's errors.
-2. **Restore service first.** A deploy that broke something: promote the
-   previous production deployment (Deploying, Rollback). A run that shows
+2. **Restore service first.** A deploy that broke something: roll back to
+   the previous production deployment (Deploying, Rollback). A run that shows
    wrong numbers: withdraw it (The production run). Lost or damaged data:
    restore (Backups and restore). A credential that may have leaked: rotate
    it (Credentials) and read the audit log for what it was used for.

@@ -235,12 +235,13 @@ as Rollback describes and try again another day.
 
    If it exits with code 1, nothing changed either, and the message says
    why. When it lists drivers or journey content to correct, something was
-   changed after the preview: promote the previous production deployment in
-   Vercel, correct the listed problems in its dashboard as in step 2, take
-   step 1 again and run step 3 again; then promote the release's deployment
-   again (Deployments, the release's deployment, Promote to Production) and
-   run this step again. When it cannot open the database, check the
-   connection string and the network, and run this step again.
+   changed after the preview: roll back to the previous production
+   deployment in Vercel (Instant Rollback; docs/OPERATIONS.md, Deploying),
+   correct the listed problems in its dashboard as in step 2, take step 1
+   again and run step 3 again; then undo the rollback (Undo Rollback,
+   choosing the release's deployment) and run this step again. When it
+   cannot open the database, check the connection string and the network,
+   and run this step again.
 
 6. **Check.** `https://prism-hcb.vercel.app/api/v1/health` answers
    `"status": "ok"` with `"driver_count": 51`, `"has_simulation": true` and
@@ -289,16 +290,20 @@ with the driver base, the first time a request needs the database.
 ## Rollback
 
 - **The migration failed** (exit code 2): nothing changed in the database.
-  Restore service by promoting the previous production deployment in Vercel
-  (Deployments, the previous one, Promote to Production), then look at the
+  Restore service by rolling back to the previous production deployment in
+  Vercel (Instant Rollback; docs/OPERATIONS.md, Deploying), then look at the
   error the script printed.
 - **A problem shows after the migration committed:** go back to the state
-  of step 1. Either restore the production branch from the backup branch in
-  Neon and promote the previous production deployment in Vercel, or point
-  every database URL the Vercel project sets (`POSTGRES_URL` and
-  `DATABASE_URL`; the first wins where both are set) at the backup branch
-  and redeploy the previous release: a deployment keeps the settings it was
-  built with. The archive file of step 5 holds the dropped rows as well.
+  of step 1. Either restore the production branch from the latest backup
+  branch of step 1 in Neon and roll back to the previous production
+  deployment in Vercel, or point every database URL the Vercel project sets
+  (`POSTGRES_URL` and `DATABASE_URL`; the first wins where both are set) at
+  that backup branch and redeploy the previous release: a deployment keeps
+  the settings it was built with. The archive file of step 5 holds the
+  dropped rows as well.
+
+Vercel puts no new push live after a rollback until it is undone (Undo
+Rollback on the project's production deployment tile).
 
 ## When a shipped text changes
 
