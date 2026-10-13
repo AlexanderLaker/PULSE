@@ -207,7 +207,9 @@ texts. After an edit to `driver_base.json`, in this order:
    changed description this step and step 4. A changed name also needs
    `python3 scripts/build_driver_analysis.py` (without `--reference`: the
    attribution record carries each driver's name, the reference run does
-   not depend on it);
+   not depend on it). A changed score, exposure or set of drivers moves the
+   production pin, which runs on the driver base: regenerate it with
+   `python3 tests/golden_production.py --write`;
 4. while migration 0001 has not run on every database, a changed
    description also goes into the migration's `descriptions.json`, which
    carries it to them (its README, "When a shipped text changes"; a changed

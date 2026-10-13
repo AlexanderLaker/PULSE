@@ -1,4 +1,5 @@
-# Continuous integration: the dashboard checks and the Python suite.
+# Continuous integration: the dashboard checks and the Python suite, and, when
+# started by hand, the full production run against the reference run.
 #
 # The Python job installs requirements-dev.txt, the environment the README
 # tells developers to install, and runs the suite against a PostgreSQL service
@@ -9,6 +10,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   dashboard:
@@ -63,3 +65,20 @@ jobs:
       - run: python scripts/build_cell_weights.py --check
       - run: python scripts/compute_overlap_correction.py --check
       - run: python scripts/build_driver_analysis.py --check
+
+  # Started by hand (Actions, ci, Run workflow): the production run at its full
+  # size, checked against the reference run of the PRISM Analysis record.
+  full-run:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest tests/test_reference_run.py -q
+        env:
+          PRISM_FULL_RUN: "1"

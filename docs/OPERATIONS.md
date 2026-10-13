@@ -99,15 +99,26 @@ python3 scripts/build_driver_analysis.py --check       # the attribution record,
 CI (`.github/workflows/ci.yml`) runs two jobs on every push to `main` and on
 every pull request: the dashboard checks and a production build, and the
 Python lint, suite (with a PostgreSQL service) and the four generator checks.
+Started by hand (Actions, ci, Run workflow), it also runs the full production
+run against the reference run.
 The build prerenders pages inside ClerkProvider, which needs a publishable
 key of the right form, so CI sets one that names no real Clerk instance.
 
 A few rules the suite holds:
 
-- **Golden pins** (`tests/test_golden_pipeline.py`) fix the engine's output on
-  a small driver set. They change only with a deliberate change of the model
-  (with a new `MODEL_VERSION`, docs/adr/0014-versioning-and-golden-pins.md) or
-  of those drivers, in the same commit.
+- **Golden pins** fix the engine's output: `tests/test_golden_pipeline.py`
+  on a small driver set, and the production pin (`tests/golden_production.py`,
+  values in `tests/golden_production.json`) on the driver base with the
+  production configuration, seed and three chains at 2,000 iterations. They
+  change only with a deliberate change of the model (with a new
+  `MODEL_VERSION`, docs/adr/0014-versioning-and-golden-pins.md) or of the
+  drivers they run on, in the same commit; `python3 tests/golden_production.py
+  --write` regenerates the production pin.
+- **The full run** at the production size is checked against the reference
+  run of the PRISM Analysis record when asked for, because it takes a few
+  minutes: `PRISM_FULL_RUN=1 python3 -m pytest tests/test_reference_run.py`
+  (CI runs it when started by hand). Run it before a release and after any
+  change to the engine, the configuration or the numpy and scipy versions.
 - **One version**: `prism.__version__`, the engine's `MODEL_VERSION`,
   `package.json` and `package-lock.json` must agree.
 - **Generated files** are never edited by hand.

@@ -13,12 +13,19 @@ the API and the dashboard also need to agree on which model they describe.
 - One version: `prism.__version__`, the engine's `MODEL_VERSION`,
   `package.json` and its lock agree, and a test checks it.
 - A change to any number the model produces is a deliberate model change: a
-  new version and, in the same commit, the golden pins of
-  `tests/test_golden_pipeline.py` regenerated and the PRISM Analysis record
-  rebuilt from a production run of the new code (docs/DRIVER_ANALYSIS.md).
-  That run is made before the commit and the deploy. The pins also move when
-  the fixture drivers they are computed on change; such a commit says so and
+  new version and, in the same commit, the golden pins regenerated and the
+  PRISM Analysis record rebuilt from a production run of the new code
+  (docs/DRIVER_ANALYSIS.md). That run is made before the commit and the
+  deploy. There are two sets of pins: `tests/test_golden_pipeline.py` on five
+  fixture drivers, and the production pin (`tests/golden_production.py`) on
+  the 51 drivers of the driver base with the production configuration, seed
+  and three chains at 2,000 iterations, which catches a change to how the
+  engine draws its numbers that the fixture cannot see. The pins also move
+  when the drivers they are computed on change; such a commit says so and
   keeps the version.
+- Before a release, the full production run at 3 x 50,000 iterations is
+  checked against the reference run of the PRISM Analysis record
+  (`PRISM_FULL_RUN=1`, `tests/test_reference_run.py`).
 - What the dashboard needs of a run is checked in `prism/api/runs.py`: every
   key it reads, every category, region and year, a gross-profit share for
   every cell and category, the run metadata and a complete driver

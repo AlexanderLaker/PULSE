@@ -328,9 +328,10 @@ id order, because the copula pairs draws with drivers by position. Every run
 records its seeds and the scipy and numpy versions it computed with. scipy is
 a hard requirement: the engine refuses to import without it, and there is no
 approximate fallback. `tests/test_golden_pipeline.py` pins the engine's
-output on a fixed set of drivers; the pins change only with a deliberate
-change of the model (together with a new `MODEL_VERSION`) or of those
-drivers, in the same commit.
+output on a fixed set of drivers and `tests/golden_production.py` on the
+driver base with the production configuration; the pins change only with a
+deliberate change of the model (together with a new `MODEL_VERSION`) or of
+those drivers, in the same commit.
 
 ## The reference result
 
