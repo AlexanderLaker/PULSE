@@ -11,14 +11,28 @@ const db = vi.hoisted(() => ({
   rows: [] as Array<{ clerk_user_id: string; role: string }>,
   admins: [] as unknown[],
   queries: [] as string[],
+  transactions: [] as Array<{ isolationLevel?: string }>,
+  /** What the transaction throws instead of committing, as PostgreSQL does for the loser of a race. */
+  conflict: null as null | { code: string },
 }));
 vi.mock('@/lib/db', () => ({
-  getSQL: () => (strings: TemplateStringsArray) => {
-    const query = strings.join('?').replace(/\s+/g, ' ').trim();
-    db.queries.push(query);
-    if (query.startsWith('SELECT clerk_user_id')) return Promise.resolve(db.rows);
-    if (query.startsWith("SELECT 1 FROM user_roles WHERE role = 'admin'")) return Promise.resolve(db.admins);
-    return Promise.resolve([]);
+  getSQL: () => {
+    const sql = (strings: TemplateStringsArray) => {
+      const query = strings.join('?').replace(/\s+/g, ' ').trim();
+      db.queries.push(query);
+      if (query.startsWith('SELECT clerk_user_id')) return Promise.resolve(db.rows);
+      // The conditional promotion: no row changes while an admin exists.
+      if (query.startsWith("UPDATE user_roles SET role = 'admin'")) {
+        return Promise.resolve(db.admins.length > 0 ? [] : [{ clerk_user_id: db.rows[0]?.clerk_user_id }]);
+      }
+      return Promise.resolve([]);
+    };
+    sql.transaction = async (queries: Array<Promise<unknown>>, opts: { isolationLevel?: string }) => {
+      db.transactions.push(opts);
+      if (db.conflict) throw db.conflict;
+      return Promise.all(queries);
+    };
+    return sql;
   },
 }));
 vi.mock('@/lib/roles', () => ({ ensureUserRolesTable: vi.fn(async () => undefined) }));
@@ -39,6 +53,8 @@ beforeEach(() => {
   db.rows = [];
   db.admins = [];
   db.queries = [];
+  db.transactions = [];
+  db.conflict = null;
   process.env.ADMIN_BOOTSTRAP_SECRET = SECRET;
 });
 afterEach(() => { delete process.env.ADMIN_BOOTSTRAP_SECRET; });
@@ -79,13 +95,35 @@ describe('/api/admin/bootstrap', () => {
     expect(db.queries.some((q) => q.startsWith('INSERT INTO audit_log'))).toBe(true);
   });
 
-  it('refuses once an admin exists, and changes nothing', async () => {
+  it('checks for an admin and promotes in one statement of a serializable transaction', async () => {
+    db.rows = [{ clerk_user_id: 'user_7', role: 'viewer' }];
+    await call(SECRET);
+    const [update] = db.queries.filter((q) => q.startsWith('UPDATE user_roles'));
+    expect(update).toContain("AND NOT EXISTS (SELECT 1 FROM user_roles WHERE role = 'admin')");
+    expect(db.transactions).toEqual([{ isolationLevel: 'Serializable' }]);
+    expect(db.queries.some((q) => q.startsWith('SELECT 1 FROM user_roles'))).toBe(false);
+  });
+
+  it('refuses once an admin exists, and writes no audit entry', async () => {
     db.rows = [{ clerk_user_id: 'user_8', role: 'viewer' }];
     db.admins = [{ '?column?': 1 }];
     const res = await call(SECRET);
     expect(res.status).toBe(409);
     expect((await res.json()).error).toContain('An admin exists already');
-    expect(db.queries.some((q) => q.startsWith('UPDATE user_roles'))).toBe(false);
     expect(db.queries.some((q) => q.startsWith('INSERT INTO audit_log'))).toBe(false);
+  });
+
+  it('refuses the loser of two calls at the same moment', async () => {
+    db.rows = [{ clerk_user_id: 'user_9', role: 'viewer' }];
+    db.conflict = { code: '40001' };
+    const res = await call(SECRET);
+    expect(res.status).toBe(409);
+    expect(db.queries.some((q) => q.startsWith('INSERT INTO audit_log'))).toBe(false);
+  });
+
+  it('lets any other database failure through', async () => {
+    db.rows = [{ clerk_user_id: 'user_9', role: 'viewer' }];
+    db.conflict = { code: '08006' };
+    await expect(call(SECRET)).rejects.toEqual({ code: '08006' });
   });
 });

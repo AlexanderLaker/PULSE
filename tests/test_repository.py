@@ -26,6 +26,7 @@
 - Every response carries the security headers of vercel.json.
 """
 import ast
+import collections
 import json
 import re
 import shutil
@@ -295,6 +296,27 @@ def test_the_python_dependencies_are_pinned_inside_their_ranges(ranges, pins):
         assert name in pinned, f"{req.name} is declared in {ranges} but not pinned in {pins}"
         assert req.specifier.contains(pinned[name], prereleases=True), \
             f"{pins} pins {req.name} {pinned[name]}, outside {ranges}'s {req.specifier}"
+
+
+def test_the_function_installs_the_versions_the_suite_tests():
+    """The Vercel function installs api/requirements.txt, the suite requirements-dev.txt, and Dependabot
+    proposes updates to the two separately: every package the function installs must be pinned in the
+    suite's file at the same version, or the API would run on a version no test ran."""
+    from packaging.requirements import Requirement
+    from packaging.utils import canonicalize_name
+
+    def pins(path):
+        found = collections.defaultdict(set)
+        for line in (REPO / path).read_text(encoding="utf-8").splitlines():
+            line = line.split("#", 1)[0].strip()
+            if line:
+                req = Requirement(line)
+                found[canonicalize_name(req.name)] |= {s.version for s in req.specifier}
+        return found
+
+    function, suite = pins("api/requirements.txt"), pins("requirements-dev.txt")
+    assert function.keys() <= suite.keys(), f"not in requirements-dev.txt: {sorted(function.keys() - suite.keys())}"
+    assert {name: (function[name], suite[name]) for name in function if function[name] != suite[name]} == {}
 
 
 def test_next_dev_leaves_the_tracked_files_alone():

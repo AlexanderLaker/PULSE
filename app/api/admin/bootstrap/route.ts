@@ -106,19 +106,27 @@ export async function POST(req: Request) {
     });
   }
 
-  const admins = (await sql`SELECT 1 FROM user_roles WHERE role = 'admin' LIMIT 1`) as unknown[];
-  if (admins.length > 0) {
-    return NextResponse.json(
-      { error: 'An admin exists already: set roles in Settings (User management) or with scripts/promote_admin.py' },
-      { status: 409 },
-    );
+  // One statement checks that no admin exists and promotes, in a serializable
+  // transaction: two calls at the same moment cannot both make an admin, as
+  // PostgreSQL lets one through and fails the other (SQLSTATE 40001).
+  const adminExists = NextResponse.json(
+    { error: 'An admin exists already: set roles in Settings (User management) or with scripts/promote_admin.py' },
+    { status: 409 },
+  );
+  let promoted: unknown[];
+  try {
+    [promoted] = (await sql.transaction([sql`
+      UPDATE user_roles
+         SET role = 'admin', updated_at = NOW()
+       WHERE clerk_user_id = ${clerkUserId}
+         AND NOT EXISTS (SELECT 1 FROM user_roles WHERE role = 'admin')
+      RETURNING clerk_user_id
+    `], { isolationLevel: 'Serializable' })) as unknown[][];
+  } catch (err) {
+    if ((err as { code?: unknown } | null)?.code === '40001') return adminExists;
+    throw err;
   }
-
-  await sql`
-    UPDATE user_roles
-       SET role = 'admin', updated_at = NOW()
-     WHERE clerk_user_id = ${clerkUserId}
-  `;
+  if (promoted.length === 0) return adminExists;
 
   await recordRoleChange({
     userId: clerkUserId, from: previousRole, to: 'admin',
