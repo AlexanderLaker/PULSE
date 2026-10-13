@@ -304,16 +304,26 @@ passed on that commit. To hold a build until it has, add the CI checks
 (Build and Deployment, Add Checks, GitHub): Vercel then promotes it once both
 pass, and Force Promote overrides that in an emergency. If Vercel does not
 offer the two checks yet, let CI run on GitHub first, on a pull request for
-example. Other branches get preview deployments. The environment variables live in the Vercel project settings
-(Production and Preview). Vercel applies a change to any of them only to
-deployments made after it, so redeploy after every change (Deployments, the
-latest deployment, Redeploy); `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and
-`NEXT_PUBLIC_SIGNUP_CODE` are also built into the dashboard's code.
-`PRISM_API_ORIGIN`, if used, belongs to Production only: set for Preview as
-well, a preview deployment's admin writes would go to the production API. A
-database that still needs migration 0001 (the API answers 503 and names it) is
-moved in the order that migration's runbook gives, the deploy first
-(`migrations/0001_driver_schema/README.md`).
+example.
+
+**Protecting `main`.** To refuse such a commit on GitHub as well, protect
+`main` (Settings, Branches): require the status checks `dashboard` and
+`python`, and tick "Do not allow bypassing the above settings", without which
+the repository's admins are exempt. A push to `main` is then accepted only for
+a commit whose checks have passed, on a pull request for example, so a local
+`--ff-only` merge of a checked branch still works. A private repository on a
+personal account needs GitHub Pro for this.
+
+Other branches get preview deployments. The environment variables live in the
+Vercel project settings (Production and Preview). Vercel applies a change to
+any of them only to deployments made after it, so redeploy after every change
+(Deployments, the latest deployment, Redeploy);
+`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `NEXT_PUBLIC_SIGNUP_CODE` are also
+built into the dashboard's code. `PRISM_API_ORIGIN`, if used, belongs to
+Production only: set for Preview as well, a preview deployment's admin writes
+would go to the production API. A database that still needs migration 0001
+(the API answers 503 and names it) is moved in the order that migration's
+runbook gives, the deploy first (`migrations/0001_driver_schema/README.md`).
 
 After a deploy:
 
@@ -383,13 +393,16 @@ export PRODUCTION='<the production branch connection string, direct (not pooled)
 pg_dump --format=custom --no-owner --no-privileges "$PRODUCTION" --file "prism_$(date +%Y%m%d).dump"
 ```
 
-Use the direct connection string (the Neon console offers both; the pooled
-one goes through a connection pooler that `pg_dump` should not use) and a
-`pg_dump` of the database's major version or newer. Store the file
-encrypted, outside Neon and outside this repository: it holds users' email
-addresses and the audit log. Take one before every migration and every
-script that writes to production, and once a night while experts and admins
-are editing (the expert ratings exist nowhere else).
+Use the direct connection string (the Neon console offers both; the pooled one
+goes through a connection pooler that `pg_dump` should not use) and a
+`pg_dump` of the database's major version or newer; an older one stops with a
+server version mismatch. On a Mac, Homebrew's `libpq` brings `pg_dump` without
+a database server (`brew install libpq`), but not on the PATH: run
+`export PATH="$(brew --prefix libpq)/bin:$PATH"` in that terminal first.
+Store the file encrypted, outside Neon and outside this repository: it holds
+users' email addresses and the audit log. Take one before every migration and
+every script that writes to production, and once a night while experts and
+admins are editing (the expert ratings exist nowhere else).
 
 **Restore drill**, at least once a quarter and at every handover: restore the
 newest dump into an empty database (a local one, as below, or an empty Neon
