@@ -7,11 +7,12 @@ Status: accepted
 Drivers of the same force, and some force pairs, tend to materialise
 together. A dependence structure is needed; it has to be a valid correlation
 matrix, or the engine must repair it and silently use correlations different
-from the configured ones. A Student-t copula would add a tail parameter; in
-the comparison behind this decision (June 2026, on the 99-driver base of the
-time with correlations valid as entered), degrees of freedom from 4 to
-infinity moved the portfolio band by less than 2 percent: complexity without
-a visible effect.
+from the configured ones. A Student-t copula would add a tail parameter. On
+the 51-driver base with the production configuration (3 x 20,000 iterations,
+seed 42), 4 to 30 degrees of freedom move the 2035 portfolio median by less
+than 0.02 points and narrow its P10 to P90 band by less than 3 percent
+(`tests/test_reference_run.py` repeats the comparison when the full run is
+asked for): complexity without a visible effect.
 
 ## Decision
 

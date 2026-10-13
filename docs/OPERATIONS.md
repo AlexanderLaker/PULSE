@@ -16,6 +16,20 @@ machine with the full Python environment. The scripts that touch a database
 act on the one in `POSTGRES_URL` or, when that is not set, `DATABASE_URL`, and
 print which one that is; read it before you go on.
 
+**Previews.** Every branch other than `main` gets a preview deployment, built
+with the variables set for Preview. Give Preview values of its own: a Neon
+branch rather than production's database URL, its own `PRISM_JWT_SECRET` and
+a Clerk development instance. With production's values a preview reads and
+writes production data and mints tokens the production API accepts. Previews
+sit behind Vercel Authentication (Settings, Deployment Protection); keep it
+on, so only members of the Vercel team can open them.
+
+**Regions.** The functions run in Vercel's `iad1` region (Washington, D.C.)
+and the database in Neon's AWS `us-east-1`, next to each other, both in the
+United States. A move to EU regions moves both: the function region (the
+project settings, or `"regions"` in `vercel.json`) and the database (a new
+Neon project in the EU, restored from a dump as under Backups and restore).
+
 ## Local development
 
 ```bash
@@ -86,6 +100,12 @@ database layer and the admin script are also tested on PostgreSQL:
 ```bash
 PRISM_TEST_POSTGRES_URL="postgresql://prism:prism@localhost:5432/prism_test?sslmode=disable" python3 -m pytest -n auto
 ```
+
+Two more variables belong to the suite alone: `PRISM_TEST_ALLOW_POSTGRES`
+and `PRISM_TEST_DATABASE_ON_POSTGRES` are set by the tests for the
+subprocesses they start against the test database. Never set them by hand:
+the first lifts the guard that keeps the database in `.env` away from the
+tests.
 
 The generated files each have a check that regenerates them in memory and
 compares:
@@ -302,7 +322,8 @@ back as that migration's runbook says.
 
 - **Backups.** Before any change to production data (a migration, a script
   that writes), create a Neon branch of the production branch. It is instant
-  and it is the rollback.
+  and it is the rollback. The copy outside Neon and the restore are under
+  Backups and restore.
 - **Migrations.** A change to the schema or to existing data is a folder
   under `migrations/`, numbered, with the script and a runbook. The pattern
   of `0001_driver_schema`: everything in one transaction; a `--dry-run` that
@@ -328,6 +349,95 @@ back as that migration's runbook says.
   database has an audit log, and the dashboard's routes write it after the
   change, so a failed entry there does not undo the change. Nothing deletes
   from it.
+
+## Backups and restore
+
+A Neon branch is a copy inside the same Neon account; it protects against a
+bad change, not against losing the account or the project. Keep a second copy
+outside it:
+
+```bash
+export PRODUCTION='<the production branch connection string, direct (not pooled)>'
+pg_dump --format=custom --no-owner --no-privileges "$PRODUCTION" --file "prism_$(date +%Y%m%d).dump"
+```
+
+Use the direct connection string (the Neon console offers both; the pooled
+one goes through a connection pooler that `pg_dump` should not use) and a
+`pg_dump` of the database's major version or newer. Store the file
+encrypted, outside Neon and outside this repository: it holds users' email
+addresses and the audit log. Take one before every migration and every
+script that writes to production, and once a night while experts and admins
+are editing (the expert ratings exist nowhere else).
+
+**Restore drill**, at least once a quarter and at every handover: restore the
+newest dump into an empty database and check that it serves the same run.
+
+```bash
+createdb prism_restore                        # or an empty Neon database
+pg_restore --no-owner --no-privileges --dbname postgresql://localhost/prism_restore "prism_<date>.dump"
+POSTGRES_URL='postgresql://localhost/prism_restore?sslmode=disable' \
+DATABASE_URL='postgresql://localhost/prism_restore?sslmode=disable' \
+  uvicorn prism.api.app:app --port 8000
+curl -s http://127.0.0.1:8000/api/v1/health    # the same driver_count and latest_run_id as production
+```
+
+**Restoring production.** Restore the production branch to an earlier point
+in Neon (within the history the plan keeps), or restore a branch from the
+backup branch of step 1 of a change. From a dump, restore into a new Neon
+branch or project, then point both database URLs in the Vercel project
+(Production) at it and redeploy: a deployment keeps the settings it was built
+with. Ask everyone to reload the dashboard afterwards.
+
+## Monitoring
+
+Nothing in PRISM raises an alarm by itself. Set up two checks:
+
+- an uptime monitor (the company's, or a service such as Better Stack or
+  UptimeRobot) on `https://prism-hcb.vercel.app/api/v1/diagnostics` every five
+  minutes, alerting the owner and the provider when the answer is not 200 or
+  does not contain `"simulation_reason":"ok"`. `/api/v1/health` answers 200
+  even when the database fails (with `"status": "degraded"`), so a check on
+  the status code alone stays green;
+- Vercel's notification of a failed deployment (Settings, Notifications).
+
+The API writes warnings and errors (a failed database connection, a run that
+cannot be read) to the function's log: in Vercel, the project's Logs, the
+function `api/index.py`. Vercel keeps runtime logs for a limited time that
+depends on the plan; a log drain keeps them longer.
+
+## Credentials
+
+None of these is in the repository; each lives in the Vercel project
+(Production and Preview), and the database URL also in the `.env` of the
+machine that runs the production run and the migrations. Rotate a credential
+when someone with access leaves, when it may have leaked, and at a handover.
+A new value takes effect with the next deployment.
+
+| Credential | Where to rotate it | Then |
+|---|---|---|
+| Neon password | the Neon console: the production branch's roles, reset the password of PRISM's role | update `DATABASE_URL` and `POSTGRES_URL` in Vercel and in the run machine's `.env`; redeploy |
+| `PRISM_JWT_SECRET` | generate one (`openssl rand -base64 48`) | set it in Vercel (a different value for Preview); redeploy. Old tokens stop working and an open dashboard fetches a new cookie, so nobody has to sign in again |
+| `CLERK_SECRET_KEY` | the Clerk dashboard, API keys: create a new secret key, and delete the old one once the new deployment is live | update Vercel; redeploy |
+| `CLERK_WEBHOOK_SIGNING_SECRET` | the Clerk dashboard, Webhooks, PRISM's endpoint: a new signing secret | update Vercel; redeploy |
+| `ADMIN_BOOTSTRAP_SECRET` | | remove it whenever no first admin is being set up |
+| `NEXT_PUBLIC_SIGNUP_CODE` | choose a new code | update Vercel; redeploy (it is readable in the browser by design) |
+
+## Incidents
+
+1. **See what is wrong.** `/api/v1/health` and `/api/v1/diagnostics` name the
+   cause (Troubleshooting below); the Vercel project's Deployments and Logs
+   show the latest deploy and the function's errors.
+2. **Restore service first.** A deploy that broke something: promote the
+   previous production deployment (Deploying, Rollback). A run that shows
+   wrong numbers: withdraw it (The production run). Lost or damaged data:
+   restore (Backups and restore). A credential that may have leaked: rotate
+   it (Credentials) and read the audit log for what it was used for.
+3. **Tell people.** The owner decides who hears what. Personal data that may
+   have reached someone it should not (user emails, names, the audit log) is
+   reported to the owner at once, who involves the company's data protection
+   contact; the time limits for notifying an authority are short.
+4. **Afterwards**, write down what happened, why, and what changes so it does
+   not happen again.
 
 ## Roles and users
 
@@ -379,7 +489,10 @@ sign-up.
 ## Handover
 
 `bash scripts/package_handover.sh` builds `PRISM_HANDOVER_<date>.zip`: a git
-repository with a single commit of the tracked tree at `HEAD`. It refuses a
+repository with a single commit of the tracked tree at `HEAD`. Hand that over,
+not this repository with its history: the history before the clean build
+holds documents and credentials of earlier applications that do not belong
+with a service provider, and the owner keeps it. It refuses a
 dirty working tree and fails if the exported tree holds a `.env` file other
 than `.env.example`, a `runs/` or `archive/` folder, a database file or a
 workbook anywhere, Clerk's local folder or a local working folder (a leading

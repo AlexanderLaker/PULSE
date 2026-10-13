@@ -379,7 +379,7 @@ class TestRunsJourneyAudit:
         assert db.latest_run_summary()["id"] == second
 
     def test_numpy_values_are_stored_as_plain_json(self, db):
-        np = pytest.importorskip("numpy")
+        import numpy as np
         run_id = db.save_simulation_run(10, {"x": np.float64(0.5), "flag": np.bool_(True), "a": np.arange(3)})
         assert db.load_latest_run()["results"] == {"x": 0.5, "flag": True, "a": [0, 1, 2]}
         assert run_id == db.latest_run_summary()["id"]

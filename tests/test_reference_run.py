@@ -1,6 +1,7 @@
-"""The full production run against the reference run of the PRISM Analysis record.
+"""The full production run against the reference run of the PRISM Analysis record,
+and the copula comparison behind docs/adr/0004-gaussian-copula.md.
 
-Opt-in, because it takes about two minutes:
+Opt-in, because it takes a few minutes:
 
     PRISM_FULL_RUN=1 python3 -m pytest tests/test_reference_run.py
 
@@ -11,16 +12,25 @@ data/drivers/driver_attribution.json, which holds them to six decimals and
 reproduces production run 99. Run it before a release and after any change
 to the engine, the configuration or the numpy and scipy versions; CI runs it
 when started by hand (.github/workflows/ci.yml, workflow_dispatch).
+
+The second test swaps the engine's Gaussian copula for a Student-t one with 4,
+10 and 30 degrees of freedom on the same configuration (3 x 20,000
+iterations) and checks the figures ADR 0004 quotes: the 2035 portfolio median
+moves by less than 0.02 points and the P10 to P90 band narrows by less than
+3 percent.
 """
 import json
 import os
 from pathlib import Path
 
+import numpy as np
 import pytest
+from scipy.linalg import cholesky
+from scipy.stats import beta as beta_dist, t as t_dist
 
 from golden_production import production_result
 from prism.config import PRODUCTION_CHAINS, PRODUCTION_ITERATIONS
-from prism.engine import MonteCarloEngine
+from prism.engine import UNIFORM_CLIP, MonteCarloEngine
 
 RECORD = Path(__file__).resolve().parents[1] / "data" / "drivers" / "driver_attribution.json"
 #: The record rounds to six decimals, so a value that reproduces lies within half a unit of the sixth.
@@ -47,3 +57,31 @@ def test_the_full_run_reproduces_the_reference_run():
             if abs(got - value) > ROUNDING:
                 moved[f"{category}/{stat}"] = (got, value)
     assert moved == {}
+
+
+def test_a_student_t_copula_changes_nothing_visible(monkeypatch):
+    gaussian = MonteCarloEngine.generate_copula_samples
+    nu = {"value": None}
+
+    def copula(self, drivers, R, n_iter):
+        if nu["value"] is None:
+            return gaussian(self, drivers, R, n_iter)
+        z = self.rng.standard_normal((n_iter, len(drivers))) @ cholesky(R, lower=True).T
+        w = self.rng.chisquare(nu["value"], size=(n_iter, 1))
+        u = np.clip(t_dist.cdf(z / np.sqrt(w / nu["value"]), nu["value"]), UNIFORM_CLIP, 1 - UNIFORM_CLIP)
+        return np.column_stack([beta_dist.ppf(u[:, j], *d.probability_prior) * d.gp1_pct_affected * d.direction_sign
+                                for j, d in enumerate(drivers)])
+
+    monkeypatch.setattr(MonteCarloEngine, "generate_copula_samples", copula)
+
+    def band():
+        p = production_result(iterations=20_000, chains=PRODUCTION_CHAINS)["totals"]["portfolio"][2035]
+        return p["median"], p["p90"] - p["p10"]
+
+    median, width = band()
+    for degrees in (4.0, 10.0, 30.0):
+        nu["value"] = degrees
+        t_median, t_width = band()
+        assert abs(t_median - median) < 0.0002, degrees          # 0.02 points
+        assert abs(t_width - width) / width < 0.03, degrees      # 3 percent of the band
+

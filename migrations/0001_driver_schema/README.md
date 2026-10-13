@@ -70,13 +70,24 @@ because the previous code would recreate its own tables next to the migrated
 ones. The dashboard is unavailable from the deploy (step 4) until the
 migration has committed (step 5): plan a few quiet minutes.
 
-You need the repository at the commit you are deploying, the Python
+You need a clean checkout of the commit you are deploying (`git status`
+shows nothing to commit: a working tree that still holds files of an earlier
+release is put aside first, with `git stash` or a fresh clone), the Python
 environment from `requirements-dev.txt` and a `.env` whose `POSTGRES_URL`
 (or, when that is not set, `DATABASE_URL`) is the Neon production database.
+Vercel deploys `main` to production (Settings, Git).
+
+0. **Compare the settings.** The Vercel project's environment variables
+   (Production) must be the ones README.md's table lists. Delete any that
+   this release no longer reads, such as `BACKEND_URL`, `PRISM_BACKEND_URL`
+   and `FORCE_DEV_PROXY`; the database URLs, `PRISM_JWT_SECRET` and the Clerk
+   keys keep their names.
 
 1. **Back up.** In the Neon console, create a branch of the production branch
    (Branches, Create branch, from the current state). It is an instant
-   point-in-time copy and your rollback.
+   point-in-time copy and your rollback. Take a `pg_dump` of production as
+   well and keep it outside Neon (docs/OPERATIONS.md, Backups and restore):
+   the branch lives in the same account.
 
 2. **Rehearse on a copy.** Create a second branch the same way (for example
    `migration-rehearsal`) and run the real migration against it. Set its
@@ -172,7 +183,10 @@ environment from `requirements-dev.txt` and a `.env` whose `POSTGRES_URL`
 
 4. **Deploy.** Merge the release into `main` and push. Vercel builds and
    promotes it in about two minutes (watch it in the Vercel dashboard). From
-   now until step 5 the dashboard reports that PRISM is being updated.
+   now until step 5 the dashboard reports that PRISM is being updated, and
+   `/api/v1/health` answers `"status": "degraded"` with
+   `"simulation_reason": "migration_pending"` and the release's commit in
+   `commit`: the release is live and waits for the migration.
 
 5. **Migrate** as soon as the deployment is live:
 
@@ -199,7 +213,8 @@ environment from `requirements-dev.txt` and a `.env` whose `POSTGRES_URL`
    the network, and run this step again.
 
 6. **Check.** `https://prism-hcb.vercel.app/api/v1/health` answers
-   `"status": "ok"` with `"driver_count": 51` and `"has_simulation": true`.
+   `"status": "ok"` with `"driver_count": 51`, `"has_simulation": true` and
+   the release's commit.
    Open the dashboard: the Shift Analysis shows the persisted run with its
    2035 portfolio median of -5.6 percent. Ask everyone who had the dashboard
    open to reload it: a page loaded before the deploy still runs the
@@ -212,6 +227,13 @@ environment from `requirements-dev.txt` and a `.env` whose `POSTGRES_URL`
    ```bash
    python3 scripts/run_production.py
    ```
+
+   The log names the release's commit without uncommitted changes, and so
+   does the Code row of the run's workbook. The runs stored before the
+   migration keep their earlier labels (their overlap-correction and
+   cell-weight sources, for example): the migration renames keys, not
+   values. They stay for the drift comparison and are no longer served once
+   this run exists.
 
 A second `migrate.py --dry-run` now answers that the database is already on
 the driver schema.
