@@ -123,7 +123,8 @@ it. This gives the timing bands their meaning, "arrives a year earlier or
 later".
 
 Every driver carries its own onset, peak year, curve and uncertainty score,
-a score for every category and every region, and a value-chain epicentre.
+a score for every category and every region (above 0 in at least one of
+each), and a value-chain epicentre.
 The engine has no defaults for any of them: a driver that lacks one, or
 whose peak does not come after its onset, is refused before the first draw
 (`prism/drivers.py`, `simulation_problems`).
@@ -136,9 +137,9 @@ x_jcr = (category exposure_jc / 5) x (regional exposure_jr / 5)
 
 Exposure describes the mechanism: where the driver acts and how strongly.
 Whether HCB has business in a cell enters only through the cell weights
-(step 7). A score of 0 means the driver does not act there, so a driver
-scored 0 in every region, or in every category, acts nowhere and moves
-nothing.
+(step 7). A score of 0 means the driver does not act there. A driver scored 0
+in every region, or in every category, would act nowhere and move nothing, so
+it is refused (`simulation_problems`) rather than kept in the model.
 
 ### 5. The force sum and the within-force overlap
 

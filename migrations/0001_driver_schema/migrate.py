@@ -9,13 +9,13 @@ or the write lock (SQLite), so nothing can write in between.
 1. Every driver is checked first. The driver schema stores only drivers the
    engine can simulate: every score present and on its scale, a start year and
    a peak year after the onset, a known force, curve, confidence and value-chain
-   stage, and at least one region. The previous engine simulated a driver
-   without any regional exposure as present in every region; the driver schema
-   has no such rule, so such a driver is refused too. While any driver fails a
-   check the migration changes nothing and lists every problem, to be
-   corrected in the previous release's dashboard (a force, a start year or a
-   confidence, which that dashboard cannot edit, with SQL). The newest
-   Consumer Journey content is checked at the same time (step 5).
+   stage, and at least one category and one region above 0. The previous
+   engine simulated a driver without any regional exposure as present in every
+   region; the driver schema has no such rule, and the problem says so. While
+   any driver fails a check the migration changes nothing and lists every
+   problem, to be corrected in the previous release's dashboard (a force, a
+   start year or a confidence, which that dashboard cannot edit, with SQL).
+   The newest Consumer Journey content is checked at the same time (step 5).
 2. The driver tables are created and filled from the previous ones:
      trends                    -> drivers      (ai_suggestion -> baseline,
                                                 user_override -> scores_edited;
@@ -512,6 +512,7 @@ def read_previous_drivers(db: Database, tables: set) -> list:
         if r.get("confidence") not in CONFIDENCE_LEVELS:
             problems.append(f"confidence {r.get('confidence')!r} is not one of {', '.join(CONFIDENCE_LEVELS)}")
         if not any(region.values()):
+            problems = [line for line in problems if not line.startswith("regional_exposure is 0 for every region")]
             problems.append("no regional exposure is stored; the previous engine simulated such a driver as present "
                             "in every region, the driver schema does not: set its regions")
         baseline, source, baseline_filled = baseline_of(r.get("ai_suggestion"), driver.scores())

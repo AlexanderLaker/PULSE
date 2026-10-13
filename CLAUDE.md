@@ -50,12 +50,12 @@ README.md; the documents in `docs/` explain everything below in full.
 - **The model configuration is code** (`prism/config.py`); the dashboard shows
   it read-only.
 - **A driver is complete or refused.** Every score present and on its scale,
-  every category and region scored, the peak after the onset: the engine and
-  the database writes run the same check (`simulation_problems` in
-  `prism/drivers.py`), the API validates every edit, and the schema's
-  constraints hold each score and name on its scale or in its taxonomy. The
-  engine has no defaults and no fallbacks for a driver's inputs; never add
-  one.
+  every category and region scored (at least one of each above 0), the peak
+  after the onset: the engine and the database writes run the same check
+  (`simulation_problems` in `prism/drivers.py`), the API validates every
+  edit, and the schema's constraints hold each score and name on its scale or
+  in its taxonomy. The engine has no defaults and no fallbacks for a driver's
+  inputs; never add one.
 - **Honest display.** One decimal for shifts and shares (docs/DESIGN.md
   names the three exceptions); the portfolio band is the joint percentile; the
   lenses are labelled attribution; sampling quality is the Monte Carlo

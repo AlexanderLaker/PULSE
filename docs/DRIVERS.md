@@ -172,8 +172,9 @@ Edited against its baseline. The name, the force and the onset come from the
 base and are not edited on the page, and a peak year must fall after the
 onset. An exposure edit sends only the cells that changed. PRISM stores only
 complete drivers, every score present and on its scale, with a score for
-every category and every region and no name outside the taxonomy, so a
-stored driver can always be simulated. Every driver carries a revision
+every category and every region, above 0 in at least one category and one
+region, and no name outside the taxonomy, so a stored driver can always be
+simulated and always acts somewhere. Every driver carries a revision
 number that each save raises; an edit names the revision it was made on, so
 when two admins (or two tabs) edit the same driver, the second save is
 refused with a request to reload instead of silently undoing the first.

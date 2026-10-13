@@ -269,7 +269,7 @@ mistaken for the estimate.
 | 3 | the simulation ran but storing it failed; the dashboard keeps serving the previous run |
 | 4 | the correlation matrix is not positive definite on this driver mix |
 | 5 | the run size is outside its range, or other than the production one on PostgreSQL without `--allow-test-size`; the configuration in `prism/config.py` is invalid; or the cell-weights file is missing or invalid |
-| 6 | a driver cannot be simulated (an unknown force, direction, curve or value-chain stage, a missing score, a score outside its scale, a peak year not after the onset, a category or region without an exposure score, an exposure on a name outside the taxonomy, a duplicate id); every problem is listed. PRISM stores no such driver, so this points at a change made to the database outside PRISM; a start year or a force corrected there needs the driver's revision raised by one as well, so the service reloads it |
+| 6 | a driver cannot be simulated (an unknown force, direction, curve or value-chain stage, a missing score, a score outside its scale, a peak year not after the onset, a category or region without an exposure score, exposure 0 in every category or every region, an exposure on a name outside the taxonomy, a duplicate id); every problem is listed. PRISM stores no such driver, so this points at a change made to the database outside PRISM; a start year or a force corrected there needs the driver's revision raised by one as well, so the service reloads it |
 
 Any other error stops the run with a traceback and exit code 1.
 

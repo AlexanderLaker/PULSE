@@ -122,8 +122,9 @@ def simulation_problems(drivers) -> list:
     and value-chain epicentre; a GP1 share in (0, 1]; a probability from 1 to
     5 and an uncertainty from 0 to 5; a start year and a peak year after the
     onset; and a whole-number score from 0 to 5 for every category and every
-    region, under the taxonomy's names only. Duplicate ids are refused as
-    well.
+    region, under the taxonomy's names only, above 0 for at least one
+    category and one region: a driver that acts nowhere would move nothing,
+    so it is refused rather than kept. Duplicate ids are refused as well.
     """
     problems = [f"driver id {i!r} appears {n} times" for i, n in Counter(d.id for d in drivers).items() if n > 1]
     for d in drivers:
@@ -148,8 +149,8 @@ def simulation_problems(drivers) -> list:
                             f"(from {first_peak_year(d.start_year)})")
         if d.vc_epicentre not in VC_STAGES:
             problems.append(f"{where}: value-chain epicentre {d.vc_epicentre!r} is not one of {VC_STAGES}")
-        for name, exposure, keys in (("category_exposure", d.category_exposure, CATEGORIES),
-                                     ("regional_exposure", d.regional_exposure, REGIONS)):
+        for name, exposure, keys, each in (("category_exposure", d.category_exposure, CATEGORIES, "category"),
+                                           ("regional_exposure", d.regional_exposure, REGIONS, "region")):
             exposure = exposure if isinstance(exposure, dict) else {}
             missing = [k for k in keys if k not in exposure]
             if missing:
@@ -159,6 +160,9 @@ def simulation_problems(drivers) -> list:
                     problems.append(f"{where}: {name} names {key!r}, which is not in the taxonomy")
                 elif not whole_in_range(score, 0, 5):
                     problems.append(f"{where}: {name}[{key!r}] = {score!r} is not a whole number from 0 to 5")
+            scores = [exposure[k] for k in keys if k in exposure]
+            if not missing and all(whole_in_range(s, 0, 5) for s in scores) and not any(scores):
+                problems.append(f"{where}: {name} is 0 for every {each}, so the driver would act nowhere")
     return problems
 
 

@@ -132,15 +132,13 @@ class TestRegionalShift:
             if cat != "Hair: Color":
                 assert sm[cat]["path"][2030]["median"] == pytest.approx(0.0, abs=1e-12)
 
-    def test_a_driver_without_regional_exposure_reaches_no_cell(self, mock_model_config):
-        """Exposure 0 in every region is exposure 0 everywhere, as a category score of 0 is: the
-        driver moves nothing, every lens of the untouched category is zero, and the run records
-        no integrity event."""
-        r = self._run(mock_model_config, _single_driver_set([0, 0, 0, 0]))
-        assert r["shift_matrix"]["Hair: Color"]["path"][2030]["median"] == 0.0
-        for lens in ("force", "vc", "region"):
-            assert set(r["decompositions"][lens][2030]["Hair: Color"].values()) == {0.0}, lens
-        assert r["integrity_events"] == []
+    def test_a_driver_without_regional_exposure_is_refused(self, mock_model_config):
+        """Exposure 0 in every region would leave the driver acting nowhere, so it is not a driver the
+        engine runs on: it is refused, as one with 0 in every category is, rather than kept moving
+        nothing."""
+        from prism.drivers import InvalidDriversError
+        with pytest.raises(InvalidDriversError, match="regional_exposure is 0 for every region"):
+            self._run(mock_model_config, _single_driver_set([0, 0, 0, 0]))
 
     def test_the_region_lens_splits_by_presence_and_the_row_mix(self, mock_model_config):
         """A driver present everywhere splits its category's attribution by the category's own
@@ -179,6 +177,10 @@ class TestDriverChecks:
         ({"regional_exposure": {"Europe": 7, "North America": 0, "Asia": 0, "High Growth": 0}},
          "is not a whole number from 0 to 5"),
         ({"regional_exposure": {"Europe": 5}}, "regional_exposure has no score for North America, Asia, High Growth"),
+        ({"regional_exposure": {"Europe": 0, "North America": 0, "Asia": 0, "High Growth": 0}},
+         "regional_exposure is 0 for every region, so the driver would act nowhere"),
+        ({"category_exposure": {c: 0 for c in category_map()}},
+         "category_exposure is 0 for every category, so the driver would act nowhere"),
     ])
     def test_the_engine_refuses_it(self, mock_model_config, change, words):
         from prism.drivers import InvalidDriversError
