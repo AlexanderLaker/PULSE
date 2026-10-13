@@ -237,6 +237,27 @@ class TestHealthAndDiagnostics:
         assert diag["db_reachable"] is True and diag["latest_run_id"] is not None
         assert dbm.load_drivers() == []
 
+    @pytest.mark.parametrize("new_instance", [False, True], ids=["running-instance", "new-instance"])
+    def test_a_dropped_drivers_table_is_lost_drivers_too(self, api, valid_run, new_instance):
+        """Dropped instead of emptied: an instance that set the schema up before and one that starts now
+        both say drivers_missing, in /health and in /diagnostics, which the uptime check reads."""
+        import prism.database as dbm
+        assert api.get("/api/v1/health").json()["driver_count"] == 51
+        persist(valid_run)
+        with dbm.get_db_connection() as conn:
+            cursor = conn.cursor()
+            for table in ("driver_sources", "driver_regional_exposure", "driver_category_exposure"):
+                cursor.execute(f"DELETE FROM {table}")
+            cursor.execute("DROP TABLE drivers")
+        if new_instance:
+            state.reset()
+        health = api.get("/api/v1/health").json()
+        assert health["status"] == "degraded" and health["simulation_reason"] == "drivers_missing"
+        diag = api.get("/api/v1/diagnostics").json()
+        assert diag["simulation_reason"] == "drivers_missing" and "restore it from its backup" in diag["error"]
+        response = api.get("/api/v1/drivers", headers=bearer())
+        assert response.status_code == 503 and "restore it from its backup" in response.json()["detail"]
+
     @pytest.mark.parametrize("entity_type, seeded", [("driver", False), ("user", True)])
     def test_of_the_audit_log_only_a_driver_edit_counts_as_history(self, api, entity_type, seeded):
         """A role change can precede the first driver request on a new database; it says nothing

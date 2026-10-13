@@ -455,9 +455,9 @@ def diagnose_connection() -> dict[str, Any]:
         latest = latest_run_summary()
         if latest:
             out["latest_run_id"] = latest["id"]
-        if "drivers" in tables and drivers_stamp()[0] == 0 and holds_history():
-            # A database that lost its drivers: the run may still be there, but
-            # nothing is served until the database is restored.
+        if ("drivers" not in tables or drivers_stamp()[0] == 0) and holds_history():
+            # A database that lost its drivers, emptied or dropped: the run may
+            # still be there, but nothing is served until it is restored.
             missing = DriversMissingError()
             out["error"], out["reason"] = describe_error(missing), failure_reason(missing)
     except Exception as e:  # noqa: BLE001 (reported, never raised)
@@ -709,6 +709,18 @@ def holds_history() -> bool:
             if cursor.fetchone() is not None:
                 return True
     return False
+
+
+def drivers_table_lost() -> bool:
+    """Whether the drivers table itself is gone from a database that holds history.
+
+    A process that set the schema up earlier does not create it again, so it
+    reads a dropped drivers table as lost drivers here (state.driver_set), as
+    a new process does once init_db has created the table empty.
+    """
+    with get_db_connection() as conn:
+        tables = table_names(conn.cursor())
+    return "drivers" not in tables and "simulation_runs" in tables and holds_history()
 
 
 # ── Simulation runs ─────────────────────────────────────────────────────────

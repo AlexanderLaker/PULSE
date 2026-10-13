@@ -44,13 +44,18 @@ def driver_set() -> DriverSet:
     seeded from prism.seed_drivers. Two instances starting on a new database at
     the same moment may both try: the second insert fails as a whole (one
     transaction), and the drivers the first stored are used. A database that
-    once held drivers (database.holds_history) and has none lost them; it is
-    restored from its backup, never reseeded, so this raises
-    DriversMissingError (503) until then.
+    once held drivers (database.holds_history) and has none, its drivers
+    table emptied or dropped, lost them; it is restored from its backup, never
+    reseeded, so this raises DriversMissingError (503) until then.
     """
     with _lock:
         ensure_schema()
-        stamp = database.drivers_stamp()
+        try:
+            stamp = database.drivers_stamp()
+        except Exception as e:
+            if database.drivers_table_lost():
+                raise database.DriversMissingError() from e
+            raise
         if stamp[0] == 0:
             if database.holds_history():
                 raise database.DriversMissingError()
