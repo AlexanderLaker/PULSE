@@ -118,10 +118,13 @@ for the stored version before the next save. While the database cannot be used
 the routes that read or write it answer 503: with the migration to run when
 the schema is older than the code, with the missing setting when no database
 is configured, and with "try again in a moment" when the database cannot be
-reached after three attempts, each of which waits at most ten seconds for
-the server (the details go to the log, never to the browser). `/health` and `/diagnostics` answer 200 even then and say what is
-wrong (`/health` with status `degraded`, both with the reason). Any other
-database error is logged and answered 500.
+reached (the details go to the log, never to the browser). An attempt to
+connect waits at most five seconds for each address of the server, no further
+attempt starts that could end after twelve seconds of trying, and for five
+seconds after such a failure the routes that read the drivers or the run
+answer at once instead of trying again. `/health` and `/diagnostics` answer
+200 even then and say what is wrong (`/health` with status `degraded`, both
+with the reason). Any other database error is logged and answered 500.
 
 Each instance keeps the drivers and the latest run in memory
 (`prism/api/state.py`). A request that reads them first checks whether the

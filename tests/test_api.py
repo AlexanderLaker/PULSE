@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 import time
+import types
 from pathlib import Path
 
 import pytest
@@ -284,6 +285,25 @@ class TestHealthAndDiagnostics:
         body = api.get("/api/v1/health").json()
         assert body["status"] == "degraded" and body["simulation_reason"] == "db_error"
         assert probes == []
+
+    def test_after_an_outage_requests_are_answered_at_once(self, api, monkeypatch):
+        """Requests that queued behind a failed attempt to reach the database answer 503 at once for a few
+        seconds instead of each trying again; after that the next request tries."""
+        import prism.database as dbm
+        assert api.get("/api/v1/health").json()["status"] == "ok"
+        clock, tries = [1000.0], []
+
+        def unreachable():
+            tries.append(clock[0])
+            raise dbm.DatabaseUnavailableError("Failed to connect to the database after 2 attempts")
+        monkeypatch.setattr(dbm, "drivers_stamp", unreachable)
+        monkeypatch.setattr(state, "time", types.SimpleNamespace(monotonic=lambda: clock[0]))
+        assert api.get("/api/v1/drivers", headers=bearer()).status_code == 503 and len(tries) == 1
+        assert api.get("/api/v1/drivers", headers=bearer()).status_code == 503 and len(tries) == 1
+        body = api.get("/api/v1/health").json()
+        assert body["simulation_reason"] == "db_error" and len(tries) == 1
+        clock[0] += state.UNREACHABLE_GRACE_SECONDS
+        assert api.get("/api/v1/drivers", headers=bearer()).status_code == 503 and len(tries) == 2
 
     @pytest.mark.parametrize("entity_type, seeded", [("driver", False), ("user", True)])
     def test_of_the_audit_log_only_a_driver_edit_counts_as_history(self, api, entity_type, seeded):

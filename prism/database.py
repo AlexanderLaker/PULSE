@@ -47,11 +47,15 @@ SCHEMA_MIGRATIONS = ("0001_driver_schema",)
 #: bytes of "prism" as a number), so that instances starting on a new database
 #: at the same moment create it one after the other.
 SCHEMA_LOCK = int.from_bytes(b"prism", "big")
-#: How long one attempt to connect to PostgreSQL waits for the server, in
-#: seconds, unless the URL sets its own connect_timeout. Without it a host
-#: that drops packets would hold each attempt for the operating system's TCP
-#: timeout, minutes, while requests queue behind the API's lock.
-CONNECT_TIMEOUT_SECONDS = 10
+#: How long one attempt to connect to PostgreSQL waits for each address of the
+#: server, in seconds, unless the URL sets its own connect_timeout. Without it
+#: a host that drops packets would hold each attempt for the operating
+#: system's TCP timeout, minutes, while requests queue behind the API's lock.
+CONNECT_TIMEOUT_SECONDS = 5
+#: get_db_connection starts no further attempt that could end after this many
+#: seconds of trying, so that a request hears its 503 well before the
+#: dashboard gives up on it (lib/apiClient.ts waits 20 seconds).
+CONNECT_BUDGET_SECONDS = 12
 
 
 class MigrationPendingError(RuntimeError):
@@ -140,10 +144,15 @@ def postgres_connect_options(url: str) -> dict:
     local server for tests says sslmode=disable) and an attempt gives up after
     CONNECT_TIMEOUT_SECONDS, unless the URL sets either itself. The API, the
     scripts and the migration connect with these."""
+    from psycopg2.extensions import parse_dsn
+    try:
+        given = parse_dsn(url).keys()
+    except Exception:  # noqa: BLE001 (a malformed URL: psycopg2.connect reports it)
+        given = set()
     options: dict = {}
-    if "sslmode=" not in url:
+    if "sslmode" not in given:
         options["sslmode"] = "require"
-    if "connect_timeout=" not in url:
+    if "connect_timeout" not in given:
         options["connect_timeout"] = CONNECT_TIMEOUT_SECONDS
     return options
 
@@ -169,11 +178,14 @@ def _connect():
 def get_db_connection():
     """A connection that commits on success and rolls back on error.
 
-    Connecting is retried three times with backoff, because a serverless
-    PostgreSQL endpoint can take a moment to wake up.
+    Connecting is tried up to three times with backoff, because a serverless
+    PostgreSQL endpoint can take a moment to wake up; no attempt starts that
+    could end after CONNECT_BUDGET_SECONDS.
     """
-    conn, last_error = None, None
+    conn, last_error, attempts = None, None, 0
+    started = time.monotonic()
     for attempt in range(3):
+        attempts += 1
         try:
             conn = _connect()
             break
@@ -181,19 +193,24 @@ def get_db_connection():
             raise
         except Exception as e:  # noqa: BLE001 (any driver error is retried)
             last_error = e
-            if attempt < 2:
-                wait = 0.5 * (2 ** attempt)
-                logger.warning("Database connection attempt %d failed: %s; retrying in %.1fs",
-                               attempt + 1, describe_error(e), wait)
-                time.sleep(wait)
+            wait = 0.5 * (2 ** attempt)
+            if attempt == 2 or time.monotonic() - started + wait + CONNECT_TIMEOUT_SECONDS > CONNECT_BUDGET_SECONDS:
+                break
+            logger.warning("Database connection attempt %d failed: %s; retrying in %.1fs",
+                           attempt + 1, describe_error(e), wait)
+            time.sleep(wait)
     if conn is None:
         raise DatabaseUnavailableError(
-            f"Failed to connect to the database after 3 attempts: {describe_error(last_error)}") from last_error
+            f"Failed to connect to the database after {attempts} attempt{'s' if attempts > 1 else ''}: "
+            f"{describe_error(last_error)}") from last_error
     try:
         yield conn
         conn.commit()
     except Exception as e:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:  # noqa: BLE001 (a connection already lost cannot roll back; the first error counts)
+            logger.debug("Rollback failed after: %s", describe_error(e))
         if not isinstance(e, (StaleRevisionError, StaleVersionError)):  # conflicts are expected answers
             logger.error("Database error: %s", e)
         raise

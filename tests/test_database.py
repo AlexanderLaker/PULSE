@@ -10,6 +10,7 @@ import json
 import os
 import subprocess
 import sys
+import types
 import uuid
 from pathlib import Path
 from urllib.parse import quote
@@ -491,6 +492,39 @@ class TestRunsJourneyAudit:
         for text in (error, str(refused.value), caplog.text):
             assert not any(secret in text for secret in ("owner", "s3cr", "ep-secret")), text
 
+    def test_connecting_stops_within_the_budget(self, db, monkeypatch):
+        """A server that never answers costs each attempt the whole connect timeout: no attempt starts that
+        could end after CONNECT_BUDGET_SECONDS, so the API's 503 comes before the dashboard gives up."""
+        clock, starts = [0.0], []
+
+        def silent():
+            starts.append(clock[0])
+            clock[0] += db.CONNECT_TIMEOUT_SECONDS
+            raise RuntimeError("timeout expired")
+        monkeypatch.setattr(db, "_connect", silent)
+        monkeypatch.setattr(db, "time", types.SimpleNamespace(
+            monotonic=lambda: clock[0], sleep=lambda seconds: clock.__setitem__(0, clock[0] + seconds)))
+        with pytest.raises(db.DatabaseUnavailableError, match="after 2 attempts"):
+            with db.get_db_connection():
+                pass
+        assert len(starts) == 2 and clock[0] <= db.CONNECT_BUDGET_SECONDS
+
+    def test_a_lost_connection_reports_the_error_that_lost_it(self, db, monkeypatch):
+        """A rollback on a connection that is already gone fails too; the first error is the one raised."""
+        class Gone:
+            def cursor(self):
+                raise RuntimeError("server closed the connection unexpectedly")
+
+            def rollback(self):
+                raise RuntimeError("connection already closed")
+
+            def close(self):
+                pass
+        monkeypatch.setattr(db, "_connect", Gone)
+        with pytest.raises(RuntimeError, match="server closed the connection unexpectedly"):
+            with db.get_db_connection() as conn:
+                conn.cursor()
+
     def test_a_missing_table_is_told_from_other_failures(self, db):
         """state.driver_set looks for lost drivers only after an error that names a missing table, on
         either backend; a connection lost in the middle of a query is not one."""
@@ -527,6 +561,8 @@ class TestRunsJourneyAudit:
     ("postgresql://u@db.example.org/prism", "require", True),
     ("postgresql://u@localhost/prism_test?sslmode=disable", None, True),
     ("postgresql://u@db.example.org/prism?connect_timeout=3", "require", False),
+    ("host=db.example.org dbname=prism sslmode = disable connect_timeout = 3", None, False),
+    ("postgresql://owner:s3cr%zzet@localhost/prism", "require", True),   # malformed: psycopg2 reports it
 ])
 def test_a_postgres_connection_requires_tls_and_gives_up_in_time(url, sslmode, timeout):
     """Unless the URL says otherwise: TLS, and an attempt that waits CONNECT_TIMEOUT_SECONDS at most, so a

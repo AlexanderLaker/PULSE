@@ -38,7 +38,7 @@ REPO = Path(__file__).resolve().parents[1]
 FIRST, LAST = DEFAULT_PATH_YEARS[0], DEFAULT_PATH_YEARS[-1]
 CELLS = len(CATEGORIES) * len(REGIONS)
 WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight", 9: "nine",
-         10: "ten"}
+         10: "ten", 11: "eleven", 12: "twelve"}
 
 
 def sci(x: float) -> str:
@@ -470,6 +470,13 @@ def test_the_security_and_session_settings():
     assert_quotes("README.md", f"the page asks for `{code}`")
 
 
-def test_the_database_connection_timeout():
-    from prism.database import CONNECT_TIMEOUT_SECONDS as seconds
-    assert_quotes("docs/ARCHITECTURE.md", f"each of which waits at most {WORDS[seconds]} seconds for the server")
+def test_the_database_connection_limits():
+    from prism.api.state import UNREACHABLE_GRACE_SECONDS as grace
+    from prism.database import CONNECT_BUDGET_SECONDS as budget
+    from prism.database import CONNECT_TIMEOUT_SECONDS as timeout
+    assert_quotes("docs/ARCHITECTURE.md", f"waits at most {WORDS[timeout]} seconds for each address of the server",
+                  f"no further attempt starts that could end after {WORDS[budget]} seconds of trying",
+                  f"for {WORDS[grace]} seconds after such a failure")
+    # The dashboard waits REQUEST_TIMEOUT_MS for an answer; a request hears its 503 before that.
+    client = int(re.search(r"REQUEST_TIMEOUT_MS = (\d+)_000", source("lib/apiClient.ts")).group(1))
+    assert budget < client

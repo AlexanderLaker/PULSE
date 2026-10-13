@@ -1104,6 +1104,24 @@ class TestShippedEditFiles:
         assert not any("\\n" in t for t in texts)
 
 
+def test_the_migration_connects_like_the_api(migration, monkeypatch):
+    """TLS and a connection timeout unless the URL sets them, as prism.database.postgres_connect_options
+    gives them to every PostgreSQL connection."""
+    import psycopg2
+
+    from prism.database import postgres_connect_options
+    url, seen = "postgresql://owner@db.example.org/prism", {}
+
+    def connect(dsn, **options):
+        seen.update(options)
+        raise RuntimeError("not connecting in a test")
+    monkeypatch.setattr(psycopg2, "connect", connect)
+    monkeypatch.setenv("POSTGRES_URL", url)
+    with pytest.raises(RuntimeError, match="not connecting"):
+        migration.Database()
+    assert seen == postgres_connect_options(url) and seen["connect_timeout"] > 0
+
+
 # ── PostgreSQL (PRISM_TEST_POSTGRES_URL) ────────────────────────────────────
 
 POSTGRES_URL = os.environ.get("PRISM_TEST_POSTGRES_URL")

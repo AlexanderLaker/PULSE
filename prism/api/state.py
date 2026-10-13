@@ -13,6 +13,8 @@ dashboard shows and what the category drill-down computes with.
 """
 import logging
 import threading
+import time
+from contextlib import contextmanager
 
 from prism import database
 from prism.config import ModelConfig
@@ -23,11 +25,31 @@ logger = logging.getLogger(__name__)
 
 _lock = threading.RLock()
 _config = ModelConfig()
-_cache: dict = {"db_ready": False, "drivers": None, "drivers_stamp": None, "run": None}
+_cache: dict = {"db_ready": False, "drivers": None, "drivers_stamp": None, "run": None, "unreachable_until": 0.0}
+#: For this many seconds after the database could not be reached, a request
+#: that needs it is answered at once instead of trying again: requests that
+#: queued behind the failed one would otherwise each wait for attempts of
+#: their own.
+UNREACHABLE_GRACE_SECONDS = 5
 
 
 def model_config() -> ModelConfig:
     return _config
+
+
+@contextmanager
+def _reading():
+    """The lock, for a read of the database; at once DatabaseUnavailableError
+    (503) while the last failure to reach the database is less than
+    UNREACHABLE_GRACE_SECONDS old."""
+    with _lock:
+        if time.monotonic() < _cache["unreachable_until"]:
+            raise database.DatabaseUnavailableError("The database could not be reached a moment ago.")
+        try:
+            yield
+        except database.DatabaseUnavailableError:
+            _cache["unreachable_until"] = time.monotonic() + UNREACHABLE_GRACE_SECONDS
+            raise
 
 
 def ensure_schema() -> None:
@@ -48,7 +70,7 @@ def driver_set() -> DriverSet:
     table emptied or dropped, lost them; it is restored from its backup, never
     reseeded, so this raises DriversMissingError (503) until then.
     """
-    with _lock:
+    with _reading():
         ensure_schema()
         try:
             stamp = database.drivers_stamp()
@@ -79,7 +101,7 @@ def driver_set() -> DriverSet:
 
 def latest_run() -> dict | None:
     """The newest persisted run ({id, run_date, iterations, results}), or None."""
-    with _lock:
+    with _reading():
         ensure_schema()
         summary = database.latest_run_summary()
         if summary is None:
@@ -98,4 +120,4 @@ def reset_drivers() -> None:
 def reset() -> None:
     """Forget everything cached, including that the schema exists (for tests)."""
     with _lock:
-        _cache.update(db_ready=False, drivers=None, drivers_stamp=None, run=None)
+        _cache.update(db_ready=False, drivers=None, drivers_stamp=None, run=None, unreachable_until=0.0)
