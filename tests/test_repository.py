@@ -326,6 +326,15 @@ def test_next_dev_leaves_the_tracked_files_alone():
     assert re.search(r"^\s*agentRules:\s*false,", (REPO / "next.config.js").read_text(encoding="utf-8"), re.M)
 
 
+def test_the_image_optimiser_stays_off():
+    """The dashboard uses no next/image, so the optimiser's endpoint stays switched off."""
+    assert re.search(r"^\s*images:\s*\{\s*unoptimized:\s*true\s*\},", (REPO / "next.config.js").read_text(
+        encoding="utf-8"), re.M)
+    uses = [p for p in (REPO / "app").rglob("*.tsx") if "next/image" in p.read_text(encoding="utf-8")]
+    uses += [p for p in (REPO / "components").rglob("*.tsx") if "next/image" in p.read_text(encoding="utf-8")]
+    assert uses == []
+
+
 def test_every_response_carries_the_security_headers():
     """vercel.json sets them on every path, the API's included: no page may be framed, no response is
     sniffed, the referrer leaves as the origin only, and search engines are asked not to index."""

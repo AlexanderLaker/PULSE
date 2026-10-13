@@ -16,6 +16,9 @@ const nextConfig = {
   // CLAUDE.md on every `next dev`, which leaves the tree dirty and fails the
   // repository's own copy tests.
   agentRules: false,
+  // The dashboard uses no next/image, so the image optimiser stays off and
+  // its endpoint offers nothing to fetch.
+  images: { unoptimized: true },
   async rewrites() {
     if (process.env.NODE_ENV === 'production') return [];
     return [{ source: '/api/v1/:path*', destination: `${LOCAL_API_URL}/api/v1/:path*` }];
