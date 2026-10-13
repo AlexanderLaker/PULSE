@@ -70,27 +70,33 @@ because the previous code would recreate its own tables next to the migrated
 ones. The dashboard is unavailable from the deploy (step 4) until the
 migration has committed (step 5): plan a few quiet minutes.
 
-You need a clean checkout of the commit you are deploying (`git status`
-shows nothing to commit: a working tree that still holds files of an earlier
-release is put aside first, with `git stash` or a fresh clone), the Python
-environment from `requirements-dev.txt` and a `.env` whose `POSTGRES_URL`
-(or, when that is not set, `DATABASE_URL`) is the Neon production database.
-Vercel deploys `main` to production (Settings, Git). While that `.env` points
+You need a clean checkout of the commit you are deploying, best a fresh
+clone (`git status` says the working tree is clean; a checkout that still
+holds changed or untracked files of an earlier release stops the switch to
+the release, so put them aside first with `git stash --include-untracked`),
+the Python environment from `requirements-dev.txt` and a `.env` whose
+`POSTGRES_URL` (or, when that is not set, `DATABASE_URL`) is the Neon
+production database. Vercel deploys `main` to production (Settings, Git). While that `.env` points
 at production, every script in the checkout writes there: run the commands
 of this runbook only, not the development ones of README.md (a run with
 `--allow-test-size` would be stored in production and served at once).
 
-CI must have passed on that commit on GitHub before the day: push the
-release's branch and open a pull request into `main` without merging it. CI
-runs both jobs on the commit, Vercel builds a preview deployment of it with
-the Preview settings, and the project's Deployment Checks can then be set
-before step 4 (docs/OPERATIONS.md, Deploying).
+CI must have passed on that commit on GitHub before the day. First check
+that the Vercel project's Preview variables are values of their own, not
+production's (docs/OPERATIONS.md, Environments, Previews): the push builds a
+preview deployment with them. Then push the release's branch and open a
+pull request into `main`, but do not merge it there: step 4 merges it
+locally with `--ff-only`, so that `main` gets the very commit CI checked and
+the commit `/api/v1/health` names matches your checkout. CI runs both jobs
+on the commit, and the project's Deployment Checks can then be set before
+step 4 (docs/OPERATIONS.md, Deploying).
 
 Ask the admins and experts not to edit from step 1 until step 6: an edit made
-after the backup of step 1 would be lost if you roll back to it. Set a limit
-for steps 4 to 6 before you start, half an hour for example: if step 6 has
-not confirmed the migrated service by then, roll back as Rollback describes
-and try again another day.
+after the backup of step 1 would be lost if you roll back to it. The
+corrections steps 2 and 5 may ask for are the exception: take step 1 again
+after them. Set a limit for steps 4 to 6 before you start, half an hour for
+example: if step 6 has not confirmed the migrated service by then, roll back
+as Rollback describes and try again another day.
 
 0. **Compare the settings.** The Vercel project's environment variables
    (Production) must be the ones README.md's table lists. Delete any that
@@ -137,15 +143,16 @@ and try again another day.
    production, in the dashboard that is still deployed: a driver's scores in
    its editor, and a journey tile in the Consumer Journey editor. A force, a
    start year or a confidence, which that dashboard cannot edit, is
-   corrected with SQL. Then delete the rehearsal branch and start this step
-   again from a fresh one.
+   corrected with SQL. Then take step 1 again, delete the rehearsal branch
+   and start this step again from a fresh one.
 
    The dry run also refuses a column of `journey_content` or `audit_log`
    that the driver schema does not know (no release has had one), since only
    the owner can say whether its values matter. Copy them out and drop the
-   column in production, then start this step again (a kept table that lacks
-   one of its columns is refused too; every release has had them all, so
-   such a database was changed by hand and needs the owner's look first):
+   column in production, then take step 1 again and start this step again
+   (a kept table that lacks one of its columns is refused too; every release
+   has had them all, so such a database was changed by hand and needs the
+   owner's look first):
 
    ```bash
    export PRODUCTION='<the production branch connection string>'
@@ -200,10 +207,12 @@ and try again another day.
    while the dry run runs the live dashboard's database reads wait. Run it at
    a quiet moment; it takes about a minute.
 
-4. **Deploy.** Merge the release into `main` and push. Vercel builds and
-   promotes it in about two minutes, or once CI has passed where the project's
-   Deployment Checks ask for that (docs/OPERATIONS.md, Deploying); watch it in
-   the Vercel dashboard. From now until step 5 the dashboard reports that
+4. **Deploy.** Merge the release into `main` in your checkout and push it:
+   `git switch main`, `git merge --ff-only <the release's branch>` and
+   `git push origin main` (not the pull request's merge button, which would
+   make a new commit). Vercel builds and promotes it in about two minutes, or
+   once CI has passed where the project's Deployment Checks ask for that
+   (docs/OPERATIONS.md, Deploying); watch it in the Vercel dashboard. From now until step 5 the dashboard reports that
    PRISM is being updated, and `/api/v1/health` answers `"status": "degraded"`
    with `"simulation_reason": "migration_pending"` and the release's commit in
    `commit`, its first 12 characters (`git rev-parse --short=12 HEAD` in the
@@ -227,11 +236,11 @@ and try again another day.
    If it exits with code 1, nothing changed either, and the message says
    why. When it lists drivers or journey content to correct, something was
    changed after the preview: promote the previous production deployment in
-   Vercel, correct the listed problems in its dashboard as in step 2 and run
-   step 3 again; then promote the release's deployment again (Deployments,
-   the release's deployment, Promote to Production) and run this step
-   again. When it cannot open the database, check the connection string and
-   the network, and run this step again.
+   Vercel, correct the listed problems in its dashboard as in step 2, take
+   step 1 again and run step 3 again; then promote the release's deployment
+   again (Deployments, the release's deployment, Promote to Production) and
+   run this step again. When it cannot open the database, check the
+   connection string and the network, and run this step again.
 
 6. **Check.** `https://prism-hcb.vercel.app/api/v1/health` answers
    `"status": "ok"` with `"driver_count": 51`, `"has_simulation": true` and
