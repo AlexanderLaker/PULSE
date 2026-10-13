@@ -63,6 +63,7 @@ describe('Shift Analysis without a run', () => {
       [diagnosis({ simulation_reason: 'db_error', db_reachable: false }), 'The API cannot reach the database'],
       [diagnosis({ simulation_reason: 'migration_pending' }), 'The database awaits a migration'],
       [diagnosis({ simulation_reason: 'no_database', db_reachable: false }), 'No database configured'],
+      [diagnosis({ simulation_reason: 'drivers_missing', latest_run_id: 99 }), 'The database has lost its drivers'],
     ];
     for (const [result, title] of cases) {
       STORE.store = makeStore({ simulation: null });

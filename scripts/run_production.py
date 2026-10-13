@@ -70,7 +70,8 @@ from prism.config import (CATEGORIES, ESTIMATE_SOURCE_PREFIX, POSITIVE_DEFINITE_
                           PRODUCTION_ITERATIONS, PRODUCTION_SEED, REGIONS, ModelConfig, cell_weight_marginals)
 from prism.config_validation import correlation_lambda_min, validate_model_config, validate_run_size  # noqa: E402
 from prism.database import (POSTGRES_URL, USE_POSTGRES, MigrationPendingError, describe_error,  # noqa: E402
-                            init_db, insert_drivers, load_drivers, load_latest_run, save_simulation_run)
+                            holds_history, init_db, insert_drivers, load_drivers, load_latest_run,
+                            save_simulation_run)
 from prism.drivers import DriverSet, simulation_problems  # noqa: E402
 from prism.engine import MonteCarloEngine  # noqa: E402
 from prism.input_drift import compare_with_run, driver_fingerprint, not_compared_event  # noqa: E402
@@ -237,14 +238,16 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as e:  # noqa: BLE001 (reported with exit code 1)
         log.error("Cannot read the database: %s", e)
         return 1
-    if not drivers and not USE_POSTGRES:
+    if not drivers and not USE_POSTGRES and not holds_history():
         # A new local file: seeded with the driver base, as the API would on first use.
         insert_drivers(get_seed_drivers())
         drivers = load_drivers()
-        log.info("The local SQLite file held no drivers; seeded it with the %d of the driver base.", len(drivers))
+        log.info("The new local SQLite file held no drivers; seeded it with the %d of the driver base.",
+                 len(drivers))
     if not drivers:
-        log.error("The database holds no drivers. PRISM seeds a new database when the API first uses it; "
-                  "a production database that lost its drivers is restored from its backup.")
+        log.error("The database holds no drivers. PRISM seeds only a new database (the API on its first use, "
+                  "this run for a new local file); a database that lost its drivers is restored from its "
+                  "backup, and a local file can be deleted to start afresh.")
         return 2
     problems = simulation_problems(drivers)
     if problems:

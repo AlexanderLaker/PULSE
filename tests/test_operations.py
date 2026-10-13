@@ -48,6 +48,19 @@ class TestProductionRun:
         assert len(dbm.load_drivers()) == 51
         assert dbm.load_latest_run()["results"]["meta"]["driver_count"] == 51
 
+    def test_a_local_file_that_lost_its_drivers_is_not_reseeded(self, production, monkeypatch, tmp_path):
+        """The API's rule: a database that stores a run but no drivers lost them, so neither the API nor
+        the run fills it with the driver base."""
+        monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "lost.db"))
+        import prism.database as dbm
+        dbm.init_db()
+        assert production.main(["--allow-sqlite", "--iterations", "200"]) == 0
+        with dbm.get_db_connection() as conn:
+            for table in ("driver_sources", "driver_regional_exposure", "driver_category_exposure", "drivers"):
+                conn.cursor().execute(f"DELETE FROM {table}")
+        assert production.main(["--allow-sqlite", "--iterations", "200"]) == 2
+        assert dbm.load_drivers() == []
+
     def test_an_empty_postgresql_database_is_refused(self, production, monkeypatch, tmp_path):
         """PostgreSQL is never seeded by the run: an empty one is a new database the API has not started
         on, or a production database that lost its drivers and is restored from its backup."""

@@ -10,7 +10,8 @@ import { S, SHADOW, HEADLINE_FONT, MONO_FONT } from '@/lib/theme';
 import type { DiagnosticsResult } from '@/types';
 
 /** Why the page has no run to show. */
-type NoRunReason = 'unreachable' | 'migrating' | 'not_configured' | 'db_unreachable' | 'unservable' | 'no_run';
+type NoRunReason = 'unreachable' | 'migrating' | 'not_configured' | 'drivers_lost' | 'db_unreachable' | 'unservable'
+  | 'no_run';
 
 /** The reason from the service's diagnosis; undefined while the diagnosis is still loading. */
 export function noRunReason(
@@ -20,6 +21,7 @@ export function noRunReason(
   if (diagnostics === undefined) return undefined;
   if (diagnostics.simulation_reason === 'migration_pending') return 'migrating';
   if (diagnostics.simulation_reason === 'no_database') return 'not_configured';
+  if (diagnostics.simulation_reason === 'drivers_missing') return 'drivers_lost';
   if (!diagnostics.db_reachable || diagnostics.simulation_reason === 'db_error') return 'db_unreachable';
   if (diagnostics.simulation_reason === 'malformed') return 'unservable';
   if (diagnostics.simulation_reason === 'no_rows') return 'no_run';
@@ -32,6 +34,7 @@ const NO_RUN_TITLE: Record<NoRunReason, { viewer: string; admin: string }> = {
   unreachable:    { viewer: 'Results unavailable right now', admin: 'The run cannot be loaded' },
   migrating:      { viewer: 'PRISM is being updated', admin: 'The database awaits a migration' },
   not_configured: { viewer: 'Data connection issue', admin: 'No database configured' },
+  drivers_lost:   { viewer: 'Results unavailable right now', admin: 'The database has lost its drivers' },
   db_unreachable: { viewer: 'Data connection issue', admin: 'The API cannot reach the database' },
   unservable:     { viewer: 'Latest run needs a refresh', admin: 'Latest run cannot be served' },
   no_run:         { viewer: 'No simulation available yet', admin: 'No run stored yet' },
@@ -100,6 +103,19 @@ export const NoRunState: FC<{
             <code style={CODE}>POSTGRES_URL</code>). Set it in the Vercel project settings to the Neon database
             the production runs write to, then redeploy.
           </p>
+        ) : reason === 'drivers_lost' ? (
+          <>
+            <p>
+              The database holds earlier runs or driver edits but no drivers, so they were lost. Restore it
+              from its backup (docs/OPERATIONS.md, Backups and restore); PRISM does not fill it with the
+              driver base.
+            </p>
+            {diagnostics?.error && (
+              <p style={{ fontFamily: MONO_FONT, fontSize: '12px', color: S.error }}>
+                {diagnostics.error}
+              </p>
+            )}
+          </>
         ) : reason === 'unreachable' ? (
           <>
             <p>

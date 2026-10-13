@@ -20,7 +20,7 @@ export const SERVICE_NOTICES: Record<DatabaseFailure, string> = {
   no_database:
     'This deployment has no database configured, so there is nothing to show. An administrator sets DATABASE_URL in the Vercel project settings.',
   drivers_missing:
-    'The database holds earlier runs but no drivers, so its drivers were lost. An administrator restores the database from its backup, and PRISM reloads by itself once that is done.',
+    'The database holds earlier runs or driver edits but no drivers, so its drivers were lost. An administrator restores the database from its backup, and PRISM reloads by itself once that is done.',
   db_error:
     'The database cannot be reached right now. PRISM keeps trying and reloads by itself once it answers.',
 };

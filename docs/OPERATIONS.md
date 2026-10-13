@@ -235,7 +235,7 @@ derivation when the estimate was used), the velocities and the run's metadata.
 |---|---|
 | `--cell-weights FILE` | the finance cell weights instead of the estimate |
 | `--iterations N`, `--chains N` | iterations per chain (default 50,000; 100 to 1,000,000) and chains (default 3; 1 to 10) |
-| `--allow-sqlite` | use the local SQLite file when no database URL is set; a file without drivers is seeded with the driver base first |
+| `--allow-sqlite` | use the local SQLite file when no database URL is set; a new file is seeded with the driver base first |
 | `--allow-test-size` | on PostgreSQL, accept a size other than the production one (a development database) |
 | `--allow-nonpsd` | run although the correlation matrix is not positive definite on this driver mix; the engine repairs it and records an integrity event |
 
@@ -265,7 +265,7 @@ mistaken for the estimate.
 |---|---|
 | 0 | the run is persisted (the workbook is best effort) |
 | 1 | no usable database: none configured (without `--allow-sqlite`), unreachable, or awaiting a migration (the message names it) |
-| 2 | the PostgreSQL database holds no drivers: a new database gets them when the API first uses it, a production database that lost them is restored from its backup (2 is also the code for a command line the script cannot read) |
+| 2 | the database holds no drivers: a new PostgreSQL database gets them when the API first uses it; one that lost them (it stores runs or driver edits) is restored from its backup, or, a local file, deleted to start afresh (2 is also the code for a command line the script cannot read) |
 | 3 | the simulation ran but storing it failed; the dashboard keeps serving the previous run |
 | 4 | the correlation matrix is not positive definite on this driver mix |
 | 5 | the run size is outside its range, or other than the production one on PostgreSQL without `--allow-test-size`; the configuration in `prism/config.py` is invalid; or the cell-weights file is missing or invalid |
@@ -500,7 +500,7 @@ sign-up.
 | Symptom | Cause and remedy |
 |---|---|
 | Every data request answers 401 | The dashboard and the API see different `PRISM_JWT_SECRET` values, or the value is shorter than 32 characters. Set the same value everywhere and redeploy |
-| The dashboard says the service is unavailable, or a notice under the navigation says the data cannot be loaded | Check `/api/v1/health` and `/api/v1/diagnostics`. `simulation_reason` names the cause: `migration_pending` (the database needs a migration; the `error` field of `/diagnostics` names it), `no_database` (neither `DATABASE_URL` nor `POSTGRES_URL` is set in this Vercel deployment), `drivers_missing` in `/health` (the database stores runs or driver edits but no drivers, so they were lost: restore it as under Backups and restore; PRISM seeds only a new database) or `db_error` (the API cannot reach the database or a query failed; the `error` field of `/diagnostics` says why) |
+| The dashboard says the service is unavailable, or a notice under the navigation says the data cannot be loaded | Check `/api/v1/health` and `/api/v1/diagnostics`. `simulation_reason` names the cause: `migration_pending` (the database needs a migration; the `error` field of `/diagnostics` names it), `no_database` (neither `DATABASE_URL` nor `POSTGRES_URL` is set in this Vercel deployment), `drivers_missing` (the database stores runs or driver edits but no drivers, so they were lost: restore it as under Backups and restore; PRISM seeds only a new database) or `db_error` (the API cannot reach the database or a query failed; the `error` field of `/diagnostics` says why) |
 | The Shift Analysis is empty | `simulation_reason` in `/api/v1/diagnostics` is `no_rows` (write a run) or `malformed` (the newest run lacks a part the dashboard needs, such as a key, a category, region or year, a gross-profit share, its run metadata or a complete driver fingerprint; the `error` field lists them; write a new run) |
 | Nobody is admin | The webhook did not reach the dashboard: check its deliveries in the Clerk dashboard, then set the role as described under Roles |
 | The production run exits with 4 | The correlation settings are not positive definite on the current driver mix; lower the cross-force correlations in `prism/config.py` |

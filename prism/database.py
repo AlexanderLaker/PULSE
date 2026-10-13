@@ -426,8 +426,10 @@ def diagnose_connection() -> dict[str, Any]:
 
     Never raises: a failure is reported in ``error`` as describe_error()
     words, so the dashboard can tell "cannot reach the database" from
-    "reachable but empty". The answer is anonymous, so it names nothing about
-    the database itself: no host, no user, no credential.
+    "reachable but empty" and from a database that lost its drivers
+    (``reason`` drivers_missing, as in /api/v1/health). The answer is
+    anonymous, so it names nothing about the database itself: no host, no
+    user, no credential.
     """
     out: dict[str, Any] = {
         "db_reachable": False,
@@ -453,6 +455,11 @@ def diagnose_connection() -> dict[str, Any]:
         latest = latest_run_summary()
         if latest:
             out["latest_run_id"] = latest["id"]
+        if "drivers" in tables and drivers_stamp()[0] == 0 and holds_history():
+            # A database that lost its drivers: the run may still be there, but
+            # nothing is served until the database is restored.
+            missing = DriversMissingError()
+            out["error"], out["reason"] = describe_error(missing), failure_reason(missing)
     except Exception as e:  # noqa: BLE001 (reported, never raised)
         out["error"], out["reason"] = describe_error(e), failure_reason(e)
         logger.warning("diagnose_connection: database probe failed: %s", e)

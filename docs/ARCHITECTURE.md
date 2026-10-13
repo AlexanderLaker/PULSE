@@ -52,9 +52,9 @@ scipy) and the database URL, and it:
 6. writes a QA workbook to `runs/` (git-ignored).
 
 On PostgreSQL a stored run is served at once, so only the production size
-runs there unless `--allow-test-size` is given; a local SQLite file
-(`--allow-sqlite`) that holds no drivers is seeded with the driver base
-first.
+runs there unless `--allow-test-size` is given; a new local SQLite file
+(`--allow-sqlite`) is seeded with the driver base first, and one that lost
+its drivers is not.
 
 Without `--cell-weights FILE` the run weights its cells with the estimated
 HCB mix of `prism/config.py`; with it, with the finance shares in the file.
@@ -96,8 +96,8 @@ engine.
 
 | Route | Access | Answer |
 |---|---|---|
-| `GET /api/v1/health` | anonymous | Status, version, the commit the deployment was built from, driver count, whether a run exists and its id; when the database cannot be used, status `degraded` and the reason (`migration_pending`, `no_database` or `db_error`) |
-| `GET /api/v1/diagnostics` | anonymous | Whether this instance reaches the database, how many runs it holds and whether the latest can be served; it names nothing about the database itself |
+| `GET /api/v1/health` | anonymous | Status, version, the commit the deployment was built from, driver count, whether a run exists and its id; when the database cannot be used, status `degraded` and the reason (`migration_pending`, `no_database`, `drivers_missing` or `db_error`) |
+| `GET /api/v1/diagnostics` | anonymous | Whether this instance reaches the database, how many runs it holds and whether the latest can be served, with the same reasons as `/health` when the database cannot be used; it names nothing about the database itself |
 | `GET /api/v1/drivers` | signed in | Every driver with its scores, sources, PRISM Analysis (from `prism/analysis_texts.py`, which ships with the code), baseline and a summary of the expert proposals |
 | `PUT /api/v1/drivers/{id}` | admin | An edit of the fields sent, made on the driver revision the request names (409 when the driver changed since); an exposure map changes only the cells it names; every changed field goes to the audit log. Name, force and onset are not edited here, and a peak year must fall after the onset |
 | `GET /api/v1/drivers/{id}/proposals` | signed in | The caller's own proposal, the aggregate across experts and who scored what |
@@ -135,7 +135,7 @@ another instance is therefore visible on the next such request.
 On an empty database the API creates the tables and seeds the driver base
 (`prism/seed_drivers.py`). It seeds only a new database: one that stores a
 run or an audited driver edit but no drivers has lost them, so the API
-answers 503 (`drivers_missing` in `/health`) until it is restored from its
+answers 503 (`drivers_missing` in `/health` and `/diagnostics`) until it is restored from its
 backup, never filling it with the base. On a database that still needs a
 migration it creates nothing and answers 503 naming the migration
 (`migrations/0001_driver_schema`, run with its README as the runbook); on

@@ -54,7 +54,9 @@ def diagnostics():
     """What this server instance sees of the database and the latest run.
 
     Lets the dashboard tell "cannot reach the database" from "reachable but
-    empty" from "the latest run cannot be served". The route is anonymous, so
+    empty" from "the latest run cannot be served", and a database that lost
+    its drivers (drivers_missing) from all of them; the documented uptime
+    check alerts on any reason other than "ok". The route is anonymous, so
     errors are described in words that name no host, user or password
     (database.describe_error) and nothing else about the database is shown.
     """

@@ -230,6 +230,11 @@ class TestHealthAndDiagnostics:
         assert response.status_code == 503 and "restore it from its backup" in response.json()["detail"]
         health = api.get("/api/v1/health").json()
         assert health["status"] == "degraded" and health["simulation_reason"] == "drivers_missing"
+        # The uptime check reads /diagnostics and alerts on any reason but "ok", so it must say so too,
+        # although the run itself is intact.
+        diag = api.get("/api/v1/diagnostics").json()
+        assert diag["simulation_reason"] == "drivers_missing" and "restore it from its backup" in diag["error"]
+        assert diag["db_reachable"] is True and diag["latest_run_id"] is not None
         assert dbm.load_drivers() == []
 
     @pytest.mark.parametrize("entity_type, seeded", [("driver", False), ("user", True)])
