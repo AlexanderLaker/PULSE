@@ -457,7 +457,8 @@ def diagnose_connection() -> dict[str, Any]:
             out["latest_run_id"] = latest["id"]
         if ("drivers" not in tables or drivers_stamp()[0] == 0) and holds_history():
             # A database that lost its drivers, emptied or dropped: the run may
-            # still be there, but nothing is served until it is restored.
+            # still be there, but neither it nor the drivers are served until
+            # the database is restored.
             missing = DriversMissingError()
             out["error"], out["reason"] = describe_error(missing), failure_reason(missing)
     except Exception as e:  # noqa: BLE001 (reported, never raised)

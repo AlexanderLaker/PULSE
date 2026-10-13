@@ -236,6 +236,14 @@ class TestHealthAndDiagnostics:
         assert diag["simulation_reason"] == "drivers_missing" and "restore it from its backup" in diag["error"]
         assert diag["db_reachable"] is True and diag["latest_run_id"] is not None
         assert dbm.load_drivers() == []
+        # No write lands in a database that is about to be restored: a Journey save is refused too, while
+        # the configuration and the stored Journey stay readable.
+        save = {"base_version": 0, "content": {"lhc": [], "hair": []}}
+        response = api.put("/api/v1/journey", json=save, headers=bearer("admin"))
+        assert response.status_code == 503 and "restore it from its backup" in response.json()["detail"]
+        assert api.get("/api/v1/journey", headers=bearer()).status_code == 200
+        assert api.get("/api/v1/config", headers=bearer()).status_code == 200
+        assert dbm.load_journey_content()["version"] == 0
 
     @pytest.mark.parametrize("new_instance", [False, True], ids=["running-instance", "new-instance"])
     def test_a_dropped_drivers_table_is_lost_drivers_too(self, api, valid_run, new_instance):
@@ -257,6 +265,22 @@ class TestHealthAndDiagnostics:
         assert diag["simulation_reason"] == "drivers_missing" and "restore it from its backup" in diag["error"]
         response = api.get("/api/v1/drivers", headers=bearer())
         assert response.status_code == 503 and "restore it from its backup" in response.json()["detail"]
+
+    def test_an_unreachable_database_is_not_probed_for_a_lost_table(self, api, monkeypatch):
+        """A database out of reach is db_error at once: no second connection, with its own retries, to look
+        for a dropped table."""
+        import prism.database as dbm
+        assert api.get("/api/v1/health").json()["status"] == "ok"
+
+        def unreachable():
+            raise dbm.DatabaseUnavailableError("Failed to connect to the database after 3 attempts")
+
+        probes = []
+        monkeypatch.setattr(dbm, "drivers_stamp", unreachable)
+        monkeypatch.setattr(dbm, "drivers_table_lost", lambda: probes.append(1) or False)
+        body = api.get("/api/v1/health").json()
+        assert body["status"] == "degraded" and body["simulation_reason"] == "db_error"
+        assert probes == []
 
     @pytest.mark.parametrize("entity_type, seeded", [("driver", False), ("user", True)])
     def test_of_the_audit_log_only_a_driver_edit_counts_as_history(self, api, entity_type, seeded):

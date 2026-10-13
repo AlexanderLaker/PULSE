@@ -50,9 +50,11 @@ def create_app() -> FastAPI:
     @app.exception_handler(DatabaseNotConfiguredError)
     @app.exception_handler(DriversMissingError)
     def _not_ready(request: Request, exc: Exception) -> JSONResponse:
-        # The database needs a migration, no database is configured, or the
-        # database lost its drivers: nothing is served and nothing is written
-        # until that is fixed.
+        # The database needs a migration or no database is configured: nothing
+        # is served and nothing is written until that is fixed. A database that
+        # lost its drivers serves neither the drivers nor the run and takes no
+        # write until it is restored; the configuration and the stored Journey
+        # stay readable.
         return JSONResponse(status_code=503, content={"detail": str(exc)})
 
     @app.exception_handler(DatabaseUnavailableError)

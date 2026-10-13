@@ -135,8 +135,10 @@ another instance is therefore visible on the next such request.
 On an empty database the API creates the tables and seeds the driver base
 (`prism/seed_drivers.py`). It seeds only a new database: one that stores a
 run or an audited driver edit but no drivers has lost them, so the API
-answers 503 (`drivers_missing` in `/health` and `/diagnostics`) until it is restored from its
-backup, never filling it with the base. On a database that still needs a
+answers 503 for the drivers, the run and every write (`drivers_missing` in
+`/health` and `/diagnostics`) until it is restored from its backup, never
+filling it with the base; the configuration and the stored Journey stay
+readable. On a database that still needs a
 migration it creates nothing and answers 503 naming the migration
 (`migrations/0001_driver_schema`, run with its README as the runbook); on
 Vercel without a database URL it answers 503 too, rather than writing to a

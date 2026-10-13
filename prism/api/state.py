@@ -52,6 +52,8 @@ def driver_set() -> DriverSet:
         ensure_schema()
         try:
             stamp = database.drivers_stamp()
+        except (database.DatabaseUnavailableError, database.DatabaseNotConfiguredError):
+            raise   # the database is out of reach, not missing a table: no second round of retries
         except Exception as e:
             if database.drivers_table_lost():
                 raise database.DriversMissingError() from e

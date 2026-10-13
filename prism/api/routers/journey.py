@@ -40,7 +40,9 @@ def put_journey_content(body: JourneySave, user: dict = Depends(require_admin)):
     problem = content_problem(body.content)
     if problem:
         raise HTTPException(422, problem)
-    state.ensure_schema()
+    # A database that lost its drivers is restored from its backup, which would discard this save:
+    # driver_set() refuses it then (503, DriversMissingError), as it refuses the driver writes.
+    state.driver_set()
     user_id = identity_from_user(user)[0]
     n_tiles = sum(len(stage[side]) for j in JOURNEYS for stage in body.content[j] for side in SIDES)
 

@@ -441,6 +441,28 @@ class TestRunsJourneyAudit:
             cursor.execute("SELECT action, new_value, user_id FROM audit_log")
             assert [_values(r) for r in cursor.fetchall()] == [("journey_content_updated", f"version {v1}", "admin-1")]
 
+    @pytest.mark.parametrize("how", ["emptied", "dropped"])
+    def test_lost_drivers_are_diagnosed_emptied_or_dropped(self, db, how):
+        """A database that stores a run and no drivers lost them, whether the drivers table was emptied
+        or dropped (with CASCADE on PostgreSQL, which keeps the exposure and source rows)."""
+        db.save_simulation_run(1000, {"meta": {"n": 1}})
+        assert db.diagnose_connection()["reason"] is None and db.drivers_table_lost() is False
+        with db.get_db_connection() as conn:
+            cursor = conn.cursor()
+            if how == "emptied":
+                for table in ("driver_sources", "driver_regional_exposure", "driver_category_exposure",
+                              "driver_score_proposals", "drivers"):
+                    cursor.execute(f"DELETE FROM {table}")
+            elif db.USE_POSTGRES:
+                cursor.execute("DROP TABLE drivers CASCADE")
+            else:
+                cursor.execute("PRAGMA foreign_keys = OFF")
+                cursor.execute("DROP TABLE drivers")
+        diag = db.diagnose_connection()
+        assert diag["reason"] == "drivers_missing" and "restore it from its backup" in diag["error"]
+        assert diag["db_reachable"] is True and diag["latest_run_id"] is not None
+        assert db.drivers_table_lost() is (how == "dropped")
+
     def test_diagnostics_never_raise(self, db, monkeypatch):
         diag = db.diagnose_connection()
         assert diag["db_reachable"] is True and diag["error"] is None
