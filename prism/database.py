@@ -144,9 +144,10 @@ def sqlite_path() -> Path:
 
 def postgres_connect_options(url: str) -> dict:
     """What every PostgreSQL connection adds to its URL: TLS is required (a
-    local server for tests says sslmode=disable) and an attempt gives up after
-    CONNECT_TIMEOUT_SECONDS, unless the URL sets either itself. The API, the
-    scripts and the migration connect with these."""
+    local server for tests says sslmode=disable) and an attempt gives up on
+    each address of the server after CONNECT_TIMEOUT_SECONDS, unless the URL
+    sets either itself. The API, the scripts and the migration connect with
+    these."""
     from psycopg2.extensions import parse_dsn
     try:
         given = parse_dsn(url).keys()

@@ -566,8 +566,8 @@ class TestRunsJourneyAudit:
     ("postgresql://owner:s3cr%zzet@localhost/prism", "require", True),   # malformed: psycopg2 reports it
 ])
 def test_a_postgres_connection_requires_tls_and_gives_up_in_time(url, sslmode, timeout):
-    """Unless the URL says otherwise: TLS, and an attempt that waits CONNECT_TIMEOUT_SECONDS at most, so a
-    host that drops packets cannot hold the API's requests for minutes."""
+    """Unless the URL says otherwise: TLS, and an attempt that waits CONNECT_TIMEOUT_SECONDS at most for each
+    address of the server, so a host that drops packets cannot hold the API's requests for minutes."""
     from prism.database import CONNECT_TIMEOUT_SECONDS, postgres_connect_options
     expected = {**({"sslmode": sslmode} if sslmode else {}),
                 **({"connect_timeout": CONNECT_TIMEOUT_SECONDS} if timeout else {})}
