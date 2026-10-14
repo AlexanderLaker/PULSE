@@ -493,8 +493,9 @@ class TestRunsJourneyAudit:
             assert not any(secret in text for secret in ("owner", "s3cr", "ep-secret")), text
 
     def test_connecting_stops_within_the_budget(self, db, monkeypatch):
-        """A server that never answers costs each attempt the whole connect timeout: no attempt starts that
-        could end after CONNECT_BUDGET_SECONDS, so the API's 503 comes before the dashboard gives up."""
+        """A server whose one address never answers costs each attempt the whole connect timeout: no further
+        attempt starts that could end after CONNECT_BUDGET_SECONDS, so the API's 503 comes before the dashboard
+        gives up."""
         clock, starts = [0.0], []
 
         def silent():

@@ -52,9 +52,12 @@ SCHEMA_LOCK = int.from_bytes(b"prism", "big")
 #: a host that drops packets would hold each attempt for the operating
 #: system's TCP timeout, minutes, while requests queue behind the API's lock.
 CONNECT_TIMEOUT_SECONDS = 5
-#: get_db_connection starts no further attempt that could end after this many
-#: seconds of trying, so that a request hears its 503 well before the
-#: dashboard gives up on it (lib/apiClient.ts waits 20 seconds).
+#: get_db_connection starts a further attempt only if, at
+#: CONNECT_TIMEOUT_SECONDS more, it would end within this many seconds of the
+#: first, so that a request to a server whose one address does not answer
+#: hears its 503 well before the dashboard gives up on it (lib/apiClient.ts
+#: waits 20 seconds). Against a server with several addresses a single attempt
+#: takes CONNECT_TIMEOUT_SECONDS for each (docs/ARCHITECTURE.md).
 CONNECT_BUDGET_SECONDS = 12
 
 
@@ -179,8 +182,9 @@ def get_db_connection():
     """A connection that commits on success and rolls back on error.
 
     Connecting is tried up to three times with backoff, because a serverless
-    PostgreSQL endpoint can take a moment to wake up; no attempt starts that
-    could end after CONNECT_BUDGET_SECONDS.
+    PostgreSQL endpoint can take a moment to wake up; a further attempt starts
+    only if, at CONNECT_TIMEOUT_SECONDS more, it would end within
+    CONNECT_BUDGET_SECONDS of the first.
     """
     conn, last_error, attempts = None, None, 0
     started = time.monotonic()
