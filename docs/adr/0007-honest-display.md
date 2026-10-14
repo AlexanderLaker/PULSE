@@ -37,6 +37,9 @@ meaningless for independent draws.
   the matrix and names the drivers, instead of letting the matrix pass for
   the current state.
 - Direction never rests on colour alone: a shift carries its sign.
+- The Consumer Journey presents its tiles as strategist hypotheses, not
+  findings: they are authored, not all of them cite their sources yet, and
+  none feeds the Shift Matrix.
 
 ## Consequences
 

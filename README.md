@@ -34,7 +34,7 @@ Dashboard (Next.js)              Clerk sign-in, roles, four views
 ```
 
 The dashboard has four views: **Drivers** (the scored drivers, their sources
-and the PRISM Analysis of each), **Consumer Journey** (an authored overlay of
+and the PRISM Analysis of each), **Consumer Journey** (strategist hypotheses:
 consumer moments and the drivers behind them), **Profit Pool Shift Analysis**
 (the Shift Matrix with its drill-downs) and the **Profit Pool Explorer**
 (beta: sourced views of the industry profit pools).

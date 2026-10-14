@@ -61,9 +61,12 @@ describe('ConsumerJourney: rail and tile dialog', () => {
     expect(container.textContent).not.toContain('(auto-dose)');
   });
 
-  it('states its scope and that the Home Care journey is not built yet', () => {
+  it('states that its tiles are strategist hypotheses, its scope, and that the Home Care journey is not built yet', () => {
     render(<ConsumerJourney />);
-    expect(screen.getByText(/Authored content does not feed the Shift Matrix\./)).toBeTruthy();
+    expect(screen.getByText('Strategist hypotheses, not findings.')).toBeTruthy();
+    expect(screen.getByText(/not every tile cites its sources yet, and authored content does not feed the Shift Matrix\./))
+      .toBeTruthy();
+    expect(screen.queryByText(/click any tile for its evidence/)).toBeNull();
     expect(screen.getByText(/the Home Care \(dish \/ surface \/ WC\) journey is not built yet/)).toBeTruthy();
   });
 
