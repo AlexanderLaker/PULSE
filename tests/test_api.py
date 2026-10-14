@@ -296,14 +296,54 @@ class TestHealthAndDiagnostics:
         def unreachable():
             tries.append(clock[0])
             raise dbm.DatabaseUnavailableError("Failed to connect to the database after 2 attempts")
+        summaries = []
+
+        def no_summary():
+            summaries.append(clock[0])
+            raise dbm.DatabaseUnavailableError("Failed to connect to the database after 2 attempts")
         monkeypatch.setattr(dbm, "drivers_stamp", unreachable)
+        monkeypatch.setattr(dbm, "latest_run_summary", no_summary)
         monkeypatch.setattr(state, "time", types.SimpleNamespace(monotonic=lambda: clock[0]))
         assert api.get("/api/v1/drivers", headers=bearer()).status_code == 503 and len(tries) == 1
         assert api.get("/api/v1/drivers", headers=bearer()).status_code == 503 and len(tries) == 1
+        assert api.get("/api/v1/simulation", headers=bearer()).status_code == 503 and summaries == []
         body = api.get("/api/v1/health").json()
         assert body["simulation_reason"] == "db_error" and len(tries) == 1
         clock[0] += state.UNREACHABLE_GRACE_SECONDS
         assert api.get("/api/v1/drivers", headers=bearer()).status_code == 503 and len(tries) == 2
+        clock[0] += state.UNREACHABLE_GRACE_SECONDS
+        assert api.get("/api/v1/simulation", headers=bearer()).status_code == 503 and len(summaries) == 1
+
+    def test_requests_queued_behind_a_failure_answer_at_once(self, api, monkeypatch):
+        """The grace is checked inside the lock: of three requests that arrive while an attempt to reach the
+        database is failing, only that one reaches it; the other two answer as soon as it has failed."""
+        import threading
+
+        import prism.database as dbm
+        assert api.get("/api/v1/health").json()["status"] == "ok"
+        calls, failed, entered = [], [], threading.Event()
+
+        def slow_and_unreachable():
+            calls.append(1)
+            entered.set()
+            time.sleep(0.3)
+            raise dbm.DatabaseUnavailableError("Failed to connect to the database after 2 attempts")
+        monkeypatch.setattr(dbm, "drivers_stamp", slow_and_unreachable)
+
+        def read_the_drivers():
+            try:
+                state.driver_set()
+            except dbm.DatabaseUnavailableError:
+                failed.append(1)
+        first = threading.Thread(target=read_the_drivers)
+        first.start()
+        assert entered.wait(5)
+        queued = [threading.Thread(target=read_the_drivers) for _ in range(2)]
+        for thread in queued:
+            thread.start()
+        for thread in (first, *queued):
+            thread.join(10)
+        assert len(calls) == 1 and len(failed) == 3
 
     @pytest.mark.parametrize("entity_type, seeded", [("driver", False), ("user", True)])
     def test_of_the_audit_log_only_a_driver_edit_counts_as_history(self, api, entity_type, seeded):

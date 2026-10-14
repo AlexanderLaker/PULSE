@@ -164,6 +164,21 @@ def test_the_deployment_leaves_out_exactly_what_it_does_not_run(tmp_path):
     assert ignored(secrets_and_outputs) == set(secrets_and_outputs)
 
 
+def test_git_ignores_secrets_and_outputs(tmp_path):
+    """The secrets, the local databases and the outputs that can hold confidential figures or personal
+    data (workbooks, dumps, the migration's archive) never become tracked files."""
+    if shutil.which("git") is None:
+        pytest.skip("git is not installed")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / ".gitignore").write_text((REPO / ".gitignore").read_text(encoding="utf-8"), encoding="utf-8")
+    paths = [".env", ".env.production.local", "data/prism.db", "runs/prism_run_1.xlsx", "prism_20261015.dump",
+             "migrations/0001_driver_schema/archive/drivers-x.csv", "_NOT_FOR_HANDOVER/notes.md",
+             "PRISM_HANDOVER_2026-10-14.zip"]
+    out = subprocess.run(["git", "check-ignore", "--no-index", "-z", "--stdin"], cwd=tmp_path,
+                         input="\0".join(paths), capture_output=True, text=True).stdout
+    assert {p for p in out.split("\0") if p} == set(paths)
+
+
 def test_colours_come_from_the_theme():
     hits = []
     for path in FILES:
@@ -286,9 +301,12 @@ def test_the_handover_refuses_an_archive_holding_a_dump(tmp_path):
         pytest.skip("not a git checkout")
     clone = tmp_path / "clone"
     subprocess.run(["git", "clone", "-q", str(REPO), str(clone)], check=True)
+    # The script under test is this tree's, committed or not.
+    shutil.copy(REPO / "scripts" / "package_handover.sh", clone / "scripts" / "package_handover.sh")
     (clone / "notes").mkdir()
     (clone / "notes" / "prism_20261015.dump").write_bytes(b"PGDMP")
-    subprocess.run(["git", "add", "-f", "notes/prism_20261015.dump"], cwd=clone, check=True)
+    subprocess.run(["git", "add", "-f", "scripts/package_handover.sh", "notes/prism_20261015.dump"], cwd=clone,
+                   check=True)
     subprocess.run(["git", "-c", "user.name=Test", "-c", "user.email=test@example.org", "commit", "-q", "-m",
                     "a dump"], cwd=clone, check=True)
     result = subprocess.run(["bash", "scripts/package_handover.sh"], cwd=clone, capture_output=True, text=True)
@@ -348,11 +366,11 @@ def test_the_image_optimiser_stays_off():
     """The dashboard uses no next/image, so the optimiser's endpoint stays switched off."""
     assert re.search(r"^\s*images:\s*\{\s*unoptimized:\s*true\s*\},", (REPO / "next.config.js").read_text(
         encoding="utf-8"), re.M)
-    sources = [path for folder in ("app", "components", "data", "hooks", "lib", "types")
-               for pattern in ("*.ts", "*.tsx") for path in (REPO / folder).rglob(pattern)]
-    sources += [REPO / "proxy.ts"]
+    imports = re.compile(r"""(from|import\(|require\()\s*['"]next/(legacy/)?image['"]""")
+    sources = [path for path in FILES if path.suffix in {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}]
     assert [path.relative_to(REPO).as_posix() for path in sources
-            if re.search(r"next/(legacy/)?image", path.read_text(encoding="utf-8"))] == []
+            if imports.search(path.read_text(encoding="utf-8"))] == []
+    assert imports.search("import Image from 'next/image';") and imports.search('await import("next/legacy/image")')
 
 
 def test_every_response_carries_the_security_headers():
