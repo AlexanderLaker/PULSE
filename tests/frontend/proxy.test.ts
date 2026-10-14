@@ -7,17 +7,31 @@
  * has ended must still be able to do. /dashboard also needs a role: a
  * signed-in user without one, and everyone while user_roles cannot be read,
  * is redirected to /pending before the App Router renders anything. No other
- * route reads the role here.
+ * route reads the role here. Clerk's redirects and links lead to PRISM's own
+ * sign-in and sign-up pages, which the proxy and the root layout name.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { existsSync } from 'fs';
+import path from 'path';
+import type { ReactElement } from 'react';
 import { NextRequest } from 'next/server';
 
+const clerk = vi.hoisted(() => ({ options: undefined as unknown }));
 vi.mock('@clerk/nextjs/server', () => ({
-  clerkMiddleware: (handler: unknown) => handler,
+  clerkMiddleware: (handler: unknown, options: unknown) => {
+    clerk.options = options;
+    return handler;
+  },
   createRouteMatcher: (patterns: string[]) => (req: NextRequest) =>
     patterns.some((p) => new RegExp(`^${p}$`).test(req.nextUrl.pathname)),
 }));
+// The root layout, read for the props it gives Clerk; nothing is rendered.
+vi.mock('@clerk/nextjs', () => ({ ClerkProvider: () => null }));
+vi.mock('next/font/google', () => {
+  const font = () => ({ variable: 'font' });
+  return { Inter: font, Manrope: font, JetBrains_Mono: font };
+});
 
 const roles = vi.hoisted(() => ({ getRole: vi.fn() }));
 vi.mock('@/lib/roles', () => roles);
@@ -112,5 +126,23 @@ describe("proxy.ts's matcher", () => {
       expect(matches({ config, url }), url).toBe(true);
     }
     expect(matches({ config, url: '/_next/static/chunks/app.js' })).toBe(false);
+  });
+});
+
+describe("Clerk's pages", () => {
+  it("are PRISM's own sign-in and sign-up pages, for the proxy's redirects and for Clerk's components", async () => {
+    expect(clerk.options).toEqual({ signInUrl: '/sign-in', signUpUrl: '/sign-up' });
+    const { default: RootLayout } = await import('@/app/layout');
+    const provider = RootLayout({ children: null }) as ReactElement<Record<string, unknown>>;
+    expect(provider.props).toMatchObject({
+      signInUrl: '/sign-in',
+      signUpUrl: '/sign-up',
+      signInFallbackRedirectUrl: '/dashboard',
+      signUpFallbackRedirectUrl: '/dashboard',
+    });
+    const root = path.resolve(__dirname, '../..');
+    for (const page of ['app/(auth)/sign-in/[[...sign-in]]/page.tsx', 'app/(auth)/sign-up/[[...sign-up]]/page.tsx', 'app/dashboard/page.tsx']) {
+      expect(existsSync(path.join(root, page)), page).toBe(true);
+    }
   });
 });

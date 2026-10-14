@@ -36,6 +36,13 @@ export const viewport: Viewport = {
  * Tailwind only generates the classes it finds in the source. Primary buttons
  * are pills, headings use Manrope and body text Inter, and fields use soft
  * tonal fills instead of hard borders.
+ *
+ * The four URL props keep Clerk on PRISM's own pages: its links between the
+ * sign-in and sign-up forms lead to /sign-in and /sign-up (app/(auth)), not to
+ * Clerk's hosted pages, and a user who signs in or up with no page to return
+ * to lands on the dashboard, which sends an account without a role on to the
+ * waiting page. proxy.ts names the same pages for its redirects; neither
+ * needs an environment variable.
  */
 export default function RootLayout({
   children,
@@ -44,6 +51,10 @@ export default function RootLayout({
 }) {
   return (
     <ClerkProvider
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      signInFallbackRedirectUrl="/dashboard"
+      signUpFallbackRedirectUrl="/dashboard"
       appearance={{
         variables: {
           colorPrimary: S.primary,

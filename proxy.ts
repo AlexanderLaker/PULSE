@@ -15,6 +15,13 @@
  * database is read for /dashboard only; every other route checks the role
  * itself, where it needs one.
  *
+ * The redirect goes to PRISM's own sign-in page because clerkMiddleware is
+ * told its path below, as the root layout (app/layout.tsx) tells Clerk's
+ * components; without them Clerk would send visitors to its hosted pages.
+ * These paths need no environment variable and win over Clerk's
+ * NEXT_PUBLIC_CLERK_SIGN_IN_URL and NEXT_PUBLIC_CLERK_SIGN_UP_URL where a
+ * deployment still sets them.
+ *
  * Public here:
  *   - /sign-in and /sign-up;
  *   - /api/webhooks/*, which authenticates by Svix signature;
@@ -53,20 +60,23 @@ async function hasRole(userId: string): Promise<boolean> {
   }
 }
 
-export default clerkMiddleware(async (auth, request) => {
-  if (isPublicRoute(request) || expiresTheCookie(request)) return;
-  const { userId, redirectToSignIn } = await auth();
-  if (userId) {
-    if (isDashboard(request) && !(await hasRole(userId))) {
-      return NextResponse.redirect(new URL('/pending', request.url));
+export default clerkMiddleware(
+  async (auth, request) => {
+    if (isPublicRoute(request) || expiresTheCookie(request)) return;
+    const { userId, redirectToSignIn } = await auth();
+    if (userId) {
+      if (isDashboard(request) && !(await hasRole(userId))) {
+        return NextResponse.redirect(new URL('/pending', request.url));
+      }
+      return;
     }
-    return;
-  }
-  if (request.nextUrl.pathname.startsWith('/api/')) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  return redirectToSignIn({ returnBackUrl: request.url });
-});
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    return redirectToSignIn({ returnBackUrl: request.url });
+  },
+  { signInUrl: '/sign-in', signUpUrl: '/sign-up' },
+);
 
 export const config = {
   matcher: [

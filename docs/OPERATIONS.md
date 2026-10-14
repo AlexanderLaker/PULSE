@@ -555,7 +555,9 @@ Two ways exist to set a role without an admin session:
 1. Create a Clerk application with email sign-in (and any SSO provider
    wanted).
 2. Copy the publishable and secret keys into
-   `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`.
+   `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`. PRISM names
+   its sign-in and sign-up pages to Clerk in code (`proxy.ts`,
+   `app/layout.tsx`), so none of Clerk's URL variables is needed.
 3. Add a webhook endpoint `https://<domain>/api/webhooks/clerk` for the
    events `user.updated` and `user.deleted` (`user.created` may be added; it
    changes nothing), and copy its signing secret into

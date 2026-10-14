@@ -99,12 +99,17 @@ example: if step 6 has not confirmed the migrated service by then, roll back
 as Rollback describes and try again another day.
 
 0. **Compare the settings.** The Vercel project's environment variables
-   (Production) must be the ones README.md's table lists, the two
+   (Production) must hold every one README.md's table lists, the two
    `ADMIN_BOOTSTRAP_*` only while a first admin is being set up and
-   `PRISM_ALLOWED_EMAIL_DOMAINS` only if wanted. Delete any that this release
-   no longer reads, such as `BACKEND_URL`, `PRISM_BACKEND_URL`,
-   `FORCE_DEV_PROXY` and `NEXT_PUBLIC_SIGNUP_CODE`; the database URLs,
-   `PRISM_JWT_SECRET` and the Clerk keys keep their names. In the Clerk
+   `PRISM_ALLOWED_EMAIL_DOMAINS` only if wanted; the database URLs,
+   `PRISM_JWT_SECRET` and the Clerk keys keep their names. Note the ones this
+   release no longer needs, such as `BACKEND_URL`, `PRISM_BACKEND_URL`,
+   `FORCE_DEV_PROXY`, `NEXT_PUBLIC_SIGNUP_CODE`, `UNSPLASH_ACCESS_KEY` and
+   Clerk's page settings (`NEXT_PUBLIC_CLERK_SIGN_IN_URL` and the three like
+   it; the code names PRISM's pages itself). They do no harm, and step 6
+   deletes them, so that a rollback which redeploys the previous release
+   still finds them. Variables a connected integration manages, such as
+   Neon's, stay while it is connected. In the Clerk
    dashboard (docs/OPERATIONS.md, Setting up Clerk), check that sign-up is
    restricted (Access mode: Invite-only, or an allowlist of the company's
    email domain) and that the Account Portal's sign-up fallback redirect is
@@ -260,6 +265,8 @@ as Rollback describes and try again another day.
    dashboard, whose reads and saves the current service refuses. Then
    review the accounts in Settings, User management: set back to pending
    anyone who should not read PRISM (docs/OPERATIONS.md, Roles and users).
+   Last, delete the Vercel variables step 0 noted; the running deployment
+   keeps what it was built with, so nothing needs a redeploy.
 
 7. **Write a fresh run** so the served run carries the current names and
    labels. With the drivers unchanged since the last run, the numbers stay

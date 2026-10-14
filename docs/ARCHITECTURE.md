@@ -233,7 +233,12 @@ the admin bootstrap route (which checks a shared secret) and
 `DELETE /api/prism-cookie`, which only expires the cookie. `/api/v1` is left to
 the API's own checks. `proxy.ts` reads `user_roles` for `/dashboard` only
 (above); every other page and route checks the role itself where it needs
-one.
+one. A page without a session goes to PRISM's own sign-in page: `proxy.ts`
+and the root layout (`app/layout.tsx`) name the sign-in and sign-up pages to
+Clerk, which would otherwise send users to its hosted pages, and a sign-in
+or sign-up with no page to return to ends on the dashboard. No environment
+variable is involved, and these paths win over Clerk's own
+(`NEXT_PUBLIC_CLERK_SIGN_IN_URL` and the like) where a deployment sets them.
 
 The dashboard's server routes (`app/api`):
 
