@@ -37,9 +37,10 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 TEXT_SUFFIXES = {".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json", ".md", ".yml", ".yaml", ".css",
-                 ".sh", ".txt", ".toml", ".ini", ".example", ".html", ".svg"}
+                 ".sh", ".txt", ".toml", ".ini", ".in", ".example", ".html", ".svg"}
+TEXT_NAMES = {".gitignore", ".vercelignore", ".python-version"}
 SKIP_DIRS = {"node_modules", ".git", ".next", ".vercel", "__pycache__", ".venv", "venv", ".pytest_cache",
-             ".hypothesis", "runs", "archive"}
+             ".ruff_cache", ".hypothesis", "runs", "archive"}
 EM_DASH = chr(0x2014)
 
 #: The names before migration 0001, and the places allowed to name them.
@@ -82,11 +83,12 @@ def american_forms(text: str) -> list:
 
 
 def text_files(root: Path = REPO) -> list:
-    """The repository's text files. In a git checkout these are all the
-    tracked ones, so a local file that is not part of the repository never
-    adds or removes a case; outside one, every file under the tree except the
-    folders of SKIP_DIRS (tools, caches and local outputs) and the local
-    working folders at the root (a leading underscore, as .gitignore has it)."""
+    """The repository's text files, known by suffix (TEXT_SUFFIXES) or name
+    (TEXT_NAMES). In a git checkout these are the tracked ones, in any folder,
+    so a local file that is not part of the repository never adds or removes a
+    case; outside one, every such file under the tree except in the folders of
+    SKIP_DIRS (tools, caches and local outputs) and the local working folders
+    at the root (a leading underscore, as .gitignore has it)."""
     paths = None
     if shutil.which("git") and (root / ".git").exists():
         listed = subprocess.run(["git", "ls-files", "-z"], cwd=root, capture_output=True, text=True)
@@ -97,7 +99,7 @@ def text_files(root: Path = REPO) -> list:
                  if not any(part in SKIP_DIRS for part in path.relative_to(root).parts[:-1])
                  and not path.relative_to(root).parts[0].startswith("_")]
     return sorted(path for path in paths
-                  if path.is_file() and (path.suffix in TEXT_SUFFIXES or path.name in {".gitignore", ".vercelignore"}))
+                  if path.is_file() and (path.suffix in TEXT_SUFFIXES or path.name in TEXT_NAMES))
 
 
 FILES = text_files()
@@ -105,26 +107,29 @@ FILES = text_files()
 
 def test_the_sweep_sees_the_repository():
     names = {f.relative_to(REPO).as_posix() for f in FILES}
-    assert {"README.md", "prism/config.py", "lib/format.ts", "docs/MODEL.md", ".gitignore"} <= names
+    assert {"README.md", "prism/config.py", "lib/format.ts", "docs/MODEL.md", ".gitignore", ".python-version",
+            "requirements-dev.in"} <= names
 
 
-def test_the_sweep_reads_every_tracked_file(tmp_path):
-    """In a git checkout every tracked file is read, in a private folder (a leading underscore) or a folder
-    named in SKIP_DIRS too; outside one, the folders of SKIP_DIRS and the local working folders at the root
-    are left out."""
-    for name in ("app/_parts/Probe.jsx", "components/archive/Probe.tsx", "lib/a.ts", "_local/notes.md",
-                 "node_modules/x/index.js"):
+def test_the_sweep_reads_every_tracked_text_file(tmp_path):
+    """In a git checkout every tracked text file is read, in a private folder (a leading underscore) or a
+    folder named in SKIP_DIRS too; outside one, the folders of SKIP_DIRS and the local working folders at the
+    root are left out. Images are not text."""
+    for name in ("app/_parts/Probe.jsx", "components/archive/Probe.tsx", "lib/a.ts", "requirements.in",
+                 ".python-version", "public/logo.png", "_local/notes.md", "node_modules/x/index.js"):
         (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / name).write_text("x", encoding="utf-8")
 
     def names() -> set:
         return {path.relative_to(tmp_path).as_posix() for path in text_files(tmp_path)}
-    assert names() == {"app/_parts/Probe.jsx", "lib/a.ts"}
+    texts = {"app/_parts/Probe.jsx", "lib/a.ts", "requirements.in", ".python-version"}
+    assert names() == texts
     if shutil.which("git") is None:
         pytest.skip("git is not installed")
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
-    subprocess.run(["git", "add", "-f", "app", "components", "lib", "_local"], cwd=tmp_path, check=True)
-    assert names() == {"app/_parts/Probe.jsx", "components/archive/Probe.tsx", "lib/a.ts", "_local/notes.md"}
+    subprocess.run(["git", "add", "-f", "app", "components", "lib", "requirements.in", ".python-version", "public",
+                    "_local"], cwd=tmp_path, check=True)
+    assert names() == texts | {"components/archive/Probe.tsx", "_local/notes.md"}
 
 
 @pytest.mark.parametrize("path", FILES, ids=[f.relative_to(REPO).as_posix() for f in FILES])
@@ -190,12 +195,14 @@ def test_git_ignores_secrets_and_outputs(tmp_path):
         pytest.skip("git is not installed")
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     (tmp_path / ".gitignore").write_text((REPO / ".gitignore").read_text(encoding="utf-8"), encoding="utf-8")
-    # Each path matches one rule only, so a rule that goes missing leaves its path out.
-    paths = [".env", ".env.production.local", "data/prism.db", "runs/prism_run_1.json", "exports/figures.xlsx",
+    # Each path matches one rule only, so a rule that goes missing leaves its path out; the template stays
+    # tracked.
+    paths = [".env", ".env.production.local", ".clerk/.tmp/keyless.json", "data/prism.db", "data/prism.db-journal",
+             "data/prism.db-wal", "data/prism.db-shm", "runs/prism_run_1.json", "exports/figures.xlsx",
              "prism_20261015.dump", "migrations/0001_driver_schema/archive/drivers-x.csv",
              "_NOT_FOR_HANDOVER/notes.md", "PRISM_HANDOVER_2026-10-14.zip"]
     out = subprocess.run(["git", "check-ignore", "--no-index", "-z", "--stdin"], cwd=tmp_path,
-                         input="\0".join(paths), capture_output=True, text=True).stdout
+                         input="\0".join([*paths, ".env.example"]), capture_output=True, text=True).stdout
     assert {p for p in out.split("\0") if p} == set(paths)
 
 
@@ -204,7 +211,7 @@ def test_colours_come_from_the_theme():
     for path in FILES:
         rel = path.relative_to(REPO).as_posix()
         if (not rel.startswith(("app/", "components/", "hooks/", "lib/")) or rel in COLOUR_HOMES
-                or path.suffix not in {".ts", ".tsx", ".css"}):
+                or path.suffix not in {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".css"}):
             continue
         for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             if LITERAL_COLOUR.search(line):
