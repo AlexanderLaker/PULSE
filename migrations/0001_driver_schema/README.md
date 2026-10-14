@@ -360,10 +360,11 @@ driver field, a new tile shape):
 - then reword every other sentence that still speaks of the migration as
   present; this lists them, leaving out the content and the generated
   modules, which speak of migration in another sense (most of the hits say
-  that the API, the scripts and the migration do something):
+  that the API, the scripts and the migration do something, or point to the
+  folder `migrations/`, which is gone once no migration is left in it):
 
   ```bash
-  git grep -n -i -E 'migration 0001|0001_driver_schema|the migration|this migration|test_migration|migrate\.py' -- . ':!data' ':!prism/seed_drivers.py' ':!prism/analysis_texts.py'
+  git grep -n -i -E 'migration 0001|0001_driver_schema|the migration|this migration|test_migration|migrate\.py|migrations/' -- . ':!data' ':!prism/seed_drivers.py' ':!prism/analysis_texts.py'
   ```
 
 A database found later on the previous schema is migrated from the last
