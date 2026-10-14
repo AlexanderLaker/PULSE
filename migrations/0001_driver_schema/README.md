@@ -99,15 +99,19 @@ example: if step 6 has not confirmed the migrated service by then, roll back
 as Rollback describes and try again another day.
 
 0. **Compare the settings.** The Vercel project's environment variables
-   (Production) must be the ones README.md's table lists. Delete any that
-   this release no longer reads, such as `BACKEND_URL`, `PRISM_BACKEND_URL`
-   and `FORCE_DEV_PROXY`; the database URLs, `PRISM_JWT_SECRET` and the Clerk
-   keys keep their names. In the Clerk dashboard, check that sign-up is
+   (Production) must be the ones README.md's table lists, the two
+   `ADMIN_BOOTSTRAP_*` only while a first admin is being set up and
+   `PRISM_ALLOWED_EMAIL_DOMAINS` only if wanted. Delete any that this release
+   no longer reads, such as `BACKEND_URL`, `PRISM_BACKEND_URL`,
+   `FORCE_DEV_PROXY` and `NEXT_PUBLIC_SIGNUP_CODE`; the database URLs,
+   `PRISM_JWT_SECRET` and the Clerk keys keep their names. In the Clerk
+   dashboard (docs/OPERATIONS.md, Setting up Clerk), check that sign-up is
    restricted (Access mode: Invite-only, or an allowlist of the company's
-   email domain; docs/OPERATIONS.md, Setting up Clerk). A new account waits
-   for an admin's approval, but a user who already has a row in `user_roles`
-   keeps their role and can read PRISM and propose scores: review the
-   accounts first (docs/OPERATIONS.md, Roles and users).
+   email domain), turn on multi-factor authentication if the Clerk plan
+   includes it, and delete under Users any account nobody recognises. A new
+   account waits for an admin's approval, but a user who already has a row
+   in `user_roles` keeps their role and can read PRISM and propose scores
+   until step 6 reviews them.
 
 1. **Back up.** In the Neon console, create a branch of the production branch
    (Branches, Create branch, from the current state). It is an instant
@@ -252,7 +256,9 @@ as Rollback describes and try again another day.
    persisted run with its 2035 portfolio median of -5.6 percent (on the
    estimated cell weights). Ask everyone who had the dashboard open to
    reload it: a page loaded before the deploy still runs the previous
-   dashboard, whose reads and saves the current service refuses.
+   dashboard, whose reads and saves the current service refuses. Then
+   review the accounts in Settings, User management: set back to pending
+   anyone who should not read PRISM (docs/OPERATIONS.md, Roles and users).
 
 7. **Write a fresh run** so the served run carries the current names and
    labels. With the drivers unchanged since the last run, the numbers stay

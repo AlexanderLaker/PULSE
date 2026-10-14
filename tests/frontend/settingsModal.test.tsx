@@ -228,30 +228,56 @@ describe('User management', () => {
     expect(own.disabled).toBe(true);
   });
 
-  it('approves a pending user with a role through api.setUserRole', async () => {
+  /** The confirmation a change of access waits for, inside the user's row. */
+  const confirmationFor = (email: string) => within(screen.getByRole('group', { name: `Confirm the change for ${email}` }));
+
+  it('approves a pending user with a role through api.setUserRole, once the admin confirms', async () => {
     openModal(true);
     openSection('User management');
     const alan = await screen.findByRole('combobox', { name: 'Access of alan@example.com' }) as HTMLSelectElement;
     expect(alan.value).toBe('pending');
 
     fireEvent.change(alan, { target: { value: 'viewer' } });
+    expect(API.setUserRole).not.toHaveBeenCalled();
+    expect(confirmationFor('alan@example.com').getByText('Approve alan@example.com as a viewer?')).toBeTruthy();
+    fireEvent.click(confirmationFor('alan@example.com').getByRole('button', { name: 'Confirm' }));
     expect(await screen.findByText('alan@example.com is approved as viewer.')).toBeTruthy();
     expect(API.setUserRole).toHaveBeenCalledWith('user_alan', 'viewer');
     expect(alan.value).toBe('viewer');
     expect(screen.getByText('All users (3)')).toBeTruthy();
   });
 
-  it('takes a role away through api.revokeUserRole: the user is pending again', async () => {
+  it('takes a role away through api.revokeUserRole once the admin confirms: the user is pending again', async () => {
     openModal(true);
     openSection('User management');
     const grace = await screen.findByRole('combobox', { name: 'Access of grace@example.com' }) as HTMLSelectElement;
 
     fireEvent.change(grace, { target: { value: 'pending' } });
+    expect(confirmationFor('grace@example.com')
+      .getByText('Take access away from grace@example.com? From their next page load they see the waiting page.')).toBeTruthy();
+    fireEvent.click(confirmationFor('grace@example.com').getByRole('button', { name: 'Take access away' }));
     expect(await screen.findByText(/^grace@example\.com is pending again: from their next page load they see the waiting page/))
       .toBeTruthy();
     expect(API.revokeUserRole).toHaveBeenCalledWith('user_grace');
     expect(API.setUserRole).not.toHaveBeenCalled();
     expect(grace.value).toBe('pending');
+  });
+
+  it('changes nothing when the admin cancels, or picks the access the user has', async () => {
+    openModal(true);
+    openSection('User management');
+    const grace = await screen.findByRole('combobox', { name: 'Access of grace@example.com' }) as HTMLSelectElement;
+
+    fireEvent.change(grace, { target: { value: 'pending' } });
+    fireEvent.click(confirmationFor('grace@example.com').getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('group', { name: 'Confirm the change for grace@example.com' })).toBeNull();
+    expect(grace.value).toBe('viewer');
+
+    fireEvent.change(grace, { target: { value: 'admin' } });
+    fireEvent.change(grace, { target: { value: 'viewer' } });
+    expect(screen.queryByRole('group', { name: 'Confirm the change for grace@example.com' })).toBeNull();
+    expect(API.revokeUserRole).not.toHaveBeenCalled();
+    expect(API.setUserRole).not.toHaveBeenCalled();
   });
 
   it('changes a role through api.setUserRole and shows a failure', async () => {
@@ -260,12 +286,15 @@ describe('User management', () => {
     const grace = await screen.findByRole('combobox', { name: 'Access of grace@example.com' }) as HTMLSelectElement;
 
     fireEvent.change(grace, { target: { value: 'admin' } });
+    expect(confirmationFor('grace@example.com').getByText('Make grace@example.com an admin?')).toBeTruthy();
+    fireEvent.click(confirmationFor('grace@example.com').getByRole('button', { name: 'Confirm' }));
     expect(await screen.findByText('Role updated.')).toBeTruthy();
     expect(API.setUserRole).toHaveBeenCalledWith('user_grace', 'admin');
     expect(grace.value).toBe('admin');
 
     API.setUserRole.mockRejectedValueOnce(new Error('Admin role required'));
     fireEvent.change(grace, { target: { value: 'viewer' } });
+    fireEvent.click(confirmationFor('grace@example.com').getByRole('button', { name: 'Confirm' }));
     expect(await screen.findByText('Admin role required')).toBeTruthy();
     expect(grace.value).toBe('admin');
   });

@@ -9,7 +9,8 @@
  *
  * Every request is verified against CLERK_WEBHOOK_SIGNING_SECRET (Svix)
  * before the body is read; without the check anyone could forge a
- * user.created event. The route is public in proxy.ts because it
+ * user.deleted event, taking a user's access away, or a user.updated event,
+ * rewriting a stored email. The route is public in proxy.ts because it
  * authenticates by signature, not by session.
  */
 import { NextResponse } from 'next/server';

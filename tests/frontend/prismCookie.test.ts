@@ -79,12 +79,13 @@ describe('/api/prism-cookie', () => {
     expect(res.headers.get('set-cookie')).toBeNull();
   });
 
-  it('500 and no cookie while the role cannot be read', async () => {
+  it('500 and no cookie while the role cannot be read, naming the failed check', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     signedIn('viewer');
     db.down = true;
     const res = await cookieGET();
     expect(res.status).toBe(500);
+    expect((await res.json()).error).toBe('Access could not be checked');
     expect(res.headers.get('set-cookie')).toBeNull();
     vi.mocked(console.error).mockRestore();
   });

@@ -84,8 +84,8 @@ const expireViewerCookie = (): Promise<void> =>
   fetch('/api/prism-cookie', { method: 'DELETE' }).then(() => undefined, () => undefined);
 
 /** The user's role was taken away while the page was open: a full navigation
- *  to /dashboard, whose check on the server (app/dashboard/page.tsx) sends
- *  them to the waiting page instead of leaving a dashboard whose reads fail. */
+ *  to /dashboard, where the role check (proxy.ts) sends them to the waiting
+ *  page instead of leaving a dashboard whose reads fail. */
 const accessWithdrawn = (): void => { window.location.replace('/dashboard'); };
 
 /** Sets the viewer cookie the /api/v1 reads need. When it cannot be set, any

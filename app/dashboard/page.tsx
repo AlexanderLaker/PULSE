@@ -1,15 +1,17 @@
 /**
- * /dashboard: the access check in front of the dashboard, on the server.
+ * /dashboard: the dashboard, for a user with a role, told whether they are
+ * admin or viewer.
  *
- * The page renders for every request, never from a cache, and reads the
- * signed-in user's access from user_roles (lib/roles.ts) before anything of
- * the dashboard is sent. A user with a role gets the dashboard
- * (DashboardApp.tsx), told whether they are admin or viewer. Anyone else is
- * sent to /pending, a page of its own, so their browser never receives the
- * dashboard's page or the addresses of its code: a pending user, whom no
- * admin has approved yet, and a user whose access could not be checked (the
- * database did not answer), which /pending reports. proxy.ts has already
- * sent visitors without a session to /sign-in.
+ * proxy.ts has already sent visitors without a session to /sign-in, and
+ * signed-in users without a role to /pending, before this page renders: a
+ * redirect from here would come too late to keep the addresses of the
+ * dashboard's code from them, because the App Router sends a page's scripts
+ * along with the page. This page renders for every request, never from a
+ * cache, and reads the role from user_roles again (lib/roles.ts): it hands
+ * the role to the dashboard (DashboardApp.tsx), and it is the second check.
+ * A user who has no role by now (taken away in the moment between the two
+ * checks), or whose access could not be checked (the database or Clerk did
+ * not answer, as the log line says), goes to /pending all the same.
  */
 import { redirect } from 'next/navigation';
 import { requireAuth, UnauthorizedError } from '@/lib/roles';

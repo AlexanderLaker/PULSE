@@ -15,16 +15,19 @@
  * sees only the waiting page on their next page load, and their viewer cookie
  * runs out within 30 minutes. Response: { role: 'pending' }.
  *
- * An admin cannot change or remove their own role, so the last admin can
- * never lock everyone out; another admin has to do it. Every change is
- * written to the audit log where possible: a failed audit write is logged and
- * the change stands.
+ * A request that would change nothing changes nothing and logs nothing. An
+ * admin cannot change or remove their own role, and every change is made
+ * only while the user's access is still what the admin saw and the admin is
+ * still admin (lib/roles.ts changeAccess), so PRISM always keeps an admin;
+ * a change refused for that reason answers 409. Every change is written to
+ * the audit log where possible: a failed audit write is logged and the change
+ * stands.
  */
 import { NextResponse } from 'next/server';
 import { clerkClient } from '@clerk/nextjs/server';
 import {
-  addUserRole, allowedEmailDomains, deleteUserRole, getRole, mayBeApproved, requireAdmin, setRole,
-  ForbiddenError, UnauthorizedError,
+  allowedEmailDomains, changeAccess, getRole, mayBeApproved, requireAdmin,
+  ForbiddenError, UnauthorizedError, type Access,
 } from '@/lib/roles';
 import { recordRoleChange } from '@/lib/audit';
 
@@ -36,6 +39,7 @@ interface Params {
 }
 
 const OWN_ROLE = "You can't change your own role. Ask another admin.";
+const CHANGED_MEANWHILE = 'This user\'s access, or your own role, changed in the meantime: reload the list and try again.';
 
 export async function PATCH(req: Request, { params }: Params) {
   try {
@@ -59,39 +63,45 @@ export async function PATCH(req: Request, { params }: Params) {
       return NextResponse.json({ error: OWN_ROLE }, { status: 400 });
     }
 
-    const existing = await getRole(targetUserId);
-    if (existing === null) {
-      // A pending user: approved now, with the email Clerk holds for them.
-      const email = await clerkEmail(targetUserId);
-      if (email === null) {
+    const existing: Access = (await getRole(targetUserId)) ?? 'pending';
+    if (existing === nextRole) return NextResponse.json({ role: nextRole });
+
+    let email: string | undefined;
+    if (existing === 'pending') {
+      // The approval, with the email Clerk holds for the user.
+      const held = await clerkEmail(targetUserId);
+      if (held === null) {
         return NextResponse.json({ error: 'Clerk has no user with this id' }, { status: 404 });
       }
-      if (!email.address) {
+      if (!held.address) {
         return NextResponse.json(
           { error: 'Clerk holds no email address for this user yet; try again once they have one.' },
           { status: 409 },
         );
       }
-      if (!email.verified) {
+      if (!held.verified) {
         return NextResponse.json(
-          { error: `Clerk has not verified ${email.address} yet; approve the user once they have confirmed it.` },
+          { error: `Clerk has not verified ${held.address} yet; approve the user once they have confirmed it.` },
           { status: 409 },
         );
       }
-      if (!mayBeApproved(email.address)) {
+      if (!mayBeApproved(held.address)) {
         return NextResponse.json(
           { error: `Only addresses at ${allowedEmailDomains().join(', ')} can be given a role here (PRISM_ALLOWED_EMAIL_DOMAINS).` },
           { status: 403 },
         );
       }
-      await addUserRole(targetUserId, email.address, nextRole);
-    } else {
-      await setRole(targetUserId, nextRole);
+      email = held.address;
     }
 
+    const changed = await changeAccess({
+      actor: admin.clerkUserId, user: targetUserId, from: existing, to: nextRole, email,
+    });
+    if (!changed) return NextResponse.json({ error: CHANGED_MEANWHILE }, { status: 409 });
+
     await recordRoleChange({
-      userId: targetUserId, from: existing, to: nextRole, via: 'via /api/users/[userId]/role',
-      actor: admin.clerkUserId,
+      userId: targetUserId, from: existing === 'pending' ? null : existing, to: nextRole,
+      via: 'via /api/users/[userId]/role', actor: admin.clerkUserId,
     });
 
     return NextResponse.json({ role: nextRole });
@@ -112,14 +122,16 @@ export async function DELETE(_req: Request, { params }: Params) {
       return NextResponse.json({ error: OWN_ROLE }, { status: 400 });
     }
 
-    // Removing the role of a user who is already pending changes nothing.
-    const removed = await deleteUserRole(targetUserId);
-    if (removed !== null) {
-      await recordRoleChange({
-        userId: targetUserId, from: removed, to: null, via: 'via /api/users/[userId]/role',
-        actor: admin.clerkUserId,
-      });
-    }
+    const existing = await getRole(targetUserId);
+    if (existing === null) return NextResponse.json({ role: 'pending' });
+
+    const changed = await changeAccess({ actor: admin.clerkUserId, user: targetUserId, from: existing, to: 'pending' });
+    if (!changed) return NextResponse.json({ error: CHANGED_MEANWHILE }, { status: 409 });
+
+    await recordRoleChange({
+      userId: targetUserId, from: existing, to: null, via: 'via /api/users/[userId]/role',
+      actor: admin.clerkUserId,
+    });
 
     return NextResponse.json({ role: 'pending' });
   } catch (err) {

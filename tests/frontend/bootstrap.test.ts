@@ -61,12 +61,13 @@ const call = (secret: string | null, body: unknown = { email: 'First.Admin@Examp
 
 const wrote = (start: string) => db.queries.some((q) => q.startsWith(start));
 
-/** The Clerk user who signs in with the named address, as getUserList returns them. */
-const clerkUser = (status: string) => ({
+/** The Clerk user who signs in with the named address, as getUserList returns them, with the address's
+ *  verification status (null: none recorded). */
+const clerkUser = (status: string | null) => ({
   id: 'user_7',
   emailAddresses: [
     { emailAddress: 'other@example.com', verification: { status: 'verified' } },
-    { emailAddress: 'First.Admin@Example.com', verification: { status } },
+    { emailAddress: 'First.Admin@Example.com', verification: status ? { status } : null },
   ],
 });
 
@@ -135,20 +136,20 @@ describe('/api/admin/bootstrap', () => {
     expect(wrote('INSERT INTO user_roles')).toBe(false);
   });
 
-  it('refuses while Clerk has not verified the address for that user, and writes nothing', async () => {
-    clerk.getUserList.mockResolvedValue({ data: [clerkUser('unverified')] });
-    const res = await call(SECRET);
-    expect(res.status).toBe(409);
-    expect((await res.json()).error).toBe(`Clerk has not verified ${NAMED} for this user yet: confirm it first`);
+  it('refuses while Clerk has not verified the address for that user, whatever the reason, and writes nothing', async () => {
+    for (const status of ['unverified', 'expired', null]) {
+      clerk.getUserList.mockResolvedValue({ data: [clerkUser(status)] });
+      const res = await call(SECRET);
+      expect(res.status).toBe(409);
+      expect((await res.json()).error).toBe(`Clerk has not verified ${NAMED} for this user yet: confirm it first`);
+    }
     expect(wrote('INSERT INTO user_roles')).toBe(false);
   });
 
   it('adds the pending user as admin and writes the approval to the audit log', async () => {
     const res = await call(SECRET);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      clerkUserId: 'user_7', email: NAMED, role: 'admin', changed: true, previousRole: null,
-    });
+    expect(await res.json()).toEqual({ clerkUserId: 'user_7', email: NAMED, role: 'admin', previousRole: null });
     expect(wrote('INSERT INTO user_roles')).toBe(true);
     expect(wrote('INSERT INTO audit_log')).toBe(true);
   });
@@ -169,12 +170,13 @@ describe('/api/admin/bootstrap', () => {
     expect(wrote('SELECT 1 FROM user_roles')).toBe(false);
   });
 
-  it('changes nothing for a user who is admin already', async () => {
+  it('answers 409 for the named user once they are admin, as for anyone once an admin exists', async () => {
     db.existingRole = 'admin';
+    db.admins = [{ '?column?': 1 }];
     const res = await call(SECRET);
-    expect(res.status).toBe(200);
-    expect((await res.json()).changed).toBe(false);
-    expect(db.transactions).toEqual([]);
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toContain('An admin exists already');
+    expect(wrote('INSERT INTO audit_log')).toBe(false);
   });
 
   it('refuses once an admin exists, and writes no audit entry', async () => {

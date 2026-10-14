@@ -5,8 +5,9 @@
  *   - The user comes from the Clerk session; without one the answer is 401
  *     and no cookie is set.
  *   - Only a user with a role in user_roles gets one: a pending user, whom
- *     no admin has approved yet, is answered 403 (lib/roles.ts). A database
- *     that cannot be reached answers 500 and sets none either.
+ *     no admin has approved yet, is answered 403 (lib/roles.ts). When the
+ *     role cannot be read (the database or Clerk does not answer) the answer
+ *     is 500 and no cookie is set either.
  *   - The token in the cookie always says viewer, admins included. The
  *     cookie authorises reads and the user's own expert proposals, never an
  *     admin write: admin writes go through the dashboard routes with a
@@ -38,20 +39,9 @@ const COOKIE = {
 };
 
 export async function GET() {
+  let me: Awaited<ReturnType<typeof requireRole>>;
   try {
-    const me = await requireRole();
-    // Viewer only, whatever the user's role (see above).
-    const token = signPrismJwt(
-      { sub: me.clerkUserId, email: me.email, name: me.name, role: 'viewer' },
-      TTL_SECONDS,
-    );
-    if (!token) {
-      // The deployment has no PRISM_JWT_SECRET of at least 32 characters.
-      return NextResponse.json({ ok: false, error: 'PRISM_JWT_SECRET is not configured' }, { status: 503 });
-    }
-    const res = NextResponse.json({ ok: true });
-    res.cookies.set('prism-token', token, { ...COOKIE, maxAge: TTL_SECONDS });
-    return res;
+    me = await requireRole();
   } catch (err) {
     if (err instanceof UnauthorizedError) {
       return NextResponse.json({ error: err.message }, { status: 401 });
@@ -59,9 +49,21 @@ export async function GET() {
     if (err instanceof ForbiddenError) {
       return NextResponse.json({ error: err.message }, { status: 403 });
     }
-    console.error('[/api/prism-cookie] error:', err);
-    return NextResponse.json({ error: 'Failed to sign the API token' }, { status: 500 });
+    console.error('[/api/prism-cookie] access check failed:', err);
+    return NextResponse.json({ error: 'Access could not be checked' }, { status: 500 });
   }
+  // Viewer only, whatever the user's role (see above).
+  const token = signPrismJwt(
+    { sub: me.clerkUserId, email: me.email, name: me.name, role: 'viewer' },
+    TTL_SECONDS,
+  );
+  if (!token) {
+    // The deployment has no PRISM_JWT_SECRET of at least 32 characters.
+    return NextResponse.json({ ok: false, error: 'PRISM_JWT_SECRET is not configured' }, { status: 503 });
+  }
+  const res = NextResponse.json({ ok: true });
+  res.cookies.set('prism-token', token, { ...COOKIE, maxAge: TTL_SECONDS });
+  return res;
 }
 
 export function DELETE() {

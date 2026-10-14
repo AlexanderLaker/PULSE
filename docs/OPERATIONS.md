@@ -324,11 +324,12 @@ Other branches get preview deployments. The environment variables live in the
 Vercel project settings (Production and Preview). Vercel applies a change to
 any of them only to deployments made after it, so redeploy after every change
 (Deployments, the latest deployment, Redeploy);
-`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is also built into the dashboard's code. `PRISM_API_ORIGIN`, if used, belongs to
-Production only: set for Preview as well, a preview deployment's admin writes
-would go to the production API. A database that still needs migration 0001
-(the API answers 503 and names it) is moved in the order that migration's
-runbook gives, the deploy first (`migrations/0001_driver_schema/README.md`).
+`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is also built into the dashboard's code.
+`PRISM_API_ORIGIN`, if used, belongs to Production only: set for Preview as
+well, a preview deployment's admin writes would go to the production API. A
+database that still needs migration 0001 (the API answers 503 and names it)
+is moved in the order that migration's runbook gives, the deploy first
+(`migrations/0001_driver_schema/README.md`).
 
 After a deploy:
 
@@ -501,16 +502,26 @@ A new value takes effect with the next deployment.
 A user who signs up gets no row in `user_roles`: they are pending, and see
 only the waiting page, until an admin gives them a role in Settings, under
 User management, which lists pending users first. Choosing Viewer or Admin
-for a pending user approves them. Choosing Pending for a user takes their
-role away: from their next page load they see the waiting page, and a
-dashboard they have open loses access within 30 minutes, when its viewer
-cookie runs out (an admin write is refused at once, as each is checked
-against `user_roles`). Admins never change their own role. While
-`PRISM_ALLOWED_EMAIL_DOMAINS` is set (comma-separated domains, such as
-`henkel.com`), only a pending user whose address is at one of them can be
-approved; a user who has a role keeps it. A user whose address Clerk has not
-verified cannot be approved at all. Every approval, change and removal goes
-to the audit log.
+for a pending user, and confirming, approves them. Choosing Pending for a
+user, and confirming, takes their role away: from their next page load they
+see the waiting page, and a dashboard they have open loses access within 30
+minutes, when its viewer cookie runs out (an admin write is refused at once,
+as each is checked against `user_roles`). Admins never change their own
+role, and a change is made only while the user's access is still what the
+list showed and the admin is still admin, so two admins working at the same
+moment cannot leave PRISM without one; a change refused for that reason asks
+for the list to be reloaded. While `PRISM_ALLOWED_EMAIL_DOMAINS` is set
+(comma-separated domains, such as `henkel.com`, matched exactly: list a
+subdomain separately), only a pending user whose address is at one of them
+can be approved; a user who has a role keeps it. A user whose address Clerk
+has not verified cannot be approved at all. Every approval, change and
+removal goes to the audit log.
+
+**Adding a user** takes two steps while sign-up is invite-only. Invite the
+address in the Clerk dashboard (Users, Invitations): the invitation leads to
+Clerk's own sign-up page (the Account Portal), which sends the user on to
+PRISM afterwards (Setting up Clerk, step 4), where they wait. Then approve
+them in Settings.
 
 **Review the accounts** at go-live and from time to time: Clerk keeps every
 account that ever signed up, and Settings shows each with its access. Set
@@ -526,10 +537,10 @@ Two ways exist to set a role without an admin session:
   exists only while `ADMIN_BOOTSTRAP_SECRET` is set, works only with a secret
   of at least 32 characters, and makes only the address in
   `ADMIN_BOOTSTRAP_EMAIL` admin, once that address has signed up and Clerk
-  has verified it.
-  Once an admin exists it answers 409 and changes nothing, and it never takes
-  a role away. Set both variables, redeploy, sign up with that address (the
-  dashboard shows the waiting page), then call the route
+  has verified it. Once an admin exists, that address's own included, it
+  answers 409 and changes nothing, and it never takes a role away. Set both
+  variables and redeploy, invite the address in Clerk and sign up with it
+  (the dashboard shows the waiting page), then call the route
 
   ```bash
   curl -X POST https://<domain>/api/admin/bootstrap -H 'x-bootstrap-secret: <secret>' \
@@ -552,11 +563,16 @@ Two ways exist to set a role without an admin session:
 4. Restrict who may sign up, in the Clerk dashboard (Access mode): the
    Invite-only sign-up mode (`restricted` in Clerk's API; users join by
    invitation) or an allowlist of email addresses or domains, which needs a
-   paid Clerk plan in production. Turn on multi-factor authentication too, if
-   the plan includes it. An account opens nothing by itself: it is pending
-   until an admin approves it, and `PRISM_ALLOWED_EMAIL_DOMAINS` limits whom
-   an admin can approve.
-5. Set up the first admin with the bootstrap route (Roles and users), then
+   paid Clerk plan in production. An invitation sent from the Clerk
+   dashboard leads to the Account Portal's sign-up page; set the sign-up
+   fallback under Account Portal, Redirects, to `https://<domain>/`, so that
+   the user arrives at PRISM afterwards. An account opens nothing by itself:
+   it is pending until an admin approves it, and
+   `PRISM_ALLOWED_EMAIL_DOMAINS` limits whom an admin can approve.
+5. Turn on multi-factor authentication if the Clerk plan includes it (a paid
+   plan in production): on the Multi-factor page, switch on at least one
+   method and Require multi-factor authentication.
+6. Set up the first admin with the bootstrap route (Roles and users), then
    check that `user_roles` holds your row with the admin role and that the
    dashboard opens.
 
@@ -567,7 +583,7 @@ Two ways exist to set a role without an admin session:
 | Every data request answers 401 | The dashboard and the API see different `PRISM_JWT_SECRET` values, or the value is shorter than 32 characters. Set the same value everywhere and redeploy |
 | The dashboard says the service is unavailable, or a notice under the navigation says the data cannot be loaded | Check `/api/v1/health` and `/api/v1/diagnostics`. `simulation_reason` names the cause: `migration_pending` (the database needs a migration; the `error` field of `/diagnostics` names it), `no_database` (neither `DATABASE_URL` nor `POSTGRES_URL` is set in this Vercel deployment), `drivers_missing` (the database stores runs or driver edits but no drivers, so they were lost: restore it as under Backups and restore; PRISM seeds only a new database) or `db_error` (the API cannot reach the database or a query failed; the `error` field of `/diagnostics` says why) |
 | The Shift Analysis is empty | `simulation_reason` in `/api/v1/diagnostics` is `no_rows` (write a run) or `malformed` (the newest run lacks a part the dashboard needs, such as a key, a category, region or year, a gross-profit share, its run metadata or a complete driver fingerprint; the `error` field lists them; write a new run) |
-| A user sees only the waiting page | They have no role yet: an admin approves them in Settings, User management. A waiting page that says their access could not be checked means the dashboard cannot reach the database (`DATABASE_URL` or `POSTGRES_URL` in the Vercel project) |
+| A user sees only the waiting page | They have no role yet: an admin approves them in Settings, User management. A waiting page that says their access could not be checked means the check itself failed: the dashboard could not read `user_roles` (`DATABASE_URL` or `POSTGRES_URL` in the Vercel project) or Clerk did not answer. The function log has the cause, on a line starting `[proxy] access check failed` or `[/pending] access check failed` |
 | Nobody is admin | A new database has none: set up the first with the bootstrap route, as under Roles and users |
 | The production run exits with 4 | The correlation settings are not positive definite on the current driver mix; lower the cross-force correlations in `prism/config.py` |
 
@@ -600,8 +616,13 @@ the owner. Move the other three into accounts the receiving organisation
 controls, through the service's own transfer where it offers one, or by
 creating them anew (a new Clerk application means new keys and a new
 webhook; a new Neon project is restored from the dump), and connect the
-Vercel project to the new repository. Rotate the credentials after the move,
-and check the deployment against the list under Deploying.
+Vercel project to the new repository. A new Clerk application gives every
+user a new id, so the restored `user_roles` rows match nobody and still hold
+an admin, which keeps the bootstrap route refusing: empty the table
+(`DELETE FROM user_roles;`, after the dump that keeps the old rows), set up
+the first admin with the bootstrap route and approve everyone again. Rotate
+the credentials after the move, and check the deployment against the list
+under Deploying.
 
 ## Hosting elsewhere
 

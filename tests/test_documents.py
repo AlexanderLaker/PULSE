@@ -38,7 +38,7 @@ REPO = Path(__file__).resolve().parents[1]
 FIRST, LAST = DEFAULT_PATH_YEARS[0], DEFAULT_PATH_YEARS[-1]
 CELLS = len(CATEGORIES) * len(REGIONS)
 WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight", 9: "nine",
-         10: "ten", 11: "eleven", 12: "twelve"}
+         10: "ten", 11: "eleven", 12: "twelve", 30: "thirty"}
 
 
 def sci(x: float) -> str:
@@ -471,8 +471,10 @@ def test_the_security_and_session_settings():
     assert_quotes("docs/OPERATIONS.md", f"works only with a secret of at least {n} characters",
                   f"the value is shorter than {n} characters")
     cookie = int(re.search(r"const TTL_SECONDS = (\d+) \* 60;", source("app/api/prism-cookie/route.ts")).group(1))
-    assert_quotes("docs/ARCHITECTURE.md", f"holding a {cookie}-minute token")
+    assert_quotes("docs/ARCHITECTURE.md", f"holding a {cookie}-minute token", f"loses access within {cookie} minutes")
     assert_quotes("docs/OPERATIONS.md", f"loses access within {cookie} minutes")
+    assert_quotes("docs/adr/0012-identity-roles-tokens.md", f"after {WORDS[cookie]} minutes for reads",
+                  f"reads within {WORDS[cookie]} minutes")
     assert f"loses access within {cookie} minutes" in source("components/dashboard/settings/UsersSection.tsx")
     admin = int(re.search(r"ttlSeconds = (\d+)\)", source("lib/prismJwt.ts")).group(1))
     assert admin % 60 == 0

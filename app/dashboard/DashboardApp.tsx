@@ -5,10 +5,10 @@
  * (settings and the welcome dialog), all inside one PrismProvider, so the
  * data loads once and every pane reads the same store.
  *
- * Only users with a role get here: the access check in app/dashboard/page.tsx
- * reads the role on the server and passes it in, and the dashboard hands it
- * to every view with admin controls as `isAdmin`. Clerk supplies the
- * identity. Every tab is open to both roles.
+ * Only users with a role get here: proxy.ts sends everyone else away, and
+ * app/dashboard/page.tsx reads the role again on the server and passes it
+ * in; the dashboard hands it to every view with admin controls as
+ * `isAdmin`. Clerk supplies the identity. Every tab is open to both roles.
  *
  * Users land on the entry gate, a pane outside the top nav that the PRISM
  * wordmark returns to. A pane mounts on its first visit and then stays

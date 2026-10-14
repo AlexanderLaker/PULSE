@@ -1,8 +1,11 @@
 /**
  * User management, for admins: every user with their access, pending users
- * first. Giving a pending user a role approves them; setting a user back to
- * pending takes their role away. Both go through the dashboard's own route
- * (lib/roles.ts), which also refuses an admin's change of their own role.
+ * first. Choosing a new access for a user asks for a confirmation first, so a
+ * stray key on the list changes nobody. Giving a pending user a role approves
+ * them; setting a user back to pending takes their role away. Both go
+ * through the dashboard's own route (lib/roles.ts), which also refuses an
+ * admin's change of their own role and a change made on a list that is out
+ * of date.
  */
 import { useEffect, useState, type FC } from 'react';
 import { UsersIcon } from 'lucide-react';
@@ -12,13 +15,28 @@ import SectionCard from '@/components/dashboard/SectionCard';
 import { S, HEADLINE_FONT } from '@/lib/theme';
 import { NO_VALUE, fmtDate } from '@/lib/format';
 import type { Access } from '@/types';
-import { errorText, INPUT_STYLE, Muted, RolePill, type Status, StatusBanner } from './parts';
+import {
+  DESTRUCTIVE_BUTTON, errorText, INPUT_STYLE, Muted, PRIMARY_BUTTON, RolePill, type Status, StatusBanner,
+} from './parts';
 
 const USER_GRID = '2fr 1.2fr 0.8fr 1fr 0.8fr';
+
+const article = (access: Access) => (access === 'admin' ? 'an admin' : 'a viewer');
+
+/** The question the confirmation asks before a change of access. */
+function confirmation(user: ManagedUser, to: Access): string {
+  if (user.role === 'pending') return `Approve ${user.email} as ${article(to)}?`;
+  if (to === 'pending') {
+    return `Take access away from ${user.email}? From their next page load they see the waiting page.`;
+  }
+  return `Make ${user.email} ${article(to)}?`;
+}
 
 export const UsersSection: FC<{ currentUserId: string | null }> = ({ currentUserId }) => {
   const [users, setUsers] = useState<ManagedUser[] | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  // The change chosen in a user's list, waiting for its confirmation.
+  const [draft, setDraft] = useState<{ id: string; to: Access } | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
 
   useEffect(() => {
@@ -35,6 +53,7 @@ export const UsersSection: FC<{ currentUserId: string | null }> = ({ currentUser
   }, []);
 
   const changeAccess = async (user: ManagedUser, next: Access) => {
+    setDraft(null);
     setUpdatingId(user.id);
     setStatus(null);
     try {
@@ -63,7 +82,7 @@ export const UsersSection: FC<{ currentUserId: string | null }> = ({ currentUser
     <SectionCard size="regular"
       title={`All users${users?.length ? ` (${users.length}${pending ? `, ${pending} pending` : ''})` : ''}`}
       icon={UsersIcon}
-      description="A new account is pending, and sees only a page saying that access awaits approval, until you give it a role here. Admins edit drivers and Consumer Journey content and manage users; viewers have read-only access. Setting a user back to pending takes their access away."
+      description="A new account is pending, and sees only a page saying that access awaits approval, until you give it a role here. Admins edit drivers and Consumer Journey content and manage users; viewers read everything and propose scores under Expert Rating. Setting a user back to pending takes their access away."
     >
       {users === null ? (
         <Muted>Loading users…</Muted>
@@ -92,6 +111,7 @@ export const UsersSection: FC<{ currentUserId: string | null }> = ({ currentUser
           {users.map((u) => {
             const isSelf = currentUserId === u.id;
             const locked = updatingId === u.id || isSelf;
+            const chosen = draft?.id === u.id ? draft.to : null;
             return (
               <div
                 key={u.id}
@@ -101,6 +121,7 @@ export const UsersSection: FC<{ currentUserId: string | null }> = ({ currentUser
                   padding: '12px 14px',
                   borderTop: `1px solid ${S.cardBorder}`,
                   alignItems: 'center',
+                  rowGap: 10,
                   fontSize: 12.5, color: S.onSurface,
                 }}
               >
@@ -120,11 +141,14 @@ export const UsersSection: FC<{ currentUserId: string | null }> = ({ currentUser
                 <span style={{ color: S.mutedText }}>{fmtDate(u.lastSignInAt)}</span>
                 <span style={{ textAlign: 'right' }}>
                   <select
-                    value={u.role}
-                    onChange={(e) => changeAccess(u, e.target.value as Access)}
+                    value={chosen ?? u.role}
+                    onChange={(e) => {
+                      const to = e.target.value as Access;
+                      setDraft(to === u.role ? null : { id: u.id, to });
+                    }}
                     disabled={locked}
                     aria-label={`Access of ${u.email}`}
-                    title={isSelf ? "You can't change your own role." : u.role === 'pending' ? 'Approve with a role' : 'Change role'}
+                    title={isSelf ? "You can't change your own role." : u.role === 'pending' ? 'Approve with a role' : 'Change access'}
                     style={{
                       ...INPUT_STYLE,
                       padding: '5px 10px',
@@ -138,6 +162,23 @@ export const UsersSection: FC<{ currentUserId: string | null }> = ({ currentUser
                     <option value="admin">Admin</option>
                   </select>
                 </span>
+                {chosen && (
+                  <div role="group" aria-label={`Confirm the change for ${u.email}`}
+                    style={{
+                      gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+                      flexWrap: 'wrap', gap: 8,
+                    }}>
+                    <span style={{ marginRight: 'auto', color: S.onSurfaceVariant }}>{confirmation(u, chosen)}</span>
+                    <button type="button" onClick={() => setDraft(null)}
+                      style={{ ...PRIMARY_BUTTON, color: S.primary, backgroundColor: S.surfaceLow, padding: '6px 14px' }}>
+                      Cancel
+                    </button>
+                    <button type="button" onClick={() => changeAccess(u, chosen)}
+                      style={{ ...(chosen === 'pending' ? DESTRUCTIVE_BUTTON : PRIMARY_BUTTON), padding: '6px 14px' }}>
+                      {chosen === 'pending' ? 'Take access away' : 'Confirm'}
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}

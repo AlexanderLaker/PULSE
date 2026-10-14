@@ -3,8 +3,11 @@
  *
  *   - A user who signs up has no row and is pending: requireAuth says
  *     'pending', requireRole and requireAdmin refuse them.
- *   - addUserRole approves a pending user (their row, the email in lower
- *     case); a row that appeared in the meantime gets the role instead.
+ *   - changeAccess approves a pending user (their row, the email in lower
+ *     case), changes a role or takes it away, each in one statement of a
+ *     serializable transaction, and only while the user's access is still the
+ *     one the admin saw and the admin is still admin; a serialization failure
+ *     (two admins at the same moment) is a change not made.
  *   - refreshUserEmail stores a known user's new email and returns their
  *     role; it adds no row for a pending user.
  *   - deleteUserRole returns the role the removed row held.
@@ -12,63 +15,100 @@
  *   - The table is created once per server instance, again after a failure,
  *     and a collision with another instance creating it is no failure.
  *
- * The fake database below plays the statement it is sent: an insert adds a
- * row unless the id is known, and an update applies only the assignments its
- * SET clause names, as PostgreSQL does.
+ * The fake database below plays each statement it is sent on a table of its
+ * own, as PostgreSQL would, when the statement is awaited (as the Neon
+ * driver's are), so a transaction that fails runs nothing.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-type Row = { email: string; role: string };
-const db = vi.hoisted(() => ({
-  table: new Map<string, Row>(),
-  creates: 0,
-  createError: null as null | (Error & { code?: string }),
-}));
-
-vi.mock('@/lib/db', () => ({
-  getSQL: () => (strings: TemplateStringsArray, ...values: unknown[]) => {
-    const query = strings.join('?').replace(/\s+/g, ' ').trim();
+const fake = vi.hoisted(() => {
+  type Row = { email: string; role: string };
+  const db = {
+    table: new Map<string, Row>(),
+    creates: 0,
+    createError: null as null | (Error & { code?: string }),
+    transactions: [] as Array<{ isolationLevel?: string } | undefined>,
+    /** What the next transaction throws instead of committing, as PostgreSQL does for the loser of a race. */
+    conflict: null as null | { code: string },
+  };
+  const isAdmin = (id: unknown) => db.table.get(id as string)?.role === 'admin';
+  const ACTOR_IS_ADMIN = "EXISTS (SELECT 1 FROM user_roles WHERE clerk_user_id = ? AND role = 'admin')";
+  function run(query: string, values: unknown[]): unknown[] {
     if (query.startsWith('CREATE TABLE')) {
       db.creates += 1;
       const error = db.createError;
       db.createError = null;
-      return error ? Promise.reject(error) : Promise.resolve([]);
+      if (error) throw error;
+      return [];
     }
-    if (query.startsWith('SELECT role')) {
-      return Promise.resolve(db.table.has(values[0] as string) ? [{ role: db.table.get(values[0] as string)!.role }] : []);
+    if (query === 'SELECT role FROM user_roles WHERE clerk_user_id = ?') {
+      const row = db.table.get(values[0] as string);
+      return row ? [{ role: row.role }] : [];
     }
-    if (query.startsWith('INSERT INTO user_roles')) {
-      // ON CONFLICT DO NOTHING: a known id is left as it is and returns no row.
-      if (!query.includes('ON CONFLICT (clerk_user_id) DO NOTHING')) throw new Error(`unexpected insert: ${query}`);
-      const [id, email, role] = values as [string, string, string];
-      if (db.table.has(id)) return Promise.resolve([]);
-      db.table.set(id, { email, role });
-      return Promise.resolve([{ role }]);
+    if (query === `INSERT INTO user_roles (clerk_user_id, email, role) SELECT ?, ?, ? WHERE ${ACTOR_IS_ADMIN} `
+      + 'ON CONFLICT (clerk_user_id) DO NOTHING RETURNING clerk_user_id') {
+      const [user, email, role, actor] = values as string[];
+      if (!isAdmin(actor) || db.table.has(user)) return [];
+      db.table.set(user, { email, role });
+      return [{ clerk_user_id: user }];
     }
-    if (query.startsWith('UPDATE user_roles SET')) {
-      // Only the assignments the statement names change, as in PostgreSQL.
-      const assignments = query.split(/\bSET\b/i)[1].split(/\bWHERE\b/i)[0];
-      const id = values[values.length - 1] as string;
-      const row = db.table.get(id);
-      if (!row) return Promise.resolve([]);
-      if (/\bemail\s*=/.test(assignments)) row.email = values[0] as string;
-      if (/\brole\s*=/.test(assignments)) row.role = values[0] as string;
-      return Promise.resolve(/RETURNING role/i.test(query) ? [{ role: row.role }] : []);
+    if (query === `UPDATE user_roles SET role = ?, updated_at = NOW() WHERE clerk_user_id = ? AND role = ? AND ${ACTOR_IS_ADMIN} `
+      + 'RETURNING clerk_user_id') {
+      const [role, user, from, actor] = values as string[];
+      const row = db.table.get(user);
+      if (!isAdmin(actor) || row?.role !== from) return [];
+      row.role = role;
+      return [{ clerk_user_id: user }];
     }
-    if (query.startsWith('DELETE FROM user_roles')) {
-      const id = values[0] as string;
-      const row = db.table.get(id);
-      db.table.delete(id);
-      return Promise.resolve(row ? [{ role: row.role }] : []);
+    if (query === `DELETE FROM user_roles WHERE clerk_user_id = ? AND role = ? AND ${ACTOR_IS_ADMIN} RETURNING clerk_user_id`) {
+      const [user, from, actor] = values as string[];
+      if (!isAdmin(actor) || db.table.get(user)?.role !== from) return [];
+      db.table.delete(user);
+      return [{ clerk_user_id: user }];
+    }
+    if (query === 'UPDATE user_roles SET email = ?, updated_at = NOW() WHERE clerk_user_id = ? RETURNING role') {
+      const [email, user] = values as string[];
+      const row = db.table.get(user);
+      if (!row) return [];
+      row.email = email;
+      return [{ role: row.role }];
+    }
+    if (query === 'DELETE FROM user_roles WHERE clerk_user_id = ? RETURNING role') {
+      const row = db.table.get(values[0] as string);
+      db.table.delete(values[0] as string);
+      return row ? [{ role: row.role }] : [];
     }
     throw new Error(`unexpected statement: ${query}`);
+  }
+  return { db, run };
+});
+const { db } = fake;
+
+vi.mock('@/lib/db', () => ({
+  getSQL: () => {
+    const sql = (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const query = strings.join('?').replace(/\s+/g, ' ').trim();
+      return {
+        then: (resolve: (rows: unknown[]) => unknown, reject: (err: unknown) => unknown) => {
+          try { return Promise.resolve(fake.run(query, values)).then(resolve, reject); } catch (err) { return reject(err); }
+        },
+      };
+    };
+    sql.transaction = async (statements: unknown[], opts?: { isolationLevel?: string }) => {
+      fake.db.transactions.push(opts);
+      const conflict = fake.db.conflict;
+      fake.db.conflict = null;
+      if (conflict) throw conflict;
+      return Promise.all(statements);
+    };
+    return sql;
   },
 }));
 const clerk = vi.hoisted(() => ({ auth: vi.fn(), currentUser: vi.fn() }));
 vi.mock('@clerk/nextjs/server', () => clerk);
 
 import {
-  addUserRole, allowedEmailDomains, deleteUserRole, ForbiddenError, mayBeApproved, refreshUserEmail,
+  allowedEmailDomains, changeAccess, deleteUserRole, ForbiddenError, mayBeApproved, refreshUserEmail,
   requireAdmin, requireAuth, requireRole, UnauthorizedError,
 } from '@/lib/roles';
 
@@ -78,7 +118,11 @@ const signedIn = (id: string | null) => {
     id ? { primaryEmailAddress: { emailAddress: 'ana@example.com' }, fullName: ' Ana Lima ' } : null);
 };
 
-beforeEach(() => { db.table.clear(); });
+beforeEach(() => {
+  db.table.clear();
+  db.transactions = [];
+  db.conflict = null;
+});
 
 describe('a user without a row', () => {
   it('is pending: requireAuth says so, and requireRole and requireAdmin refuse them', async () => {
@@ -106,16 +150,59 @@ describe('a user without a row', () => {
   });
 });
 
-describe('addUserRole', () => {
-  it('adds the row of a pending user with the email in lower case', async () => {
-    await addUserRole('user_1', 'Ana@Example.com', 'viewer');
-    expect(db.table.get('user_1')).toEqual({ email: 'ana@example.com', role: 'viewer' });
+describe('changeAccess', () => {
+  beforeEach(() => {
+    db.table.set('admin_1', { email: 'admin_1@example.com', role: 'admin' });
+    db.table.set('admin_2', { email: 'admin_2@example.com', role: 'admin' });
+    db.table.set('viewer_1', { email: 'viewer_1@example.com', role: 'viewer' });
   });
 
-  it('sets the role of a row that appeared in the meantime instead', async () => {
-    db.table.set('user_1', { email: 'ana@example.com', role: 'viewer' });
-    await addUserRole('user_1', 'ana@example.com', 'admin');
-    expect(db.table.get('user_1')).toEqual({ email: 'ana@example.com', role: 'admin' });
+  it('approves a pending user with the email in lower case, in a serializable transaction', async () => {
+    await expect(changeAccess({ actor: 'admin_1', user: 'user_new', from: 'pending', to: 'viewer', email: 'Ana@Example.com' }))
+      .resolves.toBe(true);
+    expect(db.table.get('user_new')).toEqual({ email: 'ana@example.com', role: 'viewer' });
+    expect(db.transactions).toEqual([{ isolationLevel: 'Serializable' }]);
+  });
+
+  it('changes a role, and takes one away', async () => {
+    await expect(changeAccess({ actor: 'admin_1', user: 'viewer_1', from: 'viewer', to: 'admin' })).resolves.toBe(true);
+    expect(db.table.get('viewer_1')!.role).toBe('admin');
+    await expect(changeAccess({ actor: 'admin_1', user: 'viewer_1', from: 'admin', to: 'pending' })).resolves.toBe(true);
+    expect(db.table.has('viewer_1')).toBe(false);
+    expect(db.transactions).toHaveLength(2);
+  });
+
+  it('makes no change once the user\'s access is no longer what the admin saw', async () => {
+    // Approved by someone else in the meantime.
+    db.table.set('user_new', { email: 'new@example.com', role: 'admin' });
+    await expect(changeAccess({ actor: 'admin_1', user: 'user_new', from: 'pending', to: 'viewer', email: 'new@example.com' }))
+      .resolves.toBe(false);
+    expect(db.table.get('user_new')!.role).toBe('admin');
+    // Promoted, or removed, in the meantime.
+    await expect(changeAccess({ actor: 'admin_1', user: 'admin_2', from: 'viewer', to: 'pending' })).resolves.toBe(false);
+    expect(db.table.get('admin_2')!.role).toBe('admin');
+    await expect(changeAccess({ actor: 'admin_1', user: 'user_gone', from: 'viewer', to: 'admin' })).resolves.toBe(false);
+    expect(db.table.has('user_gone')).toBe(false);
+  });
+
+  it('makes no change for an admin who is admin no longer', async () => {
+    db.table.get('admin_2')!.role = 'viewer';
+    await expect(changeAccess({ actor: 'admin_2', user: 'admin_1', from: 'admin', to: 'viewer' })).resolves.toBe(false);
+    await expect(changeAccess({ actor: 'admin_2', user: 'viewer_1', from: 'viewer', to: 'pending' })).resolves.toBe(false);
+    await expect(changeAccess({ actor: 'admin_2', user: 'user_new', from: 'pending', to: 'admin', email: 'x@example.com' }))
+      .resolves.toBe(false);
+    expect(db.table.get('admin_1')!.role).toBe('admin');
+    expect(db.table.has('viewer_1')).toBe(true);
+    expect(db.table.has('user_new')).toBe(false);
+  });
+
+  it('reports the loser of two changes at the same moment as not made, and lets any other failure through', async () => {
+    db.conflict = { code: '40001' };
+    await expect(changeAccess({ actor: 'admin_1', user: 'admin_2', from: 'admin', to: 'viewer' })).resolves.toBe(false);
+    expect(db.table.get('admin_2')!.role).toBe('admin');
+    db.conflict = { code: '08006' };
+    await expect(changeAccess({ actor: 'admin_1', user: 'admin_2', from: 'admin', to: 'viewer' }))
+      .rejects.toEqual({ code: '08006' });
   });
 });
 
@@ -163,8 +250,15 @@ describe('PRISM_ALLOWED_EMAIL_DOMAINS', () => {
     expect(mayBeApproved('ana@mail.henkel.com')).toBe(false);
     expect(mayBeApproved('ana@henkel.com.example')).toBe(false);
     expect(mayBeApproved('ana@not-henkel.com')).toBe(false);
+    expect(mayBeApproved('ana@henkel.com@evil.example')).toBe(false);
     expect(mayBeApproved('henkel.com')).toBe(false);
     expect(mayBeApproved('@henkel.com')).toBe(false);
+  });
+
+  it('takes the domain after the last @, so a quoted local part with an @ in it still counts', () => {
+    process.env.PRISM_ALLOWED_EMAIL_DOMAINS = 'henkel.com';
+    expect(mayBeApproved('"a@b"@henkel.com')).toBe(true);
+    expect(mayBeApproved('"a@henkel.com"@evil.example')).toBe(false);
   });
 });
 
@@ -178,7 +272,7 @@ describe('the user_roles table', () => {
     const roles = await import('@/lib/roles');
     await roles.getRole('user_1');
     await roles.getRole('user_2');
-    await roles.addUserRole('user_3', 'c@example.com', 'viewer');
+    await roles.refreshUserEmail('user_3', 'c@example.com');
     expect(db.creates).toBe(1);
   });
 

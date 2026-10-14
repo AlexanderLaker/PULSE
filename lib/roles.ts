@@ -61,20 +61,48 @@ export async function getRole(clerkUserId: string): Promise<Role | null> {
 }
 
 /**
- * Give a pending user a role: their row, with the email Clerk holds for them.
- * A row that appeared in the meantime (another admin approving at the same
- * moment) is set to the role instead.
+ * An admin's change of another user's access: approve a pending user (`from`
+ * 'pending': their row, with the email Clerk holds for them), change their
+ * role, or take it away (`to` 'pending': the row goes). The change is made
+ * only while the user's access is still `from`, what the admin saw, and the
+ * admin is still admin, in one statement of a serializable transaction: two
+ * admins changing the same user, or demoting each other, at the same moment
+ * cannot both succeed, as PostgreSQL fails one of them (SQLSTATE 40001), so
+ * PRISM is never left without an admin. True when the change was made; false
+ * when it was not because something changed in the meantime.
  */
-export async function addUserRole(clerkUserId: string, email: string, role: Role): Promise<void> {
+export async function changeAccess(change: {
+  actor: string; user: string; from: Access; to: Access; email?: string;
+}): Promise<boolean> {
+  const { actor, user, from, to } = change;
   await ensureUserRolesTable();
   const sql = getSQL();
-  const inserted = (await sql`
-    INSERT INTO user_roles (clerk_user_id, email, role)
-    VALUES (${clerkUserId}, ${email.toLowerCase()}, ${role})
-    ON CONFLICT (clerk_user_id) DO NOTHING
-    RETURNING role
-  `) as Array<{ role: Role }>;
-  if (inserted.length === 0) await setRole(clerkUserId, role);
+  const statement = from === 'pending'
+    ? sql`
+        INSERT INTO user_roles (clerk_user_id, email, role)
+        SELECT ${user}, ${(change.email ?? '').toLowerCase()}, ${to}
+         WHERE EXISTS (SELECT 1 FROM user_roles WHERE clerk_user_id = ${actor} AND role = 'admin')
+        ON CONFLICT (clerk_user_id) DO NOTHING
+        RETURNING clerk_user_id`
+    : to === 'pending'
+      ? sql`
+          DELETE FROM user_roles
+           WHERE clerk_user_id = ${user} AND role = ${from}
+             AND EXISTS (SELECT 1 FROM user_roles WHERE clerk_user_id = ${actor} AND role = 'admin')
+          RETURNING clerk_user_id`
+      : sql`
+          UPDATE user_roles
+             SET role = ${to}, updated_at = NOW()
+           WHERE clerk_user_id = ${user} AND role = ${from}
+             AND EXISTS (SELECT 1 FROM user_roles WHERE clerk_user_id = ${actor} AND role = 'admin')
+          RETURNING clerk_user_id`;
+  try {
+    const [changed] = (await sql.transaction([statement], { isolationLevel: 'Serializable' })) as unknown[][];
+    return changed.length > 0;
+  } catch (err) {
+    if ((err as { code?: unknown } | null)?.code === '40001') return false;
+    throw err;
+  }
 }
 
 /**
@@ -93,18 +121,7 @@ export async function refreshUserEmail(clerkUserId: string, email: string): Prom
   return updated[0]?.role ?? null;
 }
 
-/** Change a user's role. The caller must already have checked that it is an admin. */
-export async function setRole(clerkUserId: string, role: Role): Promise<void> {
-  await ensureUserRolesTable();
-  const sql = getSQL();
-  await sql`
-    UPDATE user_roles
-       SET role = ${role}, updated_at = NOW()
-     WHERE clerk_user_id = ${clerkUserId}
-  `;
-}
-
-/** Remove a user's row (a deleted user, or access taken away in Settings); the role it held, or null when there was none. */
+/** Remove the row of a user Clerk deleted; the role it held, or null when there was none. */
 export async function deleteUserRole(clerkUserId: string): Promise<Role | null> {
   await ensureUserRolesTable();
   const sql = getSQL();
@@ -115,7 +132,7 @@ export async function deleteUserRole(clerkUserId: string): Promise<Role | null> 
 }
 
 /** The signed-in user from the Clerk session alone; UnauthorizedError without one. */
-export async function requireSignedIn(): Promise<{ clerkUserId: string; email: string; name: string }> {
+async function requireSignedIn(): Promise<{ clerkUserId: string; email: string; name: string }> {
   const { userId } = await auth();
   if (!userId) throw new UnauthorizedError('Not signed in');
   const user = await currentUser();

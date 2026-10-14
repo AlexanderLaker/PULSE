@@ -1,16 +1,18 @@
 // @vitest-environment jsdom
 /**
- * The access gate: the dashboard reaches only users with a role.
+ * The access gate's pages (proxy.test.ts has the check in front of them).
  *
- *   - /dashboard (app/dashboard/page.tsx) reads the role on the server: a
- *     user with one gets the dashboard with that role, a pending user and a
+ *   - /dashboard (app/dashboard/page.tsx) reads the role on the server again:
+ *     a user with one gets the dashboard with that role, a pending user and a
  *     failed check go to /pending, a visitor without a session to /sign-in.
  *   - /pending (app/(auth)/pending/page.tsx) says that access awaits
  *     approval, reports a failed check as such, and sends a user who has a
  *     role by now on to the dashboard.
  *   - It expires any viewer cookie left in the browser; Check again goes to
- *     /dashboard, whose check decides, and Sign out expires the cookie first.
- *   - Nothing the waiting page imports reaches the dashboard's code.
+ *     /dashboard and, back on the waiting page, says the account still has
+ *     no access; Sign out expires the cookie first.
+ *   - Nothing the waiting page imports, its layouts included, reaches the
+ *     dashboard's code.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -79,9 +81,10 @@ describe('/dashboard', () => {
     expect(nav.redirect).not.toHaveBeenCalled();
   });
 
-  it('sends a pending user to the waiting page, without the dashboard', async () => {
+  it('sends a pending user to the waiting page, without the dashboard, and logs no failure', async () => {
     signedIn(null);
     await expect(DashboardPage()).rejects.toThrow('NEXT_REDIRECT /pending');
+    expect(console.error).not.toHaveBeenCalled();
   });
 
   it('sends everyone to the waiting page while the role cannot be read', async () => {
@@ -102,9 +105,10 @@ describe('/pending', () => {
     signedIn(null);
     render(await PendingPage());
     expect(screen.getByRole('heading', { name: 'Waiting for approval' })).toBeTruthy();
-    expect(screen.getByText(/You are signed in as ana@example\.com\. An admin of PRISM approves every new account/))
+    expect(screen.getByText(/^You are signed in as ana@example\.com\. This account has no access to PRISM until an admin approves it/))
       .toBeTruthy();
     expect(screen.getByRole('button', { name: 'Check again' })).toBeTruthy();
+    expect(console.error).not.toHaveBeenCalled();
   });
 
   it('sends a user who has a role by now on to the dashboard', async () => {
@@ -131,11 +135,21 @@ describe('/pending', () => {
     await waitFor(() => expect(requests).toEqual(['DELETE /api/prism-cookie']));
   });
 
-  it('checks again by going to /dashboard, whose check on the server decides', async () => {
+  it('checks again by going to /dashboard and, back here, says the account still has no access', async () => {
     signedIn(null);
     render(await PendingPage());
+    expect(screen.queryByRole('status')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
     expect(nav.push).toHaveBeenCalledWith('/dashboard');
+    expect((await screen.findByRole('status')).textContent).toBe('Still waiting: no admin has approved this account yet.');
+  });
+
+  it('says so when checking again finds the check still failing', async () => {
+    signedIn('viewer');
+    db.down = true;
+    render(await PendingPage());
+    fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
+    expect((await screen.findByRole('status')).textContent).toBe('Your access still could not be checked.');
   });
 
   it('shows a failed sign-out, and signs out with the viewer cookie expired first', async () => {
@@ -175,9 +189,9 @@ describe("the waiting page's code", () => {
     });
   };
 
-  it('reaches only the auth frame, the role check and the theme, never the dashboard', () => {
+  it('reaches only the layouts, the auth frame, the role check and the theme, never the dashboard', () => {
     const seen = new Set<string>();
-    const queue = ['app/(auth)/layout.tsx', 'app/(auth)/pending/page.tsx'].map((f) => path.join(ROOT, f));
+    const queue = ['app/layout.tsx', 'app/(auth)/layout.tsx', 'app/(auth)/pending/page.tsx'].map((f) => path.join(ROOT, f));
     while (queue.length) {
       const file = queue.pop()!;
       if (seen.has(file)) continue;
@@ -189,6 +203,8 @@ describe("the waiting page's code", () => {
       'app/(auth)/pending/PendingActions.tsx',
       'app/(auth)/pending/page.tsx',
       'app/(auth)/shared.tsx',
+      'app/globals.css',
+      'app/layout.tsx',
       'lib/db.ts',
       'lib/roles.ts',
       'lib/theme.ts',

@@ -155,32 +155,44 @@ SQLite file that would vanish with the instance.
 ## Authentication and roles
 
 Clerk owns identity (sign-up, sign-in, sessions) and decides who may create
-an account: sign-up is by invitation (docs/OPERATIONS.md). An account opens
-nothing by itself. PRISM owns the role, in the `user_roles` table, and a user
-who signs up has no row there: they are pending, and see only the waiting
-page, until an admin gives them a role in Settings (User management), which
-adds the row. While `PRISM_ALLOWED_EMAIL_DOMAINS` is set, only an address at
-one of its domains can be approved; a user who has a role keeps it. Admins
-change other users' roles, or take them away, which makes the user pending
-again; never their own. The Clerk webhook (`app/api/webhooks/clerk`) keeps a
-known user's email current and removes a deleted user's row. The first admin
-of a new database comes from `/api/admin/bootstrap`, for the address in
-`ADMIN_BOOTSTRAP_EMAIL` only; once an admin exists, it answers 409.
+an account: sign-up is restricted to invited addresses or an allowlist
+(docs/OPERATIONS.md). An account opens nothing by itself. PRISM owns the
+role, in the `user_roles` table, and a user who signs up has no row there:
+they are pending, and see only the waiting page, until an admin gives them a
+role in Settings (User management), which adds the row. While
+`PRISM_ALLOWED_EMAIL_DOMAINS` is set, only an address at one of its domains
+can be approved; a user who has a role keeps it. Admins change other users'
+roles, or take them away, which makes the user pending again; never their
+own. Each such change is one conditional statement in a serialisable
+transaction, made only while the user's access is still what the admin saw
+and the admin is still admin (`changeAccess` in `lib/roles.ts`), so two
+admins working at the same moment cannot leave PRISM without one. The Clerk
+webhook (`app/api/webhooks/clerk`) keeps a known user's email current and
+removes a deleted user's row. The first admin of a new database comes from
+`/api/admin/bootstrap`, for the address in `ADMIN_BOOTSTRAP_EMAIL` only;
+once an admin exists, it answers 409.
 
-`/dashboard` (`app/dashboard/page.tsx`) reads the role on the server, for
-every request, before anything of the dashboard is sent. A user with a role
-gets the dashboard (`app/dashboard/DashboardApp.tsx`) with that role, which
-shows or hides the admin controls. Everyone else goes to `/pending`
-(`app/(auth)/pending/`), a page of its own that imports none of the
-dashboard's code: it says that access awaits approval, or that it could not
-be checked while the database does not answer, and sends a user who has a
-role by now on to the dashboard. The check fails closed: while the database
-cannot be reached nobody opens the dashboard, and one already open keeps
-what it has loaded. The dashboard's scripts are static files, as in any
-Next.js application, and carry the content built into them, such as the
-Consumer Journey's tiles and the Explorer's figures; Vercel serves them to
-anyone who has their addresses. The gate keeps those addresses from a user
-without a role; it does not make the files private.
+`proxy.ts` checks the role for `/dashboard` against `user_roles` before the
+App Router renders anything, and sends a signed-in user without a role, and
+everyone while the role cannot be read, to `/pending`. It has to happen
+there: the router sends a page's script addresses along with the page, ahead
+of the page's own code, so a redirect from inside the page would still tell
+that user where the dashboard's code is. `/dashboard`
+(`app/dashboard/page.tsx`) then reads the role again, for every request, and
+renders the dashboard (`app/dashboard/DashboardApp.tsx`) with it, which
+shows or hides the admin controls; a user who has none by then goes to
+`/pending` as well. `/pending` (`app/(auth)/pending/`) is a page of its own
+that imports none of the dashboard's code: it says that access awaits
+approval, or that it could not be checked while the database or Clerk does
+not answer, and sends a user who has a role by now on to the dashboard. The
+checks fail closed: while the role cannot be read nobody opens the
+dashboard, and one already open keeps what it has loaded. The dashboard's
+scripts are static files, as in any Next.js application, and carry the
+content built into them, such as the Consumer Journey's tiles and the
+Explorer's figures; Vercel serves them to anyone who has their addresses.
+The gate keeps those addresses from a user without a role, but it does not
+make the files private, and a user whose role is taken away keeps any
+addresses they already had.
 
 The API never sees a Clerk session. It verifies HS256 tokens signed with
 `PRISM_JWT_SECRET`, which the dashboard's server routes issue for a user with
@@ -218,8 +230,9 @@ their full name, which the proposals list shows next to each expert's scores
 the sign-in and sign-up pages, the webhook (which checks its Svix signature),
 the admin bootstrap route (which checks a shared secret) and
 `DELETE /api/prism-cookie`, which only expires the cookie. `/api/v1` is left to
-the API's own checks. Whether a signed-in user has a role is checked by the
-pages and routes themselves, never by `proxy.ts`.
+the API's own checks. `proxy.ts` reads `user_roles` for `/dashboard` only
+(above); every other page and route checks the role itself where it needs
+one.
 
 The dashboard's server routes (`app/api`):
 
@@ -230,13 +243,14 @@ The dashboard's server routes (`app/api`):
 | `PUT /api/drivers/{id}` | admin | Forwards a driver edit to the API with an admin token |
 | `PUT /api/journey` | admin | Forwards a journey save to the API with an admin token |
 | `GET /api/users` | admin | The Clerk users (up to 500) with their access, for the user list in Settings: pending users first, then the rest, newest first in each group |
-| `PATCH /api/users/{userId}/role` | admin | Gives a user a role or changes it (never the caller's own). For a pending user this is the approval: the row is added with the email Clerk holds (409 while it holds none or has not verified it; 403 for an address outside `PRISM_ALLOWED_EMAIL_DOMAINS` while that is set) |
-| `DELETE /api/users/{userId}/role` | admin | Takes a role away (never the caller's own): the row goes and the user is pending again |
+| `PATCH /api/users/{userId}/role` | admin | Gives a user a role or changes it (never the caller's own). For a pending user this is the approval: the row is added with the email Clerk holds (409 while it holds none or has not verified it; 403 for an address outside `PRISM_ALLOWED_EMAIL_DOMAINS` while that is set). 409 as well when the user's access, or the caller's own role, changed after the caller looked |
+| `DELETE /api/users/{userId}/role` | admin | Takes a role away (never the caller's own): the row goes and the user is pending again; 409 as for `PATCH` |
 | `POST /api/webhooks/clerk` | Svix signature | Keeps a known user's email current in `user_roles` and removes a deleted user's row; adds none |
 | `POST /api/admin/bootstrap` | shared secret | Makes the address in `ADMIN_BOOTSTRAP_EMAIL` admin, once it has signed up and Clerk has verified it, while no admin exists; exists only while `ADMIN_BOOTSTRAP_SECRET` is set |
 
 Every role change, approval and removal is written to the audit log where
-possible; a failed audit write does not undo the change.
+possible; a failed audit write does not undo the change. A request that
+would change nothing changes and logs nothing.
 
 ## The dashboard
 

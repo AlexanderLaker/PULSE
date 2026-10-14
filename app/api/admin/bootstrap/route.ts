@@ -16,10 +16,10 @@
  *   - a body { email } that is not ADMIN_BOOTSTRAP_EMAIL: 403
  *   - no Clerk user signs in with that address (they have not signed up):
  *     404; Clerk has not verified it for that user: 409
- *   - an admin exists already: 409, and nothing changes. Once there is an
- *     admin, roles are set in Settings (User management) or with
- *     scripts/promote_admin.py, so a forgotten secret cannot make anyone else
- *     admin
+ *   - an admin exists already, the named user included: 409, and nothing
+ *     changes. Once there is an admin, roles are set in Settings (User
+ *     management) or with scripts/promote_admin.py, so a forgotten secret
+ *     cannot make anyone else admin
  *
  * Set both variables in the Vercel project and redeploy (Vercel applies a
  * changed variable to new deployments only), sign up with that address, call
@@ -122,16 +122,6 @@ export async function POST(req: Request) {
   `) as Array<{ role: Role }>;
   const previousRole = rows[0]?.role ?? null;
 
-  if (previousRole === 'admin') {
-    return NextResponse.json({
-      clerkUserId,
-      email,
-      role: 'admin',
-      changed: false,
-      note: 'User was already admin',
-    });
-  }
-
   // One statement checks that no admin exists and adds or promotes the row,
   // in a serializable transaction: two calls at the same moment cannot both
   // make an admin, as PostgreSQL lets one through and fails the other
@@ -161,11 +151,5 @@ export async function POST(req: Request) {
     via: 'via /api/admin/bootstrap (shared-secret)', actor: 'bootstrap',
   });
 
-  return NextResponse.json({
-    clerkUserId,
-    email,
-    role: 'admin',
-    changed: true,
-    previousRole,
-  });
+  return NextResponse.json({ clerkUserId, email, role: 'admin', previousRole });
 }
