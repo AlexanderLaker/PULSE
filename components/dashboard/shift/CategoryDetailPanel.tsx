@@ -612,7 +612,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           </div>
           {lastYearChange && (
             <div style={{ marginTop: 6, lineHeight: 1.5, opacity: 0.92 }}>
-              Change in {HORIZON} alone: median {pt(lastYearChange.median)}, 80% of iterations between{' '}
+              Change in {HORIZON} alone: median {pt(lastYearChange.median)}, 80% of simulated outcomes between{' '}
               {pt(lastYearChange.p10)} and {pt(lastYearChange.p90)}.
             </div>
           )}

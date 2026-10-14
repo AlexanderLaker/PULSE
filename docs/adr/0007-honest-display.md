@@ -20,8 +20,9 @@ meaningless for independent draws.
 - The portfolio band is the joint percentile of the per-iteration portfolio
   shift, never an average of category bands.
 - A headline band says what it covers: 80% of simulated outcomes, driver size
-  and timing only. The runs vary nothing else; the weights and the model's
-  structure are the same in every run, so their uncertainty is not in it.
+  and timing only. The Monte Carlo iterations vary nothing else; the weights
+  and the model's structure are the same in every iteration, so their
+  uncertainty is not in it.
 - The force, value-chain and region lenses are labelled attribution: they
   split one simulated median and add up to it.
 - Sampling quality is shown as the largest bootstrap standard error of a
@@ -38,8 +39,8 @@ meaningless for independent draws.
   the current state.
 - Direction never rests on colour alone: a shift carries its sign.
 - The Consumer Journey presents its tiles as strategist hypotheses, not
-  findings: they are authored, not all of them cite their sources yet, and
-  none feeds the Shift Matrix.
+  findings: they are authored, they do not cite their sources yet, the
+  evidence grade on each is its author's, and none feeds the Shift Matrix.
 
 ## Consequences
 

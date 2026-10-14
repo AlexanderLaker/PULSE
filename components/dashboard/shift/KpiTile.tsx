@@ -43,11 +43,10 @@ export const KpiTile: FC<{
       </div>
       {hovered && (
         <div
-          className="absolute left-1/2 bottom-full mb-2 z-20 rounded-lg px-3 py-1.5 w-max pointer-events-none"
+          // As wide as the tile and wrapped inside it, so it stays on the
+          // screen whichever column the tile is in.
+          className="absolute inset-x-0 bottom-full mb-2 z-20 rounded-lg px-3 py-1.5 pointer-events-none"
           style={{
-            transform: 'translateX(-50%)',
-            // As wide as its text, and wrapped within the screen on a phone.
-            maxWidth: 'min(340px, calc(100vw - 32px))',
             backgroundColor: S.surface,
             color: S.onSurface,
             border: `1px solid ${S.cardBorderStrong}`,

@@ -268,7 +268,8 @@ def test_the_band_wording():
     simulated outcomes, and the runs vary only each driver's size and timing."""
     page = source("components/dashboard/ShiftAnalysis.tsx")
     notes = re.findall(r'bandNote="([^"]+)"', page)
-    coverage = 90 - 10   # the P90 and the P10 of engine.distribution
+    band = engine.distribution(np.arange(101.0))   # the percentiles of 0 to 100 are their own ranks
+    coverage = round(band["p90"] - band["p10"])
     category = f"{coverage}% of simulated outcomes (driver size and timing only)"
     assert notes == [f"{coverage}% of simulated outcomes (joint portfolio; driver size and timing only)", category]
     assert_quotes("docs/DESIGN.md", f'"{category}"')

@@ -365,7 +365,7 @@ const Step2Views: FC = () => (
       number="2"
       icon={Route}
       title="Consumer Journey"
-      body="Maps the moments of the consumer journey and the drivers behind each one. It is authored and explains; it does not feed the model."
+      body="Maps the moments of the consumer journey and the drivers linked to them. Its tiles are strategists' hypotheses, not findings; they do not feed the model."
     />
 
     <SectionLabel style={{ marginTop: 18 }}>Output</SectionLabel>

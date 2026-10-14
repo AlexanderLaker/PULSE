@@ -3,11 +3,12 @@
  * Drivers to the moments of the Laundry and Hair consumer journeys.
  *
  * Every tile is a strategist's hypothesis: authored content with its revision
- * month and the evidence grade its author gave it. Not every tile cites its
- * sources, and the page says so. A tile's dialog shows the drivers behind the
- * moment, resolved to the live drivers and linked to the Drivers page, the
- * net effect, the Strategist Read (authored, not simulated) and the stage
- * context. Nothing here feeds or reads the Shift Matrix.
+ * month and the evidence grade its author gave it. The tiles do not cite
+ * their sources, and the page says so. A tile's dialog shows the drivers
+ * linked to the moment, resolved to the live drivers and linked to the
+ * Drivers page, the net effect, the Strategist Read (authored, not
+ * simulated) and the stage context. Nothing here feeds or reads the Shift
+ * Matrix.
  *
  * The tiles come from data/consumerJourney.ts until an admin saves an edit;
  * from then on the newest saved version replaces them. The stage contexts
@@ -278,7 +279,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
             </h1>
             <p className="mt-2 max-w-2xl text-[15px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.55 }}>
               Profit Pool Drivers mapped to consumer moments, tile by tile. Each tile is a strategist&rsquo;s
-              hypothesis, authored and dated; click a tile for the drivers behind it and the strategist&rsquo;s read.
+              hypothesis, authored and dated; click a tile for the strategist&rsquo;s read and any drivers linked to it.
             </p>
           </div>
         </header>
@@ -288,8 +289,8 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
           <Info size={14} strokeWidth={2.5} style={{ color: S.onSurfaceVariant, flexShrink: 0, marginTop: 2 }} />
           <p className="text-[12.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.55, margin: 0 }}>
             <strong style={{ fontFamily: HEADLINE_FONT }}>Strategist hypotheses, not findings.</strong> A qualitative overlay mapping
-            drivers to consumer moments: not every tile cites its sources yet, and authored content does not feed the
-            Shift Matrix.
+            drivers to consumer moments: the tiles do not cite their sources yet, the evidence grade on each is its
+            author&rsquo;s own, and authored content does not feed the Shift Matrix.
           </p>
         </div>
 
