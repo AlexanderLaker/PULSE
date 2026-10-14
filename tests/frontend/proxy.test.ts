@@ -1,9 +1,10 @@
 /**
  * proxy.ts: which requests need a Clerk session. Pages without one go to the
- * sign-in page and dashboard routes answer 401; the sign-in pages, the
- * webhook, the bootstrap route and the PRISM API are left to their own
- * checks, and so is expiring the viewer cookie, which a page whose session
- * has ended must still be able to do.
+ * sign-in page, the waiting page included, and dashboard routes answer 401;
+ * the sign-in pages, the webhook, the bootstrap route and the PRISM API are
+ * left to their own checks, and so is expiring the viewer cookie, which a
+ * page whose session has ended must still be able to do. Whether a signed-in
+ * user has a role is for the pages and routes to check, not for proxy.ts.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { NextRequest } from 'next/server';
@@ -29,14 +30,17 @@ function run(path: string, method = 'GET', userId: string | null = null) {
 describe('proxy.ts', () => {
   it('lets a signed-in user through', async () => {
     expect(await run('/dashboard', 'GET', 'user_1').result).toBeUndefined();
-    expect(await run('/api/me', 'GET', 'user_1').result).toBeUndefined();
+    expect(await run('/pending', 'GET', 'user_1').result).toBeUndefined();
+    expect(await run('/api/users', 'GET', 'user_1').result).toBeUndefined();
   });
 
   it('sends a page without a session to sign in, and answers a dashboard route 401', async () => {
-    const page = run('/dashboard');
-    expect((await page.result)?.status).toBe(307);
-    expect(page.redirectToSignIn).toHaveBeenCalledTimes(1);
-    for (const [path, method] of [['/api/me', 'GET'], ['/api/prism-cookie', 'GET'], ['/api/drivers/consumer_r01', 'PUT']]) {
+    for (const path of ['/dashboard', '/pending']) {
+      const page = run(path);
+      expect((await page.result)?.status).toBe(307);
+      expect(page.redirectToSignIn).toHaveBeenCalledTimes(1);
+    }
+    for (const [path, method] of [['/api/users', 'GET'], ['/api/prism-cookie', 'GET'], ['/api/drivers/consumer_r01', 'PUT']]) {
       const res = await run(path!, method).result;
       expect(res?.status).toBe(401);
     }

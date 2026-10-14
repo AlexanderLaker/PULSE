@@ -1,6 +1,8 @@
 /**
- * User management, for admins: every user with their role, and the change of
- * a role through the dashboard's own route (lib/roles.ts).
+ * User management, for admins: every user with their access, pending users
+ * first. Giving a pending user a role approves them; setting a user back to
+ * pending takes their role away. Both go through the dashboard's own route
+ * (lib/roles.ts), which also refuses an admin's change of their own role.
  */
 import { useEffect, useState, type FC } from 'react';
 import { UsersIcon } from 'lucide-react';
@@ -9,7 +11,7 @@ import type { ManagedUser } from '@/lib/apiClient';
 import SectionCard from '@/components/dashboard/SectionCard';
 import { S, HEADLINE_FONT } from '@/lib/theme';
 import { NO_VALUE, fmtDate } from '@/lib/format';
-import type { Role } from '@/types';
+import type { Access } from '@/types';
 import { errorText, INPUT_STYLE, Muted, RolePill, type Status, StatusBanner } from './parts';
 
 const USER_GRID = '2fr 1.2fr 0.8fr 1fr 0.8fr';
@@ -32,25 +34,36 @@ export const UsersSection: FC<{ currentUserId: string | null }> = ({ currentUser
     return () => { cancelled = true; };
   }, []);
 
-  const changeRole = async (userId: string, role: Role) => {
-    setUpdatingId(userId);
+  const changeAccess = async (user: ManagedUser, next: Access) => {
+    setUpdatingId(user.id);
     setStatus(null);
     try {
-      const saved = await api.setUserRole(userId, role);
-      setUsers((list) => list && list.map((u) => (u.id === userId ? { ...u, role: saved.role } : u)));
-      setStatus({ kind: 'success', message: 'Role updated.' });
+      const saved = next === 'pending'
+        ? await api.revokeUserRole(user.id)
+        : await api.setUserRole(user.id, next);
+      setUsers((list) => list && list.map((u) => (u.id === user.id ? { ...u, role: saved.role } : u)));
+      setStatus({
+        kind: 'success',
+        message: saved.role === 'pending'
+          ? `${user.email} is pending again: from their next page load they see the waiting page, and a dashboard they have open loses access within 30 minutes.`
+          : user.role === 'pending'
+            ? `${user.email} is approved as ${saved.role}.`
+            : 'Role updated.',
+      });
     } catch (err) {
-      setStatus({ kind: 'error', message: errorText(err, 'Failed to update role.') });
+      setStatus({ kind: 'error', message: errorText(err, 'Failed to update access.') });
     } finally {
       setUpdatingId(null);
     }
   };
 
+  const pending = users?.filter((u) => u.role === 'pending').length ?? 0;
+
   return (
     <SectionCard size="regular"
-      title={`All users${users?.length ? ` (${users.length})` : ''}`}
+      title={`All users${users?.length ? ` (${users.length}${pending ? `, ${pending} pending` : ''})` : ''}`}
       icon={UsersIcon}
-      description="Promote teammates to admin or demote them to viewer. Admins edit drivers and Consumer Journey content and manage users; viewers have read-only access."
+      description="A new account is pending, and sees only a page saying that access awaits approval, until you give it a role here. Admins edit drivers and Consumer Journey content and manage users; viewers have read-only access. Setting a user back to pending takes their access away."
     >
       {users === null ? (
         <Muted>Loading users…</Muted>
@@ -72,7 +85,7 @@ export const UsersSection: FC<{ currentUserId: string | null }> = ({ currentUser
           }}>
             <span>User</span>
             <span>Name</span>
-            <span>Role</span>
+            <span>Access</span>
             <span>Last sign-in</span>
             <span style={{ textAlign: 'right' }}>Actions</span>
           </div>
@@ -108,10 +121,10 @@ export const UsersSection: FC<{ currentUserId: string | null }> = ({ currentUser
                 <span style={{ textAlign: 'right' }}>
                   <select
                     value={u.role}
-                    onChange={(e) => changeRole(u.id, e.target.value as Role)}
+                    onChange={(e) => changeAccess(u, e.target.value as Access)}
                     disabled={locked}
-                    aria-label={`Role of ${u.email}`}
-                    title={isSelf ? "You can't change your own role." : 'Change role'}
+                    aria-label={`Access of ${u.email}`}
+                    title={isSelf ? "You can't change your own role." : u.role === 'pending' ? 'Approve with a role' : 'Change role'}
                     style={{
                       ...INPUT_STYLE,
                       padding: '5px 10px',
@@ -120,6 +133,7 @@ export const UsersSection: FC<{ currentUserId: string | null }> = ({ currentUser
                       cursor: isSelf ? 'not-allowed' : 'pointer',
                     }}
                   >
+                    <option value="pending">Pending</option>
                     <option value="viewer">Viewer</option>
                     <option value="admin">Admin</option>
                   </select>

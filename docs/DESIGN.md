@@ -1,9 +1,9 @@
 # Design
 
 The dashboard uses one visual language on every surface: views, dialogs,
-loading and error states, and the sign-in pages. It is a light editorial
-look: navy ink on pale blue surfaces, Manrope headlines, Inter text, and
-numbers that carry the hierarchy while the chrome stays quiet.
+loading and error states, and the sign-in and waiting pages. It is a light
+editorial look: navy ink on pale blue surfaces, Manrope headlines, Inter
+text, and numbers that carry the hierarchy while the chrome stays quiet.
 
 ## Where the tokens live
 

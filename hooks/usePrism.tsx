@@ -2,9 +2,9 @@
  * The dashboard's data: the drivers, the served run, the model configuration
  * and the service's health, loaded once and shared by every view.
  *
- * Mount <PrismProvider> once (app/dashboard/page.tsx); every view reads the
- * same store with usePrism(). The dashboard never simulates: it shows the
- * newest run the production job persisted.
+ * Mount <PrismProvider> once (app/dashboard/DashboardApp.tsx); every view
+ * reads the same store with usePrism(). The dashboard never simulates: it
+ * shows the newest run the production job persisted.
  *
  * A load first asks /api/prism-cookie for the viewer cookie the /api/v1 reads
  * need. Every load takes a new sequence number and only the newest may write
@@ -257,7 +257,7 @@ function usePrismStore(): PrismStore {
 
 const PrismContext = createContext<PrismStore | null>(null);
 
-/** Mount once (app/dashboard/page.tsx); every view shares this store. */
+/** Mount once (app/dashboard/DashboardApp.tsx); every view shares this store. */
 export const PrismProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const store = usePrismStore();
   return <PrismContext.Provider value={store}>{children}</PrismContext.Provider>;
@@ -266,6 +266,6 @@ export const PrismProvider: FC<{ children: ReactNode }> = ({ children }) => {
 /** The shared store. Must be used inside <PrismProvider>. */
 export default function usePrism(): PrismStore {
   const store = useContext(PrismContext);
-  if (!store) throw new Error('usePrism must be used inside <PrismProvider> (app/dashboard/page.tsx)');
+  if (!store) throw new Error('usePrism must be used inside <PrismProvider> (app/dashboard/DashboardApp.tsx)');
   return store;
 }

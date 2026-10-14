@@ -71,18 +71,23 @@ run then also needs `--allow-sqlite`.
 
 ### Roles on a development machine
 
-The Clerk webhook that adds new users to `user_roles` cannot reach
-localhost, so a user who signs up locally has no row and is a viewer. Either
-point the development instance's webhook at a tunnel to port 3000 (for
-example `ngrok http 3000`, then the webhook URL
-`https://<tunnel>/api/webhooks/clerk`), or add your row by hand in the
-development database:
+A user who signs up has no row in `user_roles` and sees only the waiting page
+until an admin approves them, and a new development database has no admin.
+Make yourself the first: sign up, then add your row by hand in the
+development database,
 
 ```sql
 INSERT INTO user_roles (clerk_user_id, email, role) VALUES ('<your Clerk user id>', '<your email>', 'admin');
 ```
 
-The Clerk user id is in the Clerk dashboard under Users.
+(the Clerk user id is in the Clerk dashboard under Users), or call the
+bootstrap route on `http://localhost:3000` as under Roles and users, with
+`ADMIN_BOOTSTRAP_SECRET` and `ADMIN_BOOTSTRAP_EMAIL` in `.env` and the dev
+server restarted. Approve anyone else in Settings. The Clerk webhook, which
+keeps the emails current and removes deleted users, cannot reach localhost;
+if you need it, point the development instance's webhook at a tunnel to port
+3000 (for example `ngrok http 3000`, then the webhook URL
+`https://<tunnel>/api/webhooks/clerk`).
 
 ## Tests and checks
 
@@ -319,8 +324,7 @@ Other branches get preview deployments. The environment variables live in the
 Vercel project settings (Production and Preview). Vercel applies a change to
 any of them only to deployments made after it, so redeploy after every change
 (Deployments, the latest deployment, Redeploy);
-`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `NEXT_PUBLIC_SIGNUP_CODE` are also
-built into the dashboard's code. `PRISM_API_ORIGIN`, if used, belongs to
+`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is also built into the dashboard's code. `PRISM_API_ORIGIN`, if used, belongs to
 Production only: set for Preview as well, a preview deployment's admin writes
 would go to the production API. A database that still needs migration 0001
 (the API answers 503 and names it) is moved in the order that migration's
@@ -473,8 +477,7 @@ A new value takes effect with the next deployment.
 | `PRISM_JWT_SECRET` | generate one (`openssl rand -base64 48`) | set it in Vercel (a different value for Preview); redeploy. Old tokens stop working and an open dashboard fetches a new cookie, so nobody has to sign in again |
 | `CLERK_SECRET_KEY` | the Clerk dashboard, API keys: create a new secret key, and delete the old one once the new deployment is live | update Vercel; redeploy |
 | `CLERK_WEBHOOK_SIGNING_SECRET` | the Clerk dashboard, Webhooks, PRISM's endpoint: a new signing secret | update Vercel; redeploy |
-| `ADMIN_BOOTSTRAP_SECRET` | | remove it whenever no first admin is being set up |
-| `NEXT_PUBLIC_SIGNUP_CODE` | choose a new code | update Vercel; redeploy (it is readable in the browser by design) |
+| `ADMIN_BOOTSTRAP_SECRET` | | remove it, and `ADMIN_BOOTSTRAP_EMAIL`, whenever no first admin is being set up |
 
 ## Incidents
 
@@ -495,22 +498,45 @@ A new value takes effect with the next deployment.
 
 ## Roles and users
 
-A user becomes admin at sign-up when `user_roles` is empty (the first user);
-everyone else starts as viewer. Admins change other users' roles in
-Settings, under User management, never their own. Two ways exist to set a
-role without an admin session:
+A user who signs up gets no row in `user_roles`: they are pending, and see
+only the waiting page, until an admin gives them a role in Settings, under
+User management, which lists pending users first. Choosing Viewer or Admin
+for a pending user approves them. Choosing Pending for a user takes their
+role away: from their next page load they see the waiting page, and a
+dashboard they have open loses access within 30 minutes, when its viewer
+cookie runs out (an admin write is refused at once, as each is checked
+against `user_roles`). Admins never change their own role. While
+`PRISM_ALLOWED_EMAIL_DOMAINS` is set (comma-separated domains, such as
+`henkel.com`), only a pending user whose address is at one of them can be
+approved; a user who has a role keeps it. A user whose address Clerk has not
+verified cannot be approved at all. Every approval, change and removal goes
+to the audit log.
+
+**Review the accounts** at go-live and from time to time: Clerk keeps every
+account that ever signed up, and Settings shows each with its access. Set
+back to pending anyone who should no longer read PRISM, and delete in Clerk
+(Users) any account nobody recognises; deleting it removes its row too.
+
+Two ways exist to set a role without an admin session:
 
 - `python3 scripts/promote_admin.py someone@example.com` (or `--role viewer`)
-  with database access. It can change any role, the last admin's included;
-- `POST /api/admin/bootstrap` with the header `x-bootstrap-secret` equal to
-  `ADMIN_BOOTSTRAP_SECRET` and the body `{"email": "..."}` makes the user
-  admin while no admin exists (409 otherwise); it never takes a role away.
-  The route exists only while the variable is set, and works only with a
-  secret of at least 32 characters: set it, redeploy, call the route, then
-  remove it and redeploy again.
+  with database access, for a user who has a role. It can change any role,
+  the last admin's included;
+- `POST /api/admin/bootstrap` sets up the first admin of a new database. It
+  exists only while `ADMIN_BOOTSTRAP_SECRET` is set, works only with a secret
+  of at least 32 characters, and makes only the address in
+  `ADMIN_BOOTSTRAP_EMAIL` admin, once that address has signed up and Clerk
+  has verified it.
+  Once an admin exists it answers 409 and changes nothing, and it never takes
+  a role away. Set both variables, redeploy, sign up with that address (the
+  dashboard shows the waiting page), then call the route
 
-Both need the user's row in `user_roles`, which the Clerk webhook adds at
-sign-up.
+  ```bash
+  curl -X POST https://<domain>/api/admin/bootstrap -H 'x-bootstrap-secret: <secret>' \
+    -H 'content-type: application/json' -d '{"email": "<the address>"}'
+  ```
+
+  and remove both variables and redeploy again.
 
 ## Setting up Clerk for a new environment
 
@@ -519,18 +545,20 @@ sign-up.
 2. Copy the publishable and secret keys into
    `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`.
 3. Add a webhook endpoint `https://<domain>/api/webhooks/clerk` for the
-   events `user.created`, `user.updated` and `user.deleted`, and copy its
-   signing secret into `CLERK_WEBHOOK_SIGNING_SECRET`. The route rejects any
-   request without a valid signature.
+   events `user.updated` and `user.deleted` (`user.created` may be added; it
+   changes nothing), and copy its signing secret into
+   `CLERK_WEBHOOK_SIGNING_SECRET`. The route rejects any request without a
+   valid signature.
 4. Restrict who may sign up, in the Clerk dashboard (Access mode): the
    Invite-only sign-up mode (`restricted` in Clerk's API; users join by
    invitation) or an allowlist of email addresses or domains, which needs a
-   paid Clerk plan in production. Every signed-in user can read PRISM and
-   propose scores. The access code the sign-up page asks for
-   (`NEXT_PUBLIC_SIGNUP_CODE`) is fixed at build time and readable in the
-   browser, so it only keeps casual visitors out.
-5. Deploy, sign up, and check that `user_roles` holds your row with the
-   admin role.
+   paid Clerk plan in production. Turn on multi-factor authentication too, if
+   the plan includes it. An account opens nothing by itself: it is pending
+   until an admin approves it, and `PRISM_ALLOWED_EMAIL_DOMAINS` limits whom
+   an admin can approve.
+5. Set up the first admin with the bootstrap route (Roles and users), then
+   check that `user_roles` holds your row with the admin role and that the
+   dashboard opens.
 
 ## Troubleshooting
 
@@ -539,7 +567,8 @@ sign-up.
 | Every data request answers 401 | The dashboard and the API see different `PRISM_JWT_SECRET` values, or the value is shorter than 32 characters. Set the same value everywhere and redeploy |
 | The dashboard says the service is unavailable, or a notice under the navigation says the data cannot be loaded | Check `/api/v1/health` and `/api/v1/diagnostics`. `simulation_reason` names the cause: `migration_pending` (the database needs a migration; the `error` field of `/diagnostics` names it), `no_database` (neither `DATABASE_URL` nor `POSTGRES_URL` is set in this Vercel deployment), `drivers_missing` (the database stores runs or driver edits but no drivers, so they were lost: restore it as under Backups and restore; PRISM seeds only a new database) or `db_error` (the API cannot reach the database or a query failed; the `error` field of `/diagnostics` says why) |
 | The Shift Analysis is empty | `simulation_reason` in `/api/v1/diagnostics` is `no_rows` (write a run) or `malformed` (the newest run lacks a part the dashboard needs, such as a key, a category, region or year, a gross-profit share, its run metadata or a complete driver fingerprint; the `error` field lists them; write a new run) |
-| Nobody is admin | The webhook did not reach the dashboard: check its deliveries in the Clerk dashboard, then set the role as described under Roles |
+| A user sees only the waiting page | They have no role yet: an admin approves them in Settings, User management. A waiting page that says their access could not be checked means the dashboard cannot reach the database (`DATABASE_URL` or `POSTGRES_URL` in the Vercel project) |
+| Nobody is admin | A new database has none: set up the first with the bootstrap route, as under Roles and users |
 | The production run exits with 4 | The correlation settings are not positive definite on the current driver mix; lower the cross-force correlations in `prism/config.py` |
 
 ## Handover
@@ -560,9 +589,8 @@ travel separately:
 - the credentials, which are not handed over but rotated: the Clerk keys and
   webhook secret, the Neon password, `PRISM_JWT_SECRET` (the old tokens stop
   working, and an open dashboard fetches a new cookie on its next request, so
-  nobody has to sign in again), `NEXT_PUBLIC_SIGNUP_CODE` and any
-  `ADMIN_BOOTSTRAP_SECRET`. Each new value takes effect with the next
-  deployment.
+  nobody has to sign in again) and any `ADMIN_BOOTSTRAP_SECRET`. Each new
+  value takes effect with the next deployment.
 
 The services themselves belong to the owner's accounts today: the GitHub
 repository, the Vercel project `prism-profit-pool`, the Neon project and the
@@ -591,9 +619,10 @@ PRISM needs four things, which Vercel, Neon and Clerk provide today:
 - PostgreSQL. The dashboard reaches it through Neon's serverless driver
   (`lib/db.ts`); another PostgreSQL service means replacing that driver;
 - an identity provider. Clerk is used in `lib/roles.ts`, `proxy.ts`,
-  `app/layout.tsx` (the provider), the sign-in and sign-up pages, the webhook,
-  the user list (`app/api/users`), the dashboard's user menu and the account
-  and session parts of Settings; the API only verifies PRISM's own tokens.
+  `app/layout.tsx` (the provider), the sign-in, sign-up and waiting pages,
+  the webhook, the user list and approvals (`app/api/users`), the bootstrap
+  route, the dashboard's user menu and the account and session parts of
+  Settings; the API only verifies PRISM's own tokens.
 
 The production run needs a machine or a job runner with the full Python
 environment and access to the database. It must keep scipy: there is no

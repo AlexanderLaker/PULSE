@@ -26,3 +26,6 @@ export type Confidence = 'High' | 'Medium' | 'Low';
 
 /** A signed-in user's role: admins edit drivers and journey content and manage users. */
 export type Role = 'admin' | 'viewer';
+
+/** What a signed-in user may do: a role, or pending until an admin gives them one. */
+export type Access = Role | 'pending';

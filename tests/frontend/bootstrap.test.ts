@@ -1,14 +1,21 @@
 /**
- * POST /api/admin/bootstrap: the first admin, set up with a shared secret. The
- * route does not exist while ADMIN_BOOTSTRAP_SECRET is unset, does not work
- * with a secret under 32 characters, refuses a wrong secret, never creates a
- * user, refuses once an admin exists, and writes the promotion to the audit
- * log.
+ * POST /api/admin/bootstrap: the first admin, set up with a shared secret for
+ * the address in ADMIN_BOOTSTRAP_EMAIL. The route does not exist while
+ * ADMIN_BOOTSTRAP_SECRET is unset, does not work with a secret under 32
+ * characters, refuses a wrong secret, works for the named address only and
+ * only once it has signed up in Clerk and Clerk has verified it, refuses once
+ * an admin exists, and writes the promotion to the audit log.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+const clerk = vi.hoisted(() => ({ getUserList: vi.fn() }));
+vi.mock('@clerk/nextjs/server', () => ({
+  clerkClient: async () => ({ users: { getUserList: clerk.getUserList } }),
+}));
+
 const db = vi.hoisted(() => ({
-  rows: [] as Array<{ clerk_user_id: string; role: string }>,
+  /** The role row the named user has, if any. */
+  existingRole: null as string | null,
   admins: [] as unknown[],
   queries: [] as string[],
   transactions: [] as Array<{ isolationLevel?: string }>,
@@ -17,13 +24,15 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/db', () => ({
   getSQL: () => {
-    const sql = (strings: TemplateStringsArray) => {
+    const sql = (strings: TemplateStringsArray, ...values: unknown[]) => {
       const query = strings.join('?').replace(/\s+/g, ' ').trim();
       db.queries.push(query);
-      if (query.startsWith('SELECT clerk_user_id')) return Promise.resolve(db.rows);
-      // The conditional promotion: no row changes while an admin exists.
-      if (query.startsWith("UPDATE user_roles SET role = 'admin'")) {
-        return Promise.resolve(db.admins.length > 0 ? [] : [{ clerk_user_id: db.rows[0]?.clerk_user_id }]);
+      if (query.startsWith('SELECT role FROM user_roles')) {
+        return Promise.resolve(db.existingRole ? [{ role: db.existingRole }] : []);
+      }
+      // The conditional insert or promotion: no row changes while an admin exists.
+      if (query.startsWith('INSERT INTO user_roles')) {
+        return Promise.resolve(db.admins.length > 0 ? [] : [{ clerk_user_id: values[0] }]);
       }
       return Promise.resolve([]);
     };
@@ -41,6 +50,7 @@ import { POST } from '@/app/api/admin/bootstrap/route';
 
 /** A made-up secret of forty characters. */
 const SECRET = 'x'.repeat(40);
+const NAMED = 'first.admin@example.com';
 
 const call = (secret: string | null, body: unknown = { email: 'First.Admin@Example.com' }) =>
   POST(new Request('https://prism.test/api/admin/bootstrap', {
@@ -49,15 +59,32 @@ const call = (secret: string | null, body: unknown = { email: 'First.Admin@Examp
     body: JSON.stringify(body),
   }));
 
+const wrote = (start: string) => db.queries.some((q) => q.startsWith(start));
+
+/** The Clerk user who signs in with the named address, as getUserList returns them. */
+const clerkUser = (status: string) => ({
+  id: 'user_7',
+  emailAddresses: [
+    { emailAddress: 'other@example.com', verification: { status: 'verified' } },
+    { emailAddress: 'First.Admin@Example.com', verification: { status } },
+  ],
+});
+
 beforeEach(() => {
-  db.rows = [];
+  db.existingRole = null;
   db.admins = [];
   db.queries = [];
   db.transactions = [];
   db.conflict = null;
+  clerk.getUserList.mockReset();
+  clerk.getUserList.mockResolvedValue({ data: [clerkUser('verified')] });
   process.env.ADMIN_BOOTSTRAP_SECRET = SECRET;
+  process.env.ADMIN_BOOTSTRAP_EMAIL = ` ${NAMED.toUpperCase()} `;
 });
-afterEach(() => { delete process.env.ADMIN_BOOTSTRAP_SECRET; });
+afterEach(() => {
+  delete process.env.ADMIN_BOOTSTRAP_SECRET;
+  delete process.env.ADMIN_BOOTSTRAP_EMAIL;
+});
 
 describe('/api/admin/bootstrap', () => {
   it('does not exist while the secret is unset', async () => {
@@ -79,50 +106,93 @@ describe('/api/admin/bootstrap', () => {
       expect((await call(secret)).status).toBe(403);
     }
     expect(db.queries).toEqual([]);
+    expect(clerk.getUserList).not.toHaveBeenCalled();
   });
 
-  it('never creates a user the Clerk webhook has not added', async () => {
+  it('does not work while ADMIN_BOOTSTRAP_EMAIL is unset', async () => {
+    delete process.env.ADMIN_BOOTSTRAP_EMAIL;
+    const res = await call(SECRET);
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toContain('ADMIN_BOOTSTRAP_EMAIL is not set');
+    expect(db.queries).toEqual([]);
+  });
+
+  it('refuses a body without an email, and any address but the named one', async () => {
+    expect((await call(SECRET, {})).status).toBe(400);
+    const other = await call(SECRET, { email: 'someone.else@example.com' });
+    expect(other.status).toBe(403);
+    expect((await other.json()).error).toBe('Only the address in ADMIN_BOOTSTRAP_EMAIL can become the first admin');
+    expect(db.queries).toEqual([]);
+    expect(clerk.getUserList).not.toHaveBeenCalled();
+  });
+
+  it('refuses while no Clerk user signs in with the address, and writes nothing', async () => {
+    clerk.getUserList.mockResolvedValue({ data: [] });
     const res = await call(SECRET);
     expect(res.status).toBe(404);
-    expect(db.queries.some((q) => q.startsWith('INSERT INTO user_roles'))).toBe(false);
+    expect((await res.json()).error).toBe(`No Clerk user signs in with ${NAMED}: sign up with it first`);
+    expect(clerk.getUserList).toHaveBeenCalledWith({ emailAddress: [NAMED], limit: 1 });
+    expect(wrote('INSERT INTO user_roles')).toBe(false);
   });
 
-  it('promotes an existing user and writes the audit log', async () => {
-    db.rows = [{ clerk_user_id: 'user_7', role: 'viewer' }];
+  it('refuses while Clerk has not verified the address for that user, and writes nothing', async () => {
+    clerk.getUserList.mockResolvedValue({ data: [clerkUser('unverified')] });
+    const res = await call(SECRET);
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe(`Clerk has not verified ${NAMED} for this user yet: confirm it first`);
+    expect(wrote('INSERT INTO user_roles')).toBe(false);
+  });
+
+  it('adds the pending user as admin and writes the approval to the audit log', async () => {
     const res = await call(SECRET);
     expect(res.status).toBe(200);
-    expect(db.queries.some((q) => q.startsWith("UPDATE user_roles SET role = 'admin'"))).toBe(true);
-    expect(db.queries.some((q) => q.startsWith('INSERT INTO audit_log'))).toBe(true);
+    expect(await res.json()).toEqual({
+      clerkUserId: 'user_7', email: NAMED, role: 'admin', changed: true, previousRole: null,
+    });
+    expect(wrote('INSERT INTO user_roles')).toBe(true);
+    expect(wrote('INSERT INTO audit_log')).toBe(true);
   });
 
-  it('checks for an admin and promotes in one statement of a serializable transaction', async () => {
-    db.rows = [{ clerk_user_id: 'user_7', role: 'viewer' }];
+  it('promotes the named user from viewer', async () => {
+    db.existingRole = 'viewer';
+    const res = await call(SECRET);
+    expect(res.status).toBe(200);
+    expect((await res.json()).previousRole).toBe('viewer');
+  });
+
+  it('checks for an admin and adds or promotes in one statement of a serializable transaction', async () => {
     await call(SECRET);
-    const [update] = db.queries.filter((q) => q.startsWith('UPDATE user_roles'));
-    expect(update).toContain("AND NOT EXISTS (SELECT 1 FROM user_roles WHERE role = 'admin')");
+    const [insert] = db.queries.filter((q) => q.startsWith('INSERT INTO user_roles'));
+    expect(insert).toContain("WHERE NOT EXISTS (SELECT 1 FROM user_roles WHERE role = 'admin')");
+    expect(insert).toContain("ON CONFLICT (clerk_user_id) DO UPDATE SET role = 'admin'");
     expect(db.transactions).toEqual([{ isolationLevel: 'Serializable' }]);
-    expect(db.queries.some((q) => q.startsWith('SELECT 1 FROM user_roles'))).toBe(false);
+    expect(wrote('SELECT 1 FROM user_roles')).toBe(false);
+  });
+
+  it('changes nothing for a user who is admin already', async () => {
+    db.existingRole = 'admin';
+    const res = await call(SECRET);
+    expect(res.status).toBe(200);
+    expect((await res.json()).changed).toBe(false);
+    expect(db.transactions).toEqual([]);
   });
 
   it('refuses once an admin exists, and writes no audit entry', async () => {
-    db.rows = [{ clerk_user_id: 'user_8', role: 'viewer' }];
     db.admins = [{ '?column?': 1 }];
     const res = await call(SECRET);
     expect(res.status).toBe(409);
     expect((await res.json()).error).toContain('An admin exists already');
-    expect(db.queries.some((q) => q.startsWith('INSERT INTO audit_log'))).toBe(false);
+    expect(wrote('INSERT INTO audit_log')).toBe(false);
   });
 
   it('refuses the loser of two calls at the same moment', async () => {
-    db.rows = [{ clerk_user_id: 'user_9', role: 'viewer' }];
     db.conflict = { code: '40001' };
     const res = await call(SECRET);
     expect(res.status).toBe(409);
-    expect(db.queries.some((q) => q.startsWith('INSERT INTO audit_log'))).toBe(false);
+    expect(wrote('INSERT INTO audit_log')).toBe(false);
   });
 
   it('lets any other database failure through', async () => {
-    db.rows = [{ clerk_user_id: 'user_9', role: 'viewer' }];
     db.conflict = { code: '08006' };
     await expect(call(SECRET)).rejects.toEqual({ code: '08006' });
   });

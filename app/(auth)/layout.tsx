@@ -1,10 +1,10 @@
 /**
- * The frame of the sign-in and sign-up pages: the PRISM wordmark in the top
- * navigation's brand treatment over one plain card, and "Authorised users
- * only" under it. The pages fill the card (app/(auth)/shared.tsx has what
- * they share). Clerk's form inside it takes the ClerkProvider appearance of
- * app/layout.tsx, and app/globals.css flattens Clerk's own frames, since the
- * card is drawn here.
+ * The frame of the sign-in, sign-up and waiting pages: the PRISM wordmark in
+ * the top navigation's brand treatment over one plain card, and "Authorised
+ * users only" under it. The pages fill the card (app/(auth)/shared.tsx has
+ * what they share). Clerk's form inside it takes the ClerkProvider appearance
+ * of app/layout.tsx, and app/globals.css flattens Clerk's own frames, since
+ * the card is drawn here.
  */
 import type { ReactNode } from 'react';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';

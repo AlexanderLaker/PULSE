@@ -293,7 +293,7 @@ def schema(postgres: bool) -> list[str]:
             tier TEXT NOT NULL CHECK (tier IN ({sql_list(("",) + SOURCE_TIERS)})),
             published TEXT NOT NULL
         )""",
-        # One row per (driver, expert): any signed-in user can propose scores
+        # One row per (driver, expert): any viewer or admin can propose scores
         # for a driver; admins endorse by editing the driver itself.
         f"""CREATE TABLE IF NOT EXISTS driver_score_proposals (
             id {serial},

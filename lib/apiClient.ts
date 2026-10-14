@@ -10,12 +10,11 @@
  * go to the dashboard's own routes under /api, which check the signed-in
  * user's role and forward the write with a short-lived admin token
  * (lib/adminWrite.ts): the viewer cookie can never authorise an admin write.
- * User management and the role lookup are dashboard routes too
- * (lib/roles.ts).
+ * User management is a dashboard route too (lib/roles.ts).
  */
 import type {
   DiagnosticsResult, Driver, DriverProposal, DriverProposalsResponse, DriverUpdate,
-  HealthStatus, ModelConfig, Role, SimulationPayload, SimulationResult,
+  Access, HealthStatus, ModelConfig, Role, SimulationPayload, SimulationResult,
 } from '@/types';
 import type { JourneyContent } from '@/data/consumerJourney';
 import { errorDetail } from '@/lib/apiError';
@@ -84,13 +83,24 @@ let priming: Promise<void> | null = null;
 const expireViewerCookie = (): Promise<void> =>
   fetch('/api/prism-cookie', { method: 'DELETE' }).then(() => undefined, () => undefined);
 
+/** The user's role was taken away while the page was open: a full navigation
+ *  to /dashboard, whose check on the server (app/dashboard/page.tsx) sends
+ *  them to the waiting page instead of leaving a dashboard whose reads fail. */
+const accessWithdrawn = (): void => { window.location.replace('/dashboard'); };
+
 /** Sets the viewer cookie the /api/v1 reads need. When it cannot be set, any
  *  cookie left in the browser (perhaps another user's) is expired instead, so
- *  the reads that follow fail rather than go out under it. Resolves either way. */
+ *  the reads that follow fail rather than go out under it; when it is refused
+ *  because the user no longer has a role (403), the page then leaves the
+ *  dashboard (accessWithdrawn). Resolves either way. */
 export const primeViewerCookie = (): Promise<void> => {
   if (cookieRetired) return Promise.resolve();
   priming ??= fetch('/api/prism-cookie')
-    .then((res) => (res.ok ? undefined : expireViewerCookie()), expireViewerCookie)
+    .then(async (res) => {
+      if (res.ok) return;
+      await expireViewerCookie();
+      if (res.status === 403) accessWithdrawn();
+    }, expireViewerCookie)
     .finally(() => { priming = null; });
   return priming;
 };
@@ -132,7 +142,7 @@ export const updateDriver = (id: string, update: DriverUpdate): Promise<DriverUp
 export const getDriverProposals = (id: string): Promise<DriverProposalsResponse> =>
   send(`/api/v1/drivers/${encodeURIComponent(id)}/proposals`);
 
-/** Merge fields into the caller's own proposal; any signed-in user may propose. */
+/** Merge fields into the caller's own proposal; any viewer or admin may propose. */
 export const saveMyProposal = (id: string, proposal: DriverProposal): Promise<DriverProposalsResponse> =>
   send(`/api/v1/drivers/${encodeURIComponent(id)}/proposals`, put(proposal));
 
@@ -171,28 +181,27 @@ export const saveJourneyContent = (
 ): Promise<{ status: 'saved'; version: number; tiles: number }> =>
   send('/api/journey', put({ base_version: baseVersion, content }));
 
-// ── Identity and users (dashboard routes) ───────────────────────────────────
+// ── Users (dashboard routes) ────────────────────────────────────────────────
 
-export interface Me {
-  clerkUserId: string;
-  email: string;
-  role: Role;
-}
-
-export const getMe = (): Promise<Me> => send('/api/me');
-
-/** A user as the admin's user list shows it: Clerk's identity with PRISM's role. */
+/** A user as the admin's user list shows it: Clerk's identity with their access in PRISM. */
 export interface ManagedUser {
   id: string;
   email: string;
   firstName: string | null;
   lastName: string | null;
-  role: Role;
+  role: Access;
   lastSignInAt: string | null;
   createdAt: string | null;
 }
 
 export const getUsers = (): Promise<{ users: ManagedUser[] }> => send('/api/users');
 
+const roleUrl = (userId: string) => `/api/users/${encodeURIComponent(userId)}/role`;
+
+/** Gives a user a role: for a pending user that is the approval. */
 export const setUserRole = (userId: string, role: Role): Promise<{ role: Role }> =>
-  send(`/api/users/${encodeURIComponent(userId)}/role`, { method: 'PATCH', body: JSON.stringify({ role }) });
+  send(roleUrl(userId), { method: 'PATCH', body: JSON.stringify({ role }) });
+
+/** Takes a user's role away: they are pending again. */
+export const revokeUserRole = (userId: string): Promise<{ role: 'pending' }> =>
+  send(roleUrl(userId), { method: 'DELETE' });

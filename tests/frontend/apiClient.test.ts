@@ -2,7 +2,9 @@
  * lib/apiClient.ts: every request the dashboard makes. The viewer cookie lasts
  * thirty minutes, so a /api/v1 request answered 401 asks /api/prism-cookie for a
  * new one and is sent once more; the dashboard's own routes are never retried,
- * and a second 401 is the answer. A write that got no answer from the API has
+ * and a second 401 is the answer. A user whose role was taken away is refused
+ * a new cookie (403), and the page leaves for /dashboard, whose check on the
+ * server shows the waiting page. A write that got no answer from the API has
  * an unknown outcome.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -58,6 +60,21 @@ describe('the viewer cookie', () => {
     const { primeViewerCookie } = await import('@/lib/apiClient');
     await primeViewerCookie();
     expect(requests).toEqual([['/api/prism-cookie', 'GET'], ['/api/prism-cookie', 'DELETE']]);
+  });
+
+  it('is refused to a user whose role was taken away: it is expired, and the page goes to /dashboard', async () => {
+    vi.resetModules();
+    const { primeViewerCookie } = await import('@/lib/apiClient');
+    const replace = vi.fn();
+    vi.stubGlobal('window', { location: { replace } });
+    const requests: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      requests.push(`${init?.method ?? 'GET'} ${url}`);
+      return init?.method === 'DELETE' ? json(200, { ok: true }) : json(403, { error: 'Access awaits approval' });
+    }));
+    await primeViewerCookie();
+    expect(requests).toEqual(['GET /api/prism-cookie', 'DELETE /api/prism-cookie']);
+    expect(replace).toHaveBeenCalledWith('/dashboard');
   });
 
   it('is not set again once it is cleared for a sign-out, until a signed-in store resumes it', async () => {

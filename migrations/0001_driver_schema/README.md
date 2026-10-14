@@ -104,9 +104,10 @@ as Rollback describes and try again another day.
    and `FORCE_DEV_PROXY`; the database URLs, `PRISM_JWT_SECRET` and the Clerk
    keys keep their names. In the Clerk dashboard, check that sign-up is
    restricted (Access mode: Invite-only, or an allowlist of the company's
-   email domain; docs/OPERATIONS.md, Setting up Clerk): every signed-in user
-   can read PRISM and propose scores, and the sign-up page's access code is
-   readable in the browser, so it keeps nobody out.
+   email domain; docs/OPERATIONS.md, Setting up Clerk). A new account waits
+   for an admin's approval, but a user who already has a row in `user_roles`
+   keeps their role and can read PRISM and propose scores: review the
+   accounts first (docs/OPERATIONS.md, Roles and users).
 
 1. **Back up.** In the Neon console, create a branch of the production branch
    (Branches, Create branch, from the current state). It is an instant

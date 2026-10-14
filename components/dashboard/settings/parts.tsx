@@ -4,9 +4,9 @@
  * the model tables share.
  */
 import type { CSSProperties, FC, ReactNode } from 'react';
-import { ShieldCheck, Check, AlertCircle, Info } from 'lucide-react';
+import { ShieldCheck, Check, AlertCircle, Info, Clock } from 'lucide-react';
 import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
-import type { Role } from '@/types';
+import type { Access } from '@/types';
 
 export type Status = { kind: 'success' | 'error' | 'info'; message: string };
 
@@ -18,17 +18,20 @@ export const Muted: FC<{ children: ReactNode }> = ({ children }) => (
   <div style={{ color: S.mutedText, fontSize: 13 }}>{children}</div>
 );
 
-export const RolePill: FC<{ role: Role }> = ({ role }) => {
-  const isAdmin = role === 'admin';
+/** A user's access: admin with a shield, viewer, or pending (no role yet) in amber with a clock. */
+export const RolePill: FC<{ role: Access }> = ({ role }) => {
+  const { bg, fg } = role === 'admin'
+    ? { bg: S.primaryContainer, fg: S.onPrimaryContainer }
+    : role === 'pending'
+      ? { bg: S.amberContainer, fg: S.onAmberContainer }
+      : { bg: S.secondaryContainer, fg: S.onSecondaryContainer };
   return (
     <span
       className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase"
-      style={{
-        backgroundColor: isAdmin ? S.primaryContainer : S.secondaryContainer,
-        color: isAdmin ? S.onPrimaryContainer : S.onSecondaryContainer,
-      }}
+      style={{ backgroundColor: bg, color: fg }}
     >
-      {isAdmin && <ShieldCheck size={11} strokeWidth={2.5} />}
+      {role === 'admin' && <ShieldCheck size={11} strokeWidth={2.5} />}
+      {role === 'pending' && <Clock size={11} strokeWidth={2.5} />}
       {role}
     </span>
   );

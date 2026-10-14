@@ -1,6 +1,6 @@
 /**
  * The welcome dialog: two steps of orientation, shown once per sign-in
- * (app/dashboard/page.tsx keeps the per-session flag).
+ * (app/dashboard/DashboardApp.tsx keeps the per-session flag).
  *
  *   Step 1: the early-access note and a request for feedback.
  *   Step 2: the three production views in header order: Drivers (the input),

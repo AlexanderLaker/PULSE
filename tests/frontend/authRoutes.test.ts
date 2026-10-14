@@ -2,7 +2,6 @@
  * The dashboard's server routes around the PRISM API: who may call them and
  * what they forward.
  *
- *   /api/me            the signed-in user and the role from user_roles
  *   /api/drivers/{id}  an admin edit of a driver, forwarded with an admin token
  *   /api/journey       an admin save of the journey content, forwarded likewise
  *
@@ -24,15 +23,15 @@ vi.mock('next/headers', () => ({
   headers: () => new Map([['host', 'prism.test'], ['x-forwarded-proto', 'https']]),
 }));
 
-import { GET as meGET } from '@/app/api/me/route';
 import { PUT as driverPUT } from '@/app/api/drivers/[id]/route';
 import { PUT as journeyPUT } from '@/app/api/journey/route';
 
 const signedOut = () => clerk.auth.mockResolvedValue({ userId: null });
-const signedIn = (role: 'admin' | 'viewer') => {
+/** Signed in as user_1 with this role; null: pending, without a row. */
+const signedIn = (role: 'admin' | 'viewer' | null) => {
   clerk.auth.mockResolvedValue({ userId: 'user_1' });
   clerk.currentUser.mockResolvedValue({ primaryEmailAddress: { emailAddress: 'a@b.de' } });
-  db.roleRows = [{ role }];
+  db.roleRows = role ? [{ role }] : [];
 };
 const answer = (status: number, body: unknown) =>
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(body), {
@@ -57,29 +56,17 @@ beforeEach(() => {
   answer(200, { status: 'updated', driver_id: 'consumer_r01', changed: ['probability'], revision: 2 });
 });
 
-describe('/api/me', () => {
-  it('answers 401 without a session', async () => {
-    signedOut();
-    expect((await meGET()).status).toBe(401);
-  });
-
-  it('returns the user with the role from user_roles', async () => {
-    signedIn('viewer');
-    const res = await meGET();
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ clerkUserId: 'user_1', email: 'a@b.de', role: 'viewer' });
-  });
-});
-
 describe('/api/drivers/{id}', () => {
   const params = { params: Promise.resolve({ id: 'consumer_r01' }) };
   const edit = (body: unknown = { revision: 1, probability: 4 }) =>
     new Request('https://prism.test/api/drivers/consumer_r01', { method: 'PUT', body: JSON.stringify(body) });
 
-  it('answers 401 without a session and 403 for a viewer, forwarding nothing', async () => {
+  it('answers 401 without a session and 403 for a viewer or a pending user, forwarding nothing', async () => {
     signedOut();
     expect((await driverPUT(edit(), params)).status).toBe(401);
     signedIn('viewer');
+    expect((await driverPUT(edit(), params)).status).toBe(403);
+    signedIn(null);
     expect((await driverPUT(edit(), params)).status).toBe(403);
     expect(fetch).not.toHaveBeenCalled();
   });

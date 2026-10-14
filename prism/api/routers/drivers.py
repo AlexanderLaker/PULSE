@@ -149,7 +149,7 @@ def get_driver_proposals(driver_id: str, user: dict = Depends(require_auth)):
 
 @router.put("/api/v1/drivers/{driver_id}/proposals")
 def put_driver_proposal(driver_id: str, proposal: ProposalUpdate, user: dict = Depends(require_auth)):
-    """Merge the caller's partial proposal; any signed-in user may propose.
+    """Merge the caller's partial proposal; any viewer or admin may propose.
 
     Only the fields sent change. A field sent as null clears it; an exposure
     map replaces the caller's whole map for that field. A proposal never

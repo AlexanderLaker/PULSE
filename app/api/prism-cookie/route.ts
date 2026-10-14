@@ -4,10 +4,13 @@
  * GET sets it:
  *   - The user comes from the Clerk session; without one the answer is 401
  *     and no cookie is set.
- *   - The token in the cookie always says viewer, admins included, so the
- *     role is not looked up. The cookie authorises reads and the user's own
- *     expert proposals, never an admin write: admin writes go through the
- *     dashboard routes with a separate admin token (lib/adminWrite.ts).
+ *   - Only a user with a role in user_roles gets one: a pending user, whom
+ *     no admin has approved yet, is answered 403 (lib/roles.ts). A database
+ *     that cannot be reached answers 500 and sets none either.
+ *   - The token in the cookie always says viewer, admins included. The
+ *     cookie authorises reads and the user's own expert proposals, never an
+ *     admin write: admin writes go through the dashboard routes with a
+ *     separate admin token (lib/adminWrite.ts).
  *   - httpOnly, Secure in production, SameSite=Lax and Path=/api/v1: script
  *     cannot read it and it is sent to the API only.
  *   - It lasts 30 minutes, so a session ended on another device loses its
@@ -19,7 +22,7 @@
  * the dashboard calls it before signing out and when the session has ended.
  */
 import { NextResponse } from 'next/server';
-import { requireSignedIn, UnauthorizedError } from '@/lib/roles';
+import { ForbiddenError, requireRole, UnauthorizedError } from '@/lib/roles';
 import { signPrismJwt } from '@/lib/prismJwt';
 
 export const runtime = 'nodejs';
@@ -36,7 +39,7 @@ const COOKIE = {
 
 export async function GET() {
   try {
-    const me = await requireSignedIn();
+    const me = await requireRole();
     // Viewer only, whatever the user's role (see above).
     const token = signPrismJwt(
       { sub: me.clerkUserId, email: me.email, name: me.name, role: 'viewer' },
@@ -52,6 +55,9 @@ export async function GET() {
   } catch (err) {
     if (err instanceof UnauthorizedError) {
       return NextResponse.json({ error: err.message }, { status: 401 });
+    }
+    if (err instanceof ForbiddenError) {
+      return NextResponse.json({ error: err.message }, { status: 403 });
     }
     console.error('[/api/prism-cookie] error:', err);
     return NextResponse.json({ error: 'Failed to sign the API token' }, { status: 500 });

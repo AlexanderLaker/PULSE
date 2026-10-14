@@ -86,8 +86,9 @@ export interface DriverUpdate {
 }
 
 // ── Expert proposals ────────────────────────────────────────────────────────
-// Any signed-in expert may propose scores for a driver. A proposal never
-// changes the driver; an admin endorses it by editing the driver.
+// Any expert with a role, viewer or admin, may propose scores for a driver.
+// A proposal never changes the driver; an admin endorses it by editing the
+// driver.
 
 /** The caller's own proposal: any subset of the scores, plus a comment. Sent as
  *  an update, a field set to null is cleared and an exposure map replaces the

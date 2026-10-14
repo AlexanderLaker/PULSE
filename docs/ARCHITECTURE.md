@@ -92,19 +92,21 @@ uvicorn, loading the repository's `.env` first (`prism/env_loader.py`;
 variables set in the shell win), and the Next.js dev server rewrites `/api/v1`
 to it (`next.config.js`). The function installs only `api/requirements.txt`
 (FastAPI, pydantic, psycopg2): it has no numpy or scipy and never imports the
-engine.
+engine. A route open to a role takes any valid token, the viewer cookie the
+dashboard gives a user with a role or an admin token; an admin route takes
+an admin token only.
 
 | Route | Access | Answer |
 |---|---|---|
 | `GET /api/v1/health` | anonymous | Status, version, the commit the deployment was built from, driver count, whether a run exists and its id; when the database cannot be used, status `degraded` and the reason (`migration_pending`, `no_database`, `drivers_missing` or `db_error`) |
 | `GET /api/v1/diagnostics` | anonymous | Whether this instance reaches the database, how many runs it holds and whether the latest can be served, with the same reasons as `/health` when the database cannot be used; it names nothing about the database itself |
-| `GET /api/v1/drivers` | signed in | Every driver with its scores, sources, PRISM Analysis (from `prism/analysis_texts.py`, which ships with the code), baseline and a summary of the expert proposals |
+| `GET /api/v1/drivers` | a role | Every driver with its scores, sources, PRISM Analysis (from `prism/analysis_texts.py`, which ships with the code), baseline and a summary of the expert proposals |
 | `PUT /api/v1/drivers/{id}` | admin | An edit of the fields sent, made on the driver revision the request names (409 when the driver changed since); an exposure map changes only the cells it names; every changed field goes to the audit log. Name, force and onset are not edited here, and a peak year must fall after the onset |
-| `GET /api/v1/drivers/{id}/proposals` | signed in | The caller's own proposal, the aggregate across experts and who scored what |
-| `PUT /api/v1/drivers/{id}/proposals` | signed in | Merges the fields sent into the caller's own proposal (a field sent as null is cleared); never changes the driver |
-| `GET /api/v1/simulation` | signed in | The latest run: the bundle above, with `run_meta` in place of `meta` (the run's id, date and iterations per chain, and from `meta` the seeds, chain count, model version, engine, numerics backend, driver count and overlap-correction source), and `inputs_since_run`, the drivers changed, added or removed since the run; 404 when there is none to serve |
-| `GET /api/v1/config` | signed in | The model configuration the production run uses, read-only |
-| `GET /api/v1/journey` | signed in | `{version, content}`: the newest stored Consumer Journey tile map, or version 0 and no content while the dashboard's bundled content applies |
+| `GET /api/v1/drivers/{id}/proposals` | a role | The caller's own proposal, the aggregate across experts and who scored what |
+| `PUT /api/v1/drivers/{id}/proposals` | a role | Merges the fields sent into the caller's own proposal (a field sent as null is cleared); never changes the driver |
+| `GET /api/v1/simulation` | a role | The latest run: the bundle above, with `run_meta` in place of `meta` (the run's id, date and iterations per chain, and from `meta` the seeds, chain count, model version, engine, numerics backend, driver count and overlap-correction source), and `inputs_since_run`, the drivers changed, added or removed since the run; 404 when there is none to serve |
+| `GET /api/v1/config` | a role | The model configuration the production run uses, read-only |
+| `GET /api/v1/journey` | a role | `{version, content}`: the newest stored Consumer Journey tile map, or version 0 and no content while the dashboard's bundled content applies |
 | `PUT /api/v1/journey` | admin | Stores a new version of the whole tile map, edited from the version the request names (409 when another save came in between); a map the dashboard could not render, or one citing a code that is not a driver, is refused (`prism/journey.py`) |
 
 A body the API cannot accept is answered 422 with the reason, which the
@@ -152,23 +154,50 @@ SQLite file that would vanish with the instance.
 
 ## Authentication and roles
 
-Clerk owns identity (sign-up, sign-in, sessions). PRISM owns the role, in the
-`user_roles` table: the Clerk webhook (`app/api/webhooks/clerk`) adds a row
-when a user signs up, as admin when the table is empty (the first user) and
-as viewer otherwise. Admins change other users' roles in Settings, never
-their own.
+Clerk owns identity (sign-up, sign-in, sessions) and decides who may create
+an account: sign-up is by invitation (docs/OPERATIONS.md). An account opens
+nothing by itself. PRISM owns the role, in the `user_roles` table, and a user
+who signs up has no row there: they are pending, and see only the waiting
+page, until an admin gives them a role in Settings (User management), which
+adds the row. While `PRISM_ALLOWED_EMAIL_DOMAINS` is set, only an address at
+one of its domains can be approved; a user who has a role keeps it. Admins
+change other users' roles, or take them away, which makes the user pending
+again; never their own. The Clerk webhook (`app/api/webhooks/clerk`) keeps a
+known user's email current and removes a deleted user's row. The first admin
+of a new database comes from `/api/admin/bootstrap`, for the address in
+`ADMIN_BOOTSTRAP_EMAIL` only; once an admin exists, it answers 409.
+
+`/dashboard` (`app/dashboard/page.tsx`) reads the role on the server, for
+every request, before anything of the dashboard is sent. A user with a role
+gets the dashboard (`app/dashboard/DashboardApp.tsx`) with that role, which
+shows or hides the admin controls. Everyone else goes to `/pending`
+(`app/(auth)/pending/`), a page of its own that imports none of the
+dashboard's code: it says that access awaits approval, or that it could not
+be checked while the database does not answer, and sends a user who has a
+role by now on to the dashboard. The check fails closed: while the database
+cannot be reached nobody opens the dashboard, and one already open keeps
+what it has loaded. The dashboard's scripts are static files, as in any
+Next.js application, and carry the content built into them, such as the
+Consumer Journey's tiles and the Explorer's figures; Vercel serves them to
+anyone who has their addresses. The gate keeps those addresses from a user
+without a role; it does not make the files private.
 
 The API never sees a Clerk session. It verifies HS256 tokens signed with
-`PRISM_JWT_SECRET`, which the dashboard's server routes issue for the
-signed-in user (`lib/prismJwt.ts`, verified in `prism/api/auth.py`):
+`PRISM_JWT_SECRET`, which the dashboard's server routes issue for a user with
+a role (`lib/prismJwt.ts`, verified in `prism/api/auth.py`):
 
 - **Reads and proposals.** On load the dashboard calls `/api/prism-cookie`,
   which sets an httpOnly cookie scoped to `/api/v1` holding a 30-minute token
-  with the viewer role, for admins too. The browser's `/api/v1` requests carry
-  it. It authorises reads and the user's own expert proposals, nothing else.
-  When an `/api/v1` request is answered 401 (the token expired), the client
-  asks for a new cookie once and repeats the request (`lib/apiClient.ts`).
-  The cookie is not tied to the Clerk session, so the dashboard expires it
+  with the viewer role, for admins too; a pending user is refused (403). The
+  browser's `/api/v1` requests carry it. It authorises reads and the user's
+  own expert proposals, nothing else. When an `/api/v1` request is answered
+  401 (the token expired), the client asks for a new cookie once and repeats
+  the request (`lib/apiClient.ts`); when the new cookie is refused because the
+  user's role was taken away, the page goes to `/dashboard`, which sends them
+  to the waiting page. The API checks the token, not the role, so a user
+  whose role is taken away loses access within 30 minutes, when their token
+  expires; the waiting page expires the cookie in that browser at once. The
+  cookie is not tied to the Clerk session either, so the dashboard expires it
   (`DELETE /api/prism-cookie`) before signing out and when the session ends,
   and in place of a cookie it cannot renew. Signing out first sends the
   expert proposal edits still held back or on their way and waits up to five
@@ -189,28 +218,34 @@ their full name, which the proposals list shows next to each expert's scores
 the sign-in and sign-up pages, the webhook (which checks its Svix signature),
 the admin bootstrap route (which checks a shared secret) and
 `DELETE /api/prism-cookie`, which only expires the cookie. `/api/v1` is left to
-the API's own checks.
+the API's own checks. Whether a signed-in user has a role is checked by the
+pages and routes themselves, never by `proxy.ts`.
 
 The dashboard's server routes (`app/api`):
 
 | Route | Access | Does |
 |---|---|---|
-| `GET /api/prism-cookie` | signed in | Sets the viewer cookie for `/api/v1`; 503 while `PRISM_JWT_SECRET` is missing or shorter than 32 characters |
+| `GET /api/prism-cookie` | a role | Sets the viewer cookie for `/api/v1`; 403 for a pending user; 503 while `PRISM_JWT_SECRET` is missing or shorter than 32 characters |
 | `DELETE /api/prism-cookie` | anyone | Expires the viewer cookie |
-| `GET /api/me` | signed in | The user's Clerk id, email and role |
 | `PUT /api/drivers/{id}` | admin | Forwards a driver edit to the API with an admin token |
 | `PUT /api/journey` | admin | Forwards a journey save to the API with an admin token |
-| `GET /api/users` | admin | The Clerk users (up to 500, newest first) with their roles, for the user list in Settings |
-| `PATCH /api/users/{userId}/role` | admin | Changes a role (never the caller's own) and writes it to the audit log where possible; a failed audit write does not undo the change. A user the webhook has not added yet gets their row first, with the email Clerk holds (409 while it holds none, as the webhook skips such a user) |
-| `POST /api/webhooks/clerk` | Svix signature | Adds, updates or removes a user's row in `user_roles` |
-| `POST /api/admin/bootstrap` | shared secret | Makes a signed-up user admin while no admin exists; exists only while `ADMIN_BOOTSTRAP_SECRET` is set |
+| `GET /api/users` | admin | The Clerk users (up to 500) with their access, for the user list in Settings: pending users first, then the rest, newest first in each group |
+| `PATCH /api/users/{userId}/role` | admin | Gives a user a role or changes it (never the caller's own). For a pending user this is the approval: the row is added with the email Clerk holds (409 while it holds none or has not verified it; 403 for an address outside `PRISM_ALLOWED_EMAIL_DOMAINS` while that is set) |
+| `DELETE /api/users/{userId}/role` | admin | Takes a role away (never the caller's own): the row goes and the user is pending again |
+| `POST /api/webhooks/clerk` | Svix signature | Keeps a known user's email current in `user_roles` and removes a deleted user's row; adds none |
+| `POST /api/admin/bootstrap` | shared secret | Makes the address in `ADMIN_BOOTSTRAP_EMAIL` admin, once it has signed up and Clerk has verified it, while no admin exists; exists only while `ADMIN_BOOTSTRAP_SECRET` is set |
+
+Every role change, approval and removal is written to the audit log where
+possible; a failed audit write does not undo the change.
 
 ## The dashboard
 
-Next.js with the App Router, React and TypeScript. `app/dashboard/page.tsx`
-holds the top navigation and mounts `PrismProvider` (`hooks/usePrism.tsx`),
-which loads the drivers, the configuration and the latest run and shares them
-with every view. It asks `/api/v1/health` every minute (every 30 seconds while
+Next.js with the App Router, React and TypeScript.
+`app/dashboard/DashboardApp.tsx`, which the access check in
+`app/dashboard/page.tsx` renders for a user with a role, holds the top
+navigation and mounts `PrismProvider` (`hooks/usePrism.tsx`), which loads the
+drivers, the configuration and the latest run and shares them with every
+view. It asks `/api/v1/health` every minute (every 30 seconds while
 the service is unreachable or degraded) and reloads when the service recovers
 or a newer run appears, so an open dashboard shows a new production run
 within about a minute. While the database cannot be used, the views keep what
@@ -221,11 +256,11 @@ its own:
 | View | File | What it shows |
 |---|---|---|
 | Entry gate | `HomeGate.tsx` | The four views and what each is for |
-| Drivers | `Drivers.tsx`, `drivers/` | The drivers with their scores, sources and PRISM Analysis; Expert Rating, where every signed-in user can propose scores; for admins the editor and Review & Endorse, which sets the expert aggregate against the baseline and endorses the chosen values as an ordinary edit. `Drivers.tsx` is the table; `drivers/` holds the row, the three panels, the PRISM Analysis card and the scales and cards they share |
+| Drivers | `Drivers.tsx`, `drivers/` | The drivers with their scores, sources and PRISM Analysis; Expert Rating, where every viewer and admin can propose scores; for admins the editor and Review & Endorse, which sets the expert aggregate against the baseline and endorses the chosen values as an ordinary edit. `Drivers.tsx` is the table; `drivers/` holds the row, the three panels, the PRISM Analysis card and the scales and cards they share |
 | Consumer Journey | `ConsumerJourney.tsx`, `journey/` | Consumer moments per journey stage with the drivers behind them; admins edit the tiles. `journey/` holds the tile parts, the tile dialog, its why-chain and the tile editor |
 | Profit Pool Shift Analysis | `ShiftAnalysis.tsx`, `shift/` | The Shift Matrix through the four lenses, the portfolio band and the drill-down per category (`shift/CategoryDetailPanel.tsx`). The page attributes the run to the drivers once, at the score means: the drill-down ranks its drivers with it and the Time Path's Expansion and Contraction filters split the median with it. `shift/` also holds the matrix model, the toolbar, the state without a run and the "About this model" footer |
 | Profit Pool Explorer (beta) | `ProfitPoolExplorer.tsx`, `explorer/` | Sourced profit pool views of the Hair and Laundry & Home Care industries |
-| Settings | `SettingsModal.tsx`, `settings/` | Profile, password and sessions (from Clerk); the model configuration, read-only: the code's parameters and the cell weights the served run used; the user list for admins |
+| Settings | `SettingsModal.tsx`, `settings/` | Profile, password and sessions (from Clerk); the model configuration, read-only: the code's parameters and the cell weights the served run used; for admins the user list, where they approve pending users and change or take away roles |
 
 `Chip.tsx` and `SectionCard.tsx` are the pieces several views share: one look
 for a label and one for a boxed section. The shell around the views is

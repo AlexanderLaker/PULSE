@@ -1,9 +1,10 @@
 """Give a user the admin role (or take it away) directly in the database.
 
-Roles live in the user_roles table (lib/roles.ts); the Clerk webhook adds a
-user's row when they sign up. The in-app route /api/admin/bootstrap can make
-a user admin when ADMIN_BOOTSTRAP_SECRET is set; this script needs nothing but
-database access, and can also take the role away.
+Roles live in the user_roles table (lib/roles.ts). A user who signs up has no
+row: they are pending until an admin approves them in Settings (User
+management), which adds it. This script changes the role of a user who has a
+row and needs nothing but database access. The first admin of a new database
+comes from the in-app route /api/admin/bootstrap instead (docs/OPERATIONS.md).
 
     python3 scripts/promote_admin.py someone@example.com
     python3 scripts/promote_admin.py someone@example.com --role viewer
@@ -72,8 +73,9 @@ def _set_role(conn, email: str, role: str) -> int:
         cur.execute("SELECT clerk_user_id, role FROM user_roles WHERE lower(email) = %s LIMIT 1", (email,))
         row = cur.fetchone()
         if row is None:
-            print(f"No user with the email {email}: the Clerk webhook adds a user when they sign up "
-                  "(its deliveries are listed in the Clerk dashboard).", file=sys.stderr)
+            print(f"No user with the email {email} has a role: a user who signs up is pending until an admin "
+                  "approves them in Settings (User management), and the first admin of a new database comes "
+                  "from /api/admin/bootstrap (docs/OPERATIONS.md).", file=sys.stderr)
             return 3
         if row["role"] == role:
             print(f"{email} is already {role}; nothing changed.")

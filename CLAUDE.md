@@ -17,7 +17,9 @@ README.md; the documents in `docs/` explain everything below in full.
   content. It never simulates and never imports the engine; its runtime has
   no numpy or scipy.
 - The dashboard (`app/`, `components/dashboard/`) authenticates with Clerk.
-  Roles live in `user_roles`. Reads use a viewer cookie scoped to `/api/v1`;
+  Roles live in `user_roles`; a user without a row is pending and sees only
+  the waiting page until an admin approves them (`app/dashboard/page.tsx`
+  checks on the server). Reads use a viewer cookie scoped to `/api/v1`;
   admin writes go through the dashboard's server routes, which forward them
   with a five-minute admin token (`lib/adminWrite.ts`).
 - The numbers are relative shifts, ceteris paribus (no management response),

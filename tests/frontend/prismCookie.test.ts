@@ -1,27 +1,35 @@
 /**
  * /api/prism-cookie: the cookie the API reads need. It carries a viewer token
- * for every user, admins included, in an httpOnly SameSite=Lax cookie scoped
- * to /api/v1 that lasts thirty minutes, so a request riding on it can never
- * authorise an admin write. Callers without a session get no cookie; the role
- * is never looked up, so a database outage does not stop the reads. DELETE
- * expires the cookie.
+ * for every user with a role, admins included, in an httpOnly SameSite=Lax
+ * cookie scoped to /api/v1 that lasts thirty minutes, so a request riding on
+ * it can never authorise an admin write. Callers without a session get no
+ * cookie, a pending user (no row in user_roles) gets 403 and none, and so
+ * does everyone while the role cannot be read (500). DELETE expires the
+ * cookie.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const clerk = vi.hoisted(() => ({ auth: vi.fn(), currentUser: vi.fn() }));
 vi.mock('@clerk/nextjs/server', () => clerk);
-const db = vi.hoisted(() => ({ roleRows: [] as Array<{ role: string }>, queries: 0 }));
+const db = vi.hoisted(() => ({ roleRows: [] as Array<{ role: string }>, down: false }));
 vi.mock('@/lib/db', () => ({
   getSQL: () => (strings: TemplateStringsArray, ..._v: unknown[]) => {
-    db.queries += 1;
+    if (db.down) return Promise.reject(new Error('connection refused'));
     return Promise.resolve(strings.join('?').includes('SELECT role') ? db.roleRows : []);
   },
 }));
 
 import { DELETE as cookieDELETE, GET as cookieGET } from '@/app/api/prism-cookie/route';
 
+const signedIn = (role: 'admin' | 'viewer' | null) => {
+  clerk.auth.mockResolvedValue({ userId: 'user_1' });
+  clerk.currentUser.mockResolvedValue({ primaryEmailAddress: { emailAddress: 'a@b.de' } });
+  db.roleRows = role ? [{ role }] : [];
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
+  db.down = false;
   process.env.PRISM_JWT_SECRET = 'y'.repeat(48);
 });
 
@@ -55,13 +63,30 @@ describe('/api/prism-cookie', () => {
     expect(left).toBeLessThanOrEqual(1800);
   });
 
-  it('sets the cookie without looking up the role', async () => {
-    clerk.auth.mockResolvedValue({ userId: 'user_1' });
-    clerk.currentUser.mockResolvedValue({ primaryEmailAddress: { emailAddress: 'a@b.de' } });
-    db.queries = 0;
+  it('mints the same viewer cookie for a viewer', async () => {
+    signedIn('viewer');
     const res = await cookieGET();
     expect(res.status).toBe(200);
-    expect(db.queries).toBe(0);
+    const token = /prism-token=([^;]+)/.exec(res.headers.get('set-cookie')!)![1];
+    expect(JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString()).role).toBe('viewer');
+  });
+
+  it('403 for a pending user, whom no admin has approved: no cookie set', async () => {
+    signedIn(null);
+    const res = await cookieGET();
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toBe('Access awaits approval');
+    expect(res.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('500 and no cookie while the role cannot be read', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    signedIn('viewer');
+    db.down = true;
+    const res = await cookieGET();
+    expect(res.status).toBe(500);
+    expect(res.headers.get('set-cookie')).toBeNull();
+    vi.mocked(console.error).mockRestore();
   });
 
   it('DELETE expires the cookie on its path', async () => {

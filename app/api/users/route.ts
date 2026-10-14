@@ -1,13 +1,14 @@
 /**
- * GET /api/users: every user with their role, for the admin's user list.
+ * GET /api/users: every user with their access, for the admin's user list.
  *
  * Joins Clerk (email, names, sign-in activity) with user_roles (the role). A
- * Clerk user without a row yet, whom the webhook has not reached, is listed
- * as viewer rather than left out. Admin only. Response: { users }.
+ * Clerk user without a row is listed as pending: they signed up and wait for
+ * an admin to give them a role. Pending users come first, then the rest,
+ * newest first within each group. Admin only. Response: { users }.
  */
 import { NextResponse } from 'next/server';
 import { clerkClient } from '@clerk/nextjs/server';
-import { requireAdmin, ForbiddenError, UnauthorizedError, type Role } from '@/lib/roles';
+import { requireAdmin, ForbiddenError, UnauthorizedError, type Access, type Role } from '@/lib/roles';
 import { getSQL } from '@/lib/db';
 
 export const runtime = 'nodejs';
@@ -27,16 +28,19 @@ export async function GET() {
     const { data } = await client.users.getUserList({ limit: 500, orderBy: '-created_at' });
     const users = data.map((u) => {
       const primary = u.emailAddresses.find((e) => e.id === u.primaryEmailAddressId) ?? u.emailAddresses[0];
+      const role: Access = roleById.get(u.id) ?? 'pending';
       return {
         id: u.id,
         email: primary?.emailAddress ?? '',
         firstName: u.firstName,
         lastName: u.lastName,
-        role: roleById.get(u.id) ?? 'viewer',
+        role,
         lastSignInAt: u.lastSignInAt ? new Date(u.lastSignInAt).toISOString() : null,
         createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : null,
       };
     });
+    // A stable sort keeps Clerk's order (newest first) within each group.
+    users.sort((a, b) => Number(b.role === 'pending') - Number(a.role === 'pending'));
     return NextResponse.json({ users });
   } catch (err) {
     if (err instanceof UnauthorizedError) return NextResponse.json({ error: err.message }, { status: 401 });

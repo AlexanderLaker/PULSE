@@ -83,7 +83,7 @@ def get_current_user(
 
 
 def require_auth(user: dict | None = Depends(get_current_user)) -> dict:
-    """Any signed-in user."""
+    """A user with a valid token, viewer or admin: the dashboard signs one only for a user with a role."""
     if not user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Authentication required",
                             headers={"WWW-Authenticate": "Bearer"})

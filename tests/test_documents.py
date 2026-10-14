@@ -450,8 +450,9 @@ def test_the_shadows_and_the_heat_ramp():
 # ── the security and session settings ───────────────────────────────────────
 
 def test_the_security_and_session_settings():
-    """The token secret's minimum length, the lifetimes of the two tokens, how long signing out waits for
-    the expert's saves, and the sign-up page's default access code."""
+    """The token secret's minimum length, the lifetimes of the two tokens (the viewer cookie's also bounds
+    how long a user whose role was taken away keeps reading), and how long signing out waits for the
+    expert's saves."""
     from prism.api.auth import MIN_SECRET_LENGTH as n
     assert_quotes("README.md", f"at least {n} characters, the same value on both sides", f"(at least {n} characters)")
     assert_quotes("docs/ARCHITECTURE.md", f"missing or shorter than {n} characters")
@@ -459,15 +460,14 @@ def test_the_security_and_session_settings():
                   f"the value is shorter than {n} characters")
     cookie = int(re.search(r"const TTL_SECONDS = (\d+) \* 60;", source("app/api/prism-cookie/route.ts")).group(1))
     assert_quotes("docs/ARCHITECTURE.md", f"holding a {cookie}-minute token")
+    assert_quotes("docs/OPERATIONS.md", f"loses access within {cookie} minutes")
+    assert f"loses access within {cookie} minutes" in source("components/dashboard/settings/UsersSection.tsx")
     admin = int(re.search(r"ttlSeconds = (\d+)\)", source("lib/prismJwt.ts")).group(1))
     assert admin % 60 == 0
     for relative in ("CLAUDE.md", "docs/ARCHITECTURE.md", "docs/adr/0012-identity-roles-tokens.md"):
         assert_quotes(relative, f"{WORDS[admin // 60]}-minute admin token")
     wait = int(re.search(r"export const SAVE_WAIT_MS = (\d+)_000;", source("lib/session.ts")).group(1))
     assert_quotes("docs/ARCHITECTURE.md", f"waits up to {WORDS[wait]} seconds")
-    code = re.search(r"NEXT_PUBLIC_SIGNUP_CODE \|\| '([^']+)'",
-                     source("app/(auth)/sign-up/[[...sign-up]]/page.tsx")).group(1)
-    assert_quotes("README.md", f"the page asks for `{code}`")
 
 
 def test_the_database_connection_limits(monkeypatch):

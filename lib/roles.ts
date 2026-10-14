@@ -3,18 +3,21 @@
  *
  * The role lives in the user_roles table of PRISM's database, keyed by the
  * Clerk user id, so role changes sit next to the audit log they are written
- * to and would survive a change of identity provider. The Clerk webhook adds
- * a row when a user signs up: the first user ever becomes admin, everyone
- * after that viewer. Admins change roles in Settings (or with
- * scripts/promote_admin.py).
+ * to and would survive a change of identity provider. A user who signs up
+ * gets no row: they are pending, and see nothing of PRISM, until an admin
+ * gives them a role in Settings, which adds the row. The Clerk webhook keeps
+ * a known user's email current and removes a deleted user's row. The first
+ * admin of a new database comes from /api/admin/bootstrap, for the address
+ * in ADMIN_BOOTSTRAP_EMAIL; scripts/promote_admin.py changes the role of a
+ * user who has a row.
  *
  * Server-side only.
  */
 import { auth, currentUser } from '@clerk/nextjs/server';
-import type { Role } from '@/types';
+import type { Access, Role } from '@/types';
 import { getSQL } from './db';
 
-export type { Role };
+export type { Access, Role };
 
 let tableReady: Promise<void> | null = null;
 
@@ -47,7 +50,7 @@ async function createUserRolesTable(): Promise<void> {
   }
 }
 
-/** The user's role, or null when the webhook has not added the user yet. */
+/** The user's role, or null while they are pending (no row). */
 export async function getRole(clerkUserId: string): Promise<Role | null> {
   await ensureUserRolesTable();
   const sql = getSQL();
@@ -58,37 +61,36 @@ export async function getRole(clerkUserId: string): Promise<Role | null> {
 }
 
 /**
- * Add a user, or refresh the email of a known one, and return the role the
- * table holds for them and whether the row is new (a role granted now, which
- * the caller writes to the audit log). A new user becomes admin when the
- * table is empty and viewer otherwise; a known user keeps their role. Two
- * sign-ups in the same instant could both see an empty table; the worst case
- * is two admins, which an admin can undo.
+ * Give a pending user a role: their row, with the email Clerk holds for them.
+ * A row that appeared in the meantime (another admin approving at the same
+ * moment) is set to the role instead.
  */
-export async function upsertUserRole(
-  clerkUserId: string, email: string,
-): Promise<{ role: Role; created: boolean }> {
+export async function addUserRole(clerkUserId: string, email: string, role: Role): Promise<void> {
   await ensureUserRolesTable();
   const sql = getSQL();
-  const existing = (await sql`SELECT COUNT(*)::int AS n FROM user_roles`) as Array<{ n: number }>;
-  const roleIfNew: Role = existing[0].n === 0 ? 'admin' : 'viewer';
   const inserted = (await sql`
     INSERT INTO user_roles (clerk_user_id, email, role)
-    VALUES (${clerkUserId}, ${email.toLowerCase()}, ${roleIfNew})
+    VALUES (${clerkUserId}, ${email.toLowerCase()}, ${role})
     ON CONFLICT (clerk_user_id) DO NOTHING
     RETURNING role
   `) as Array<{ role: Role }>;
-  if (inserted.length > 0) return { role: inserted[0].role, created: true };
+  if (inserted.length === 0) await setRole(clerkUserId, role);
+}
+
+/**
+ * Store the new email of a known user (Clerk reported a change) and return
+ * their role; a pending user gets no row from this, and the answer is null.
+ */
+export async function refreshUserEmail(clerkUserId: string, email: string): Promise<Role | null> {
+  await ensureUserRolesTable();
+  const sql = getSQL();
   const updated = (await sql`
     UPDATE user_roles
        SET email = ${email.toLowerCase()}, updated_at = NOW()
      WHERE clerk_user_id = ${clerkUserId}
     RETURNING role
   `) as Array<{ role: Role }>;
-  // Gone between the two statements (the user deleted at that moment): the
-  // caller fails, and Clerk sends the event again.
-  if (updated.length === 0) throw new Error(`the user_roles row of ${clerkUserId} vanished during the update`);
-  return { role: updated[0].role, created: false };
+  return updated[0]?.role ?? null;
 }
 
 /** Change a user's role. The caller must already have checked that it is an admin. */
@@ -102,7 +104,7 @@ export async function setRole(clerkUserId: string, role: Role): Promise<void> {
   `;
 }
 
-/** Remove a deleted user's row (Clerk webhook); the role it held, or null when there was none. */
+/** Remove a user's row (a deleted user, or access taken away in Settings); the role it held, or null when there was none. */
 export async function deleteUserRole(clerkUserId: string): Promise<Role | null> {
   await ensureUserRolesTable();
   const sql = getSQL();
@@ -122,11 +124,36 @@ export async function requireSignedIn(): Promise<{ clerkUserId: string; email: s
   return { clerkUserId: userId, email, name };
 }
 
-/** The signed-in user with their role (viewer until the webhook has added them). */
-export async function requireAuth(): Promise<{ clerkUserId: string; email: string; name: string; role: Role }> {
+/** The signed-in user with their access: their role, or 'pending' while they have no row. */
+export async function requireAuth(): Promise<{ clerkUserId: string; email: string; name: string; role: Access }> {
   const me = await requireSignedIn();
-  const role = (await getRole(me.clerkUserId)) ?? 'viewer';
+  const role = (await getRole(me.clerkUserId)) ?? 'pending';
   return { ...me, role };
+}
+
+/** The signed-in user if they have a role; ForbiddenError while they are pending. */
+export async function requireRole(): Promise<{ clerkUserId: string; email: string; name: string; role: Role }> {
+  const me = await requireAuth();
+  if (me.role === 'pending') throw new ForbiddenError('Access awaits approval');
+  return { ...me, role: me.role };
+}
+
+/** The email domains a user may be approved from: PRISM_ALLOWED_EMAIL_DOMAINS, comma-separated, in lower
+ *  case and without a leading @; empty when any domain may be approved. */
+export function allowedEmailDomains(): string[] {
+  return (process.env.PRISM_ALLOWED_EMAIL_DOMAINS ?? '')
+    .split(',')
+    .map((domain) => domain.trim().toLowerCase().replace(/^@/, ''))
+    .filter(Boolean);
+}
+
+/** Whether an address may be given a role: its domain is one of allowedEmailDomains() exactly (a
+ *  subdomain is a domain of its own), or that list is empty. */
+export function mayBeApproved(email: string): boolean {
+  const domains = allowedEmailDomains();
+  if (domains.length === 0) return true;
+  const at = email.lastIndexOf('@');
+  return at > 0 && domains.includes(email.slice(at + 1).trim().toLowerCase());
 }
 
 /** The signed-in user if they are an admin; ForbiddenError otherwise. */

@@ -1,10 +1,11 @@
 /**
- * POST /api/webhooks/clerk: Clerk's user events, mirrored into user_roles.
- * The route fails closed without its signing secret, refuses an event whose
- * Svix signature does not verify before anything reaches the role table, and
- * then adds, refreshes or removes the user's row. A role granted to a new row
- * and one removed with a deleted user go to the audit log; an email refresh
- * does not.
+ * POST /api/webhooks/clerk: Clerk's user events, applied to user_roles.
+ * The route fails closed without its signing secret and refuses an event
+ * whose Svix signature does not verify before anything reaches the role
+ * table. A new user gets no row (they are pending until an admin approves
+ * them), an update refreshes the email of a user who has a row and adds none,
+ * and a deleted user's row is removed, with the role it held written to the
+ * audit log.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Webhook } from 'svix';
@@ -12,7 +13,7 @@ import { Webhook } from 'svix';
 const SECRET = `whsec_${Buffer.from('a-test-signing-secret-of-some-length').toString('base64')}`;
 
 const roles = vi.hoisted(() => ({
-  upsertUserRole: vi.fn(async () => ({ role: 'viewer', created: true })),
+  refreshUserEmail: vi.fn(async (): Promise<string | null> => 'viewer'),
   deleteUserRole: vi.fn(async (): Promise<string | null> => 'viewer'),
 }));
 vi.mock('@/lib/roles', () => roles);
@@ -48,7 +49,7 @@ const created = {
 
 beforeEach(() => {
   process.env.CLERK_WEBHOOK_SIGNING_SECRET = SECRET;
-  roles.upsertUserRole.mockClear();
+  roles.refreshUserEmail.mockClear();
   roles.deleteUserRole.mockClear();
   audit.recordRoleChange.mockClear();
   vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -60,32 +61,39 @@ afterEach(() => {
 });
 
 describe('/api/webhooks/clerk', () => {
+  const updated = { ...created, type: 'user.updated' };
+
   it('fails closed while the signing secret is unset', async () => {
     delete process.env.CLERK_WEBHOOK_SIGNING_SECRET;
-    expect((await POST(signed(created))).status).toBe(500);
-    expect(roles.upsertUserRole).not.toHaveBeenCalled();
+    expect((await POST(signed(updated))).status).toBe(500);
+    expect(roles.refreshUserEmail).not.toHaveBeenCalled();
   });
 
   it('refuses an event signed with another secret, or without the Svix headers', async () => {
-    const forged = signed(created, `whsec_${Buffer.from('somebody-else').toString('base64')}`);
+    const forged = signed(updated, `whsec_${Buffer.from('somebody-else').toString('base64')}`);
     expect((await POST(forged)).status).toBe(400);
-    const request = signed(created);
+    const request = signed(updated);
     incoming.headers = new Headers();
     expect((await POST(request)).status).toBe(400);
-    expect(roles.upsertUserRole).not.toHaveBeenCalled();
+    expect(roles.refreshUserEmail).not.toHaveBeenCalled();
   });
 
-  it('adds a new user with their primary address and writes the granted role to the audit log', async () => {
+  it('gives a new user no row: they are pending until an admin approves them', async () => {
     expect((await POST(signed(created))).status).toBe(200);
-    expect(roles.upsertUserRole).toHaveBeenCalledWith('user_7', 'Primary@Example.com');
-    expect(audit.recordRoleChange).toHaveBeenCalledWith({
-      userId: 'user_7', from: null, to: 'viewer', via: 'via the Clerk webhook (user.created)', actor: 'clerk-webhook',
-    });
+    expect(roles.refreshUserEmail).not.toHaveBeenCalled();
+    expect(roles.deleteUserRole).not.toHaveBeenCalled();
+    expect(audit.recordRoleChange).not.toHaveBeenCalled();
   });
 
-  it('writes nothing to the audit log when an update only refreshes the email', async () => {
-    roles.upsertUserRole.mockResolvedValueOnce({ role: 'admin', created: false });
-    expect((await POST(signed({ ...created, type: 'user.updated' }))).status).toBe(200);
+  it("refreshes a known user's email with their primary address, and writes nothing to the audit log", async () => {
+    expect((await POST(signed(updated))).status).toBe(200);
+    expect(roles.refreshUserEmail).toHaveBeenCalledWith('user_7', 'Primary@Example.com');
+    expect(audit.recordRoleChange).not.toHaveBeenCalled();
+  });
+
+  it('acknowledges an update of a pending user, who keeps no row (lib/roles.ts refreshUserEmail)', async () => {
+    roles.refreshUserEmail.mockResolvedValueOnce(null);
+    expect((await POST(signed(updated))).status).toBe(200);
     expect(audit.recordRoleChange).not.toHaveBeenCalled();
   });
 
@@ -104,7 +112,7 @@ describe('/api/webhooks/clerk', () => {
   });
 
   it('answers 500 when the write fails, so Clerk sends the event again', async () => {
-    roles.upsertUserRole.mockRejectedValueOnce(new Error('database down'));
-    expect((await POST(signed(created))).status).toBe(500);
+    roles.refreshUserEmail.mockRejectedValueOnce(new Error('database down'));
+    expect((await POST(signed(updated))).status).toBe(500);
   });
 });

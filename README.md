@@ -95,14 +95,14 @@ production model's: `PRISM_FULL_RUN=1 python3 -m pytest
 tests/test_reference_run.py` checks them against the reference run behind
 the PRISM Analysis, to six decimals, and the run's QA workbook in `runs/`
 shows them. The API's data routes answer only with the token the dashboard
-gives a signed-in user, so without Clerk only `/api/v1/health` and
+gives a user with a role, so without Clerk only `/api/v1/health` and
 `/api/v1/diagnostics` answer; `PRISM_API_DOCS=1` in the shell adds the
 interactive documentation at `/docs`. The dashboard needs Clerk for sign-in
 and Neon for its role table.
 
-Roles come from a Clerk webhook, which cannot reach a development machine on
-its own; docs/OPERATIONS.md (Roles on a development machine) shows how to
-work as an admin locally.
+A new account sees only a waiting page until an admin approves it, and a new
+development database has no admin yet; docs/OPERATIONS.md (Roles on a
+development machine) shows how to make yourself the first.
 
 ## Repository layout
 
@@ -146,12 +146,13 @@ effect with the next deployment.
 |---|---|---|
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | dashboard (also at build time) | Clerk publishable key |
 | `CLERK_SECRET_KEY` | dashboard | Clerk secret key |
-| `CLERK_WEBHOOK_SIGNING_SECRET` | dashboard | Verifies the Clerk webhook that adds new users to `user_roles` |
+| `CLERK_WEBHOOK_SIGNING_SECRET` | dashboard | Verifies the Clerk webhook that keeps the emails in `user_roles` current and removes deleted users |
 | `DATABASE_URL` | dashboard, API, scripts | The PostgreSQL database |
 | `POSTGRES_URL` | dashboard, API, scripts | The same, under the name some Vercel integrations set; wins when both are set |
 | `PRISM_JWT_SECRET` | dashboard, API | Signs the tokens between the dashboard and the API; at least 32 characters, the same value on both sides |
-| `NEXT_PUBLIC_SIGNUP_CODE` | dashboard (at build time) | The access code the sign-up page asks for (without it the page asks for `HCB2026`). It is readable in the browser, so who may sign up is restricted in Clerk (docs/OPERATIONS.md) |
-| `ADMIN_BOOTSTRAP_SECRET` | dashboard | Enables `/api/admin/bootstrap` while set (at least 32 characters); remove it once an admin exists |
+| `PRISM_ALLOWED_EMAIL_DOMAINS` | dashboard (optional) | Comma-separated email domains (such as `henkel.com`): an admin can approve only a pending user whose address is at one of them. Unset, any address can be approved; a user who has a role keeps it either way |
+| `ADMIN_BOOTSTRAP_SECRET` | dashboard | Enables `/api/admin/bootstrap` while set (at least 32 characters); remove it, and `ADMIN_BOOTSTRAP_EMAIL`, once an admin exists |
+| `ADMIN_BOOTSTRAP_EMAIL` | dashboard | The one address `/api/admin/bootstrap` can make the first admin |
 | `PRISM_API_ORIGIN` | dashboard (optional) | The origin the admin routes call the API on; without it, the host the request came in on. On Vercel set it for Production only, so a preview deployment never writes to the production API |
 | `PRISM_LOCAL_API_URL` | local dashboard | Where the dev server sends `/api/v1` (default `http://127.0.0.1:8000`) |
 | `PRISM_DB_PATH` | API, scripts | The SQLite file used when neither database URL is set (default `data/prism.db`); the production run uses it only with `--allow-sqlite` |

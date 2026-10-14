@@ -1,10 +1,11 @@
 /**
- * POST /api/webhooks/clerk: Clerk's user events, mirrored into user_roles.
+ * POST /api/webhooks/clerk: Clerk's user events, applied to user_roles.
  *
- * Clerk calls this route when a user is created, updated or deleted, and the
- * role table in PRISM's database follows (lib/roles.ts): the first user ever
- * becomes admin, everyone after that viewer. A role granted to a new row, and
- * one removed with a deleted user, go to the audit log (lib/audit.ts).
+ * Clerk calls this route when a user is created, updated or deleted
+ * (lib/roles.ts). A new user gets no row: they stay pending until an admin
+ * gives them a role in Settings. An update stores the new email of a user who
+ * has a row, and a deleted user's row is removed, with the role it held
+ * written to the audit log (lib/audit.ts).
  *
  * Every request is verified against CLERK_WEBHOOK_SIGNING_SECRET (Svix)
  * before the body is read; without the check anyone could forge a
@@ -15,7 +16,7 @@ import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { Webhook } from 'svix';
 import type { WebhookEvent } from '@clerk/nextjs/server';
-import { deleteUserRole, upsertUserRole } from '@/lib/roles';
+import { deleteUserRole, refreshUserEmail } from '@/lib/roles';
 import { recordRoleChange } from '@/lib/audit';
 
 // Svix verifies with Node's crypto, and the Neon driver expects Node too.
@@ -68,7 +69,12 @@ export async function POST(req: Request) {
 
   try {
     switch (event.type) {
-      case 'user.created':
+      case 'user.created': {
+        // No row: the user waits for an admin's approval (Settings, User management).
+        console.log(`[clerk-webhook] user.created: ${event.data.id} is pending`);
+        break;
+      }
+
       case 'user.updated': {
         const { id, email_addresses, primary_email_address_id } = event.data;
         // The primary address, else the first one.
@@ -77,16 +83,11 @@ export async function POST(req: Request) {
           email_addresses[0];
         const email = primary?.email_address ?? '';
         if (!email) {
-          console.warn(`[clerk-webhook] ${event.type} without email for ${id}`);
+          console.warn(`[clerk-webhook] user.updated without email for ${id}`);
           break;
         }
-        const { role, created } = await upsertUserRole(id, email);
-        if (created) {
-          await recordRoleChange({
-            userId: id, from: null, to: role, via: `via the Clerk webhook (${event.type})`, actor: 'clerk-webhook',
-          });
-        }
-        console.log(`[clerk-webhook] ${event.type}: ${id} is ${role}`);
+        const role = await refreshUserEmail(id, email);
+        console.log(`[clerk-webhook] user.updated: ${id} is ${role ?? 'pending'}`);
         break;
       }
 

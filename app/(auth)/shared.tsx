@@ -1,7 +1,7 @@
 /**
- * What the sign-in and sign-up pages share inside the card of
- * app/(auth)/layout.tsx: the card's heading and the appearance that seats
- * Clerk's form in it.
+ * What the pages share inside the card of app/(auth)/layout.tsx: the card's
+ * heading, and the appearance that seats Clerk's form in it on the sign-in
+ * and sign-up pages.
  */
 import type { ReactNode } from 'react';
 import { S, HEADLINE_FONT } from '@/lib/theme';

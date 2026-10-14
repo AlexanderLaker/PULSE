@@ -125,7 +125,7 @@ describe('the driver vocabulary', () => {
   });
 
   it('the top navigation names the page "Drivers"', () => {
-    const page = fs.readFileSync(path.join(REPO, 'app', 'dashboard', 'page.tsx'), 'utf8');
+    const page = fs.readFileSync(path.join(REPO, 'app', 'dashboard', 'DashboardApp.tsx'), 'utf8');
     expect(page).toMatch(/\{ id: 'drivers', label: 'Drivers' \}/);
   });
 });

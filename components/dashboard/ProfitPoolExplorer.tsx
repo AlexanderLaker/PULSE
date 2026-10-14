@@ -1,5 +1,5 @@
 /**
- * The Profit Pool Explorer (Beta, open to every signed-in user): profit pool
+ * The Profit Pool Explorer (Beta, open to every user with a role): profit pool
  * views over public data, one chart per view.
  *
  *   Chart: bar width = revenue share, bar height = GP1 margin, bar area = the

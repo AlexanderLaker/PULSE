@@ -5,7 +5,9 @@
  *   - Model configuration is a read-only view of what the model uses: the
  *     parameters from the store's config and the served run's cell weights,
  *     with their marginals and basis. It has no inputs and asks for nothing.
- *   - User management is for admins only and goes through lib/apiClient.
+ *   - User management is for admins only and goes through lib/apiClient:
+ *     pending users first, approved with a role, and a role taken away by
+ *     setting the user back to pending.
  *   - Active sessions lists the user's sessions on every device.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -18,7 +20,8 @@ const STATE = vi.hoisted(() => ({ store: null as unknown as PrismStore }));
 vi.mock('@/hooks/usePrism', () => ({ default: () => STATE.store }));
 
 const API = vi.hoisted(() => ({
-  getUsers: vi.fn(), setUserRole: vi.fn(), clearViewerCookie: vi.fn(async () => {}), resumeViewerCookie: vi.fn(),
+  getUsers: vi.fn(), setUserRole: vi.fn(), revokeUserRole: vi.fn(),
+  clearViewerCookie: vi.fn(async () => {}), resumeViewerCookie: vi.fn(),
 }));
 vi.mock('@/lib/apiClient', () => API);
 
@@ -64,7 +67,9 @@ vi.mock('@clerk/nextjs', () => ({
 
 import SettingsModal from '@/components/dashboard/SettingsModal';
 
+// As /api/users sends them: pending users first.
 const USERS = [
+  { id: 'user_alan', email: 'alan@example.com', firstName: 'Alan', lastName: 'Turing', role: 'pending', lastSignInAt: null, createdAt: null },
   { id: 'user_ada', email: 'ada@example.com', firstName: 'Ada', lastName: 'Lovelace', role: 'admin', lastSignInAt: null, createdAt: null },
   { id: 'user_grace', email: 'grace@example.com', firstName: 'Grace', lastName: 'Hopper', role: 'viewer', lastSignInAt: null, createdAt: null },
 ];
@@ -76,6 +81,7 @@ beforeEach(() => {
   STATE.store = makeStore();
   API.getUsers.mockResolvedValue({ users: USERS });
   API.setUserRole.mockImplementation(async (_id: string, role: string) => ({ role }));
+  API.revokeUserRole.mockImplementation(async () => ({ role: 'pending' }));
   fetchMock = vi.fn(async () => new Response('{}'));
   vi.stubGlobal('fetch', fetchMock);
 });
@@ -217,14 +223,41 @@ describe('User management', () => {
     openSection('User management');
     expect(await screen.findByText('grace@example.com')).toBeTruthy();
     expect(API.getUsers).toHaveBeenCalledTimes(1);
-    const own = screen.getByRole('combobox', { name: 'Role of ada@example.com' }) as HTMLSelectElement;
+    expect(screen.getByText('All users (3, 1 pending)')).toBeTruthy();
+    const own = screen.getByRole('combobox', { name: 'Access of ada@example.com' }) as HTMLSelectElement;
     expect(own.disabled).toBe(true);
+  });
+
+  it('approves a pending user with a role through api.setUserRole', async () => {
+    openModal(true);
+    openSection('User management');
+    const alan = await screen.findByRole('combobox', { name: 'Access of alan@example.com' }) as HTMLSelectElement;
+    expect(alan.value).toBe('pending');
+
+    fireEvent.change(alan, { target: { value: 'viewer' } });
+    expect(await screen.findByText('alan@example.com is approved as viewer.')).toBeTruthy();
+    expect(API.setUserRole).toHaveBeenCalledWith('user_alan', 'viewer');
+    expect(alan.value).toBe('viewer');
+    expect(screen.getByText('All users (3)')).toBeTruthy();
+  });
+
+  it('takes a role away through api.revokeUserRole: the user is pending again', async () => {
+    openModal(true);
+    openSection('User management');
+    const grace = await screen.findByRole('combobox', { name: 'Access of grace@example.com' }) as HTMLSelectElement;
+
+    fireEvent.change(grace, { target: { value: 'pending' } });
+    expect(await screen.findByText(/^grace@example\.com is pending again: from their next page load they see the waiting page/))
+      .toBeTruthy();
+    expect(API.revokeUserRole).toHaveBeenCalledWith('user_grace');
+    expect(API.setUserRole).not.toHaveBeenCalled();
+    expect(grace.value).toBe('pending');
   });
 
   it('changes a role through api.setUserRole and shows a failure', async () => {
     openModal(true);
     openSection('User management');
-    const grace = await screen.findByRole('combobox', { name: 'Role of grace@example.com' }) as HTMLSelectElement;
+    const grace = await screen.findByRole('combobox', { name: 'Access of grace@example.com' }) as HTMLSelectElement;
 
     fireEvent.change(grace, { target: { value: 'admin' } });
     expect(await screen.findByText('Role updated.')).toBeTruthy();
