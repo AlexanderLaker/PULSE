@@ -336,32 +336,34 @@ the schema it was written for. Once every database has run it, retire it
 before any change that would alter what it produces (another category, a new
 driver field, a new tile shape):
 
-- delete this folder and `tests/test_migration.py`;
-- keep `0001_driver_schema` in `SCHEMA_MIGRATIONS`, so a new database still
-  records it as done;
-- move `previous_names.txt` to `tests/previous_names.txt` and, in
+- move `previous_names.txt` to `tests/previous_names.txt` first, reword its
+  header comment (it speaks of this folder) and, in
   `tests/test_repository.py`, point `_NAMES_FILE` at it and let
   `MAY_NAME_THE_PREVIOUS_RELEASE` name that file alone, so the test keeps
   refusing the previous names everywhere else;
+- then delete this folder and `tests/test_migration.py`;
+- keep `0001_driver_schema` in `SCHEMA_MIGRATIONS`, so a new database still
+  records it as done;
 - remove the two quotes of this README that `tests/test_documents.py`
   checks (the driver count and the 2035 median);
 - remove or reword what refers to this folder: the documents table of
-  README.md; the model for later migrations in CLAUDE.md and in
-  docs/OPERATIONS.md (The database), described in words or by the next
-  migration; the deploy order in docs/OPERATIONS.md (Deploying);
-  docs/ARCHITECTURE.md; in docs/DRIVERS.md the step for changed texts and
-  the model for a driver migration; the docstrings of `schema` in
-  `prism/database.py`, of `prism/journey.py` and of
-  `tests/test_repository.py`; and the 503 message of `MigrationPendingError`
-  in `prism/database.py`, which then names the last commit that has this
-  folder, together with the two tests that check that message
-  (`tests/test_api.py`, `tests/test_database.py`);
+  README.md, and its row for `migrations/` if no other migration is left;
+  the model for later migrations in CLAUDE.md and in docs/OPERATIONS.md (The
+  database), described in words or by the next migration; the deploy order
+  in docs/OPERATIONS.md (Deploying); docs/ARCHITECTURE.md; in
+  docs/DRIVERS.md the step for changed texts and the model for a driver
+  migration; the docstrings of `schema` in `prism/database.py`, of
+  `prism/journey.py` and of `tests/test_repository.py`; and the 503 message
+  of `MigrationPendingError` in `prism/database.py`, which then names the
+  last commit that has this folder, together with the two tests that check
+  that message (`tests/test_api.py`, `tests/test_database.py`);
 - then reword every other sentence that still speaks of the migration as
-  present; this lists them (most say that the API, the scripts and the
-  migration do something):
+  present; this lists them, leaving out the content and the generated
+  modules, which speak of migration in another sense (most of the hits say
+  that the API, the scripts and the migration do something):
 
   ```bash
-  git grep -n -i -E 'migration 0001|0001_driver_schema|the migration|migrate\.py'
+  git grep -n -i -E 'migration 0001|0001_driver_schema|the migration|this migration|test_migration|migrate\.py' -- . ':!data' ':!prism/seed_drivers.py' ':!prism/analysis_texts.py'
   ```
 
 A database found later on the previous schema is migrated from the last

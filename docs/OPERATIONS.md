@@ -447,8 +447,8 @@ Nothing in PRISM raises an alarm by itself. Set up two checks:
   does not contain `"simulation_reason":"ok"`. `/api/v1/health` answers 200
   even when the database fails (with `"status": "degraded"`), so a check on
   the status code alone stays green. Give the check a timeout of 30 seconds:
-  when the database cannot be reached, the answer can take up to about 15
-  seconds;
+  while the database cannot be reached, an answer takes about 10.5 seconds, or
+  five seconds for each address of the database host if it has several;
 - Vercel's notification of a failed deployment (Settings, Notifications).
 
 PRISM's own messages reach the function's log from INFO up (a new database

@@ -474,9 +474,19 @@ def test_the_database_connection_limits():
     from prism.api.state import UNREACHABLE_GRACE_SECONDS as grace
     from prism.database import CONNECT_BUDGET_SECONDS as budget
     from prism.database import CONNECT_TIMEOUT_SECONDS as timeout
+    # When the server's one address never answers: the attempts get_db_connection makes, and when it gives up.
+    elapsed = 0.0
+    for attempt in range(3):
+        elapsed += timeout
+        wait = 0.5 * 2 ** attempt
+        if attempt == 2 or elapsed + wait + timeout > budget:
+            break
+        elapsed += wait
     assert_quotes("docs/ARCHITECTURE.md", f"waits at most {WORDS[timeout]} seconds for each address of the server",
-                  f"no further attempt starts that could end after {WORDS[budget]} seconds of trying",
-                  f"for {WORDS[grace]} seconds after such a failure")
+                  f"at {WORDS[timeout]} seconds more, it would end within {WORDS[budget]} seconds of the first",
+                  f"given up after about {elapsed:g} seconds", f"For {WORDS[grace]} seconds after such a failure")
+    assert_quotes("docs/OPERATIONS.md", f"an answer takes about {elapsed:g} seconds, or {WORDS[timeout]} seconds "
+                                        "for each address of the database host")
     # The dashboard waits REQUEST_TIMEOUT_MS for an answer; a request hears its 503 before that.
     client = int(re.search(r"REQUEST_TIMEOUT_MS = (\d+)_000", source("lib/apiClient.ts")).group(1))
     assert budget < client
