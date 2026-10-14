@@ -19,6 +19,9 @@ meaningless for independent draws.
   and the sampling noise to three decimals of a point (docs/DESIGN.md).
 - The portfolio band is the joint percentile of the per-iteration portfolio
   shift, never an average of category bands.
+- A headline band says what it covers: 80% of simulated outcomes, driver size
+  and timing only. The runs vary nothing else; the weights and the model's
+  structure are the same in every run, so their uncertainty is not in it.
 - The force, value-chain and region lenses are labelled attribution: they
   split one simulated median and add up to it.
 - Sampling quality is shown as the largest bootstrap standard error of a

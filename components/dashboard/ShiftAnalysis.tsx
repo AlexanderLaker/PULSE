@@ -286,7 +286,8 @@ const ShiftAnalysis: FC<{
 
         {/* The three headline numbers; each band opens on hover, focus or tap.
             The portfolio band is the engine's joint percentile of the
-            portfolio shift. */}
+            portfolio shift. A band covers what the runs vary, each driver's
+            size and timing, and its note says so. */}
         {headline && (
           <div
             className="mb-5 grid gap-3"
@@ -295,7 +296,7 @@ const ShiftAnalysis: FC<{
             <KpiTile
               label={`Portfolio exposure (if no action) · by ${HORIZON}`}
               band={headline.portfolio}
-              bandNote="80% of outcomes (joint portfolio)"
+              bandNote="80% of simulated outcomes (joint portfolio; driver size and timing only)"
             />
             {headline.categoryTiles.map((tile) => (
               <KpiTile
@@ -303,7 +304,7 @@ const ShiftAnalysis: FC<{
                 label={tile.label}
                 name={categoryDisplay(tile.name)}
                 band={tile.band}
-                bandNote="80% of outcomes"
+                bandNote="80% of simulated outcomes (driver size and timing only)"
                 onOpen={() => setSelectedCategory(tile.name)}
               />
             ))}

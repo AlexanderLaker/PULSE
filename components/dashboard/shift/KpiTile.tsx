@@ -16,7 +16,7 @@ export const KpiTile: FC<{
   band: PercentileDistribution;
   /** The category's label; the portfolio tile has none. */
   name?: string;
-  /** Appended to the band, e.g. "80% of outcomes". */
+  /** Appended to the band: what it covers. */
   bandNote: string;
   onOpen?: () => void;
 }> = ({ label, band, name, bandNote, onOpen }) => {
@@ -43,9 +43,11 @@ export const KpiTile: FC<{
       </div>
       {hovered && (
         <div
-          className="absolute left-1/2 bottom-full mb-2 z-20 rounded-lg px-3 py-1.5 whitespace-nowrap pointer-events-none"
+          className="absolute left-1/2 bottom-full mb-2 z-20 rounded-lg px-3 py-1.5 w-max pointer-events-none"
           style={{
             transform: 'translateX(-50%)',
+            // As wide as its text, and wrapped within the screen on a phone.
+            maxWidth: 'min(340px, calc(100vw - 32px))',
             backgroundColor: S.surface,
             color: S.onSurface,
             border: `1px solid ${S.cardBorderStrong}`,

@@ -113,9 +113,11 @@ value a reader needs.
 - A shift always shows its sign; below 0.05 percent it counts as flat and
   shows neither sign nor colour.
 - A missing value shows `–`.
-- A band is written P10 to P90. The matrix cells show medians only; on the
-  time-path lens the band is in the cell's tooltip, and every category's band
-  is in its drill-down's fan chart, so the grid stays readable.
+- A band is written P10 to P90, and a headline band names what it covers:
+  "80% of simulated outcomes (driver size and timing only)". The matrix
+  cells show medians only; on the time-path lens the band is in the cell's
+  tooltip, and every category's band is in its drill-down's fan chart, so the
+  grid stays readable.
 - Dates read "26 Jun 2026" whatever the browser's locale.
 
 ## Shapes and patterns

@@ -16,7 +16,7 @@ import { RunDetails } from './RunDetails';
 const GLOSSARY: Array<[string, string]> = [
   ['GP1', 'Gross profit 1: net sales less the direct cost of goods, the profit layer whose shifts the model projects.'],
   ['MC median', 'The middle outcome of all simulated Monte Carlo paths: the central estimate shown in every cell.'],
-  ['P10 to P90', 'The range covering 80% of simulated outcomes: 10% of runs land below P10, 10% above P90.'],
+  ['P10 to P90', "The range covering 80% of simulated outcomes: 10% of runs land below P10, 10% above P90. The runs vary only each driver's size and timing; the weights and the structure of the model are the same in every run, so the range leaves their uncertainty out."],
   ['Category codes', 'LHC = Laundry & Home Care. FCN Fabric Clean · FCA Fabric Care · FFI Fabric Finishers · LAD Laundry Additives · HDW Hand Dishwash · ADW Auto Dishwash · HSC Hard-Surface Cleaner · TOI Toilet Care · IC Insect Control.'],
   ['Attenuation', "The factor that scales each force's summed contribution by how much of its signal the other forces already carry, so a mechanism two forces share is not counted twice. Drivers that overlap within a force are dampened separately."],
   ['Cumulative shift', `Each cell is the compounded level vs ${BASE_YEAR} at that year, not a year-on-year change.`],

@@ -145,10 +145,10 @@ describe('Shift Matrix lenses', () => {
     render(<ShiftAnalysis />);
     const portfolio = screen.getByRole('group', { name: /^Portfolio exposure/ });
     expect(portfolio.getAttribute('aria-label')).toMatch(
-      /^Portfolio exposure \(if no action\) · by 2035: median -\d+\.\d%, P10 -\d+\.\d% to P90 [+-]?\d+\.\d%, 80% of outcomes \(joint portfolio\)$/);
+      /^Portfolio exposure \(if no action\) · by 2035: median -\d+\.\d%, P10 -\d+\.\d% to P90 [+-]?\d+\.\d%, 80% of simulated outcomes \(joint portfolio; driver size and timing only\)$/);
     const exposed = screen.getByRole('button', { name: /^Most exposed category: / });
     expect(exposed.getAttribute('aria-label')).toMatch(
-      /^Most exposed category: [A-Z][\w ]+, median -\d+\.\d%, P10 .+ to P90 .+, 80% of outcomes\. Opens the drill-down$/);
+      /^Most exposed category: [A-Z][\w ]+, median -\d+\.\d%, P10 .+ to P90 .+, 80% of simulated outcomes \(driver size and timing only\)\. Opens the drill-down$/);
   });
 
   it('opens the drill-down at the lens year chosen with the stepper', () => {

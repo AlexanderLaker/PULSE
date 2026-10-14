@@ -263,6 +263,18 @@ def test_the_published_distribution():
     assert_quotes("docs/ARCHITECTURE.md", "the P10, P25, median, P75, P90, mean and standard deviation of the shift")
 
 
+def test_the_band_wording():
+    """The headline bands name what they cover, as docs/DESIGN.md and ADR 0007 say: P10 to P90 is 80% of the
+    simulated outcomes, and the runs vary only each driver's size and timing."""
+    page = source("components/dashboard/ShiftAnalysis.tsx")
+    notes = re.findall(r'bandNote="([^"]+)"', page)
+    coverage = 90 - 10   # the P90 and the P10 of engine.distribution
+    category = f"{coverage}% of simulated outcomes (driver size and timing only)"
+    assert notes == [f"{coverage}% of simulated outcomes (joint portfolio; driver size and timing only)", category]
+    assert_quotes("docs/DESIGN.md", f'"{category}"')
+    assert_quotes("docs/adr/0007-honest-display.md", f"{coverage}% of simulated outcomes, driver size and timing only")
+
+
 def test_the_sampling_settings():
     """docs/MODEL.md: the bootstrap behind the Monte Carlo standard error and the chain seeds."""
     result = engine.MonteCarloEngine(ModelConfig(), seed=PRODUCTION_SEED).run(
