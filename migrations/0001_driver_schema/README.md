@@ -107,10 +107,11 @@ as Rollback describes and try again another day.
    `PRISM_JWT_SECRET` and the Clerk keys keep their names. In the Clerk
    dashboard (docs/OPERATIONS.md, Setting up Clerk), check that sign-up is
    restricted (Access mode: Invite-only, or an allowlist of the company's
-   email domain), turn on multi-factor authentication if the Clerk plan
-   includes it, and delete under Users any account nobody recognises. A new
-   account waits for an admin's approval, but a user who already has a row
-   in `user_roles` keeps their role and can read PRISM and propose scores
+   email domain) and that the Account Portal's sign-up fallback redirect is
+   the dashboard's address, turn on multi-factor authentication if the Clerk
+   plan includes it, and delete under Users any account nobody recognises. A
+   new account waits for an admin's approval, but a user who already has a
+   row in `user_roles` keeps their role and can read PRISM and propose scores
    until step 6 reviews them.
 
 1. **Back up.** In the Neon console, create a branch of the production branch

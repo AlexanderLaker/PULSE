@@ -508,9 +508,10 @@ see the waiting page, and a dashboard they have open loses access within 30
 minutes, when its viewer cookie runs out (an admin write is refused at once,
 as each is checked against `user_roles`). Admins never change their own
 role, and a change is made only while the user's access is still what the
-list showed and the admin is still admin, so two admins working at the same
-moment cannot leave PRISM without one; a change refused for that reason asks
-for the list to be reloaded. While `PRISM_ALLOWED_EMAIL_DOMAINS` is set
+list shows and the admin is still admin, so two admins working at the same
+moment cannot undo each other's changes unseen or leave PRISM without an
+admin; a change refused for that reason loads the list again, which then
+shows the current access. While `PRISM_ALLOWED_EMAIL_DOMAINS` is set
 (comma-separated domains, such as `henkel.com`, matched exactly: list a
 subdomain separately), only a pending user whose address is at one of them
 can be approved; a user who has a role keeps it. A user whose address Clerk
@@ -620,7 +621,8 @@ Vercel project to the new repository. A new Clerk application gives every
 user a new id, so the restored `user_roles` rows match nobody and still hold
 an admin, which keeps the bootstrap route refusing: empty the table
 (`DELETE FROM user_roles;`, after the dump that keeps the old rows), set up
-the first admin with the bootstrap route and approve everyone again. Rotate
+the first admin with the bootstrap route, then invite and approve everyone
+again. Rotate
 the credentials after the move, and check the deployment against the list
 under Deploying.
 

@@ -265,7 +265,7 @@ def test_the_published_distribution():
 
 def test_the_band_wording():
     """The headline bands name what they cover, as docs/DESIGN.md and ADR 0007 say: P10 to P90 is 80% of the
-    simulated outcomes, and the runs vary only each driver's size and timing."""
+    simulated outcomes, and the Monte Carlo iterations vary only each driver's size and timing."""
     page = source("components/dashboard/ShiftAnalysis.tsx")
     notes = re.findall(r'bandNote="([^"]+)"', page)
     band = engine.distribution(np.arange(101.0))   # the percentiles of 0 to 100 are their own ranks

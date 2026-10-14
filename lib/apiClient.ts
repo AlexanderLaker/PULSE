@@ -198,10 +198,11 @@ export const getUsers = (): Promise<{ users: ManagedUser[] }> => send('/api/user
 
 const roleUrl = (userId: string) => `/api/users/${encodeURIComponent(userId)}/role`;
 
-/** Gives a user a role: for a pending user that is the approval. */
-export const setUserRole = (userId: string, role: Role): Promise<{ role: Role }> =>
-  send(roleUrl(userId), { method: 'PATCH', body: JSON.stringify({ role }) });
+/** Gives a user a role: for a pending user that is the approval. `from` is the access the admin's list
+ *  shows; the route refuses the change (409) when the user's access is no longer that. */
+export const setUserRole = (userId: string, role: Role, from: Access): Promise<{ role: Role }> =>
+  send(roleUrl(userId), { method: 'PATCH', body: JSON.stringify({ role, from }) });
 
-/** Takes a user's role away: they are pending again. */
-export const revokeUserRole = (userId: string): Promise<{ role: 'pending' }> =>
-  send(roleUrl(userId), { method: 'DELETE' });
+/** Takes a user's role away: they are pending again. `from` as for setUserRole. */
+export const revokeUserRole = (userId: string, from: Access): Promise<{ role: 'pending' }> =>
+  send(`${roleUrl(userId)}?from=${encodeURIComponent(from)}`, { method: 'DELETE' });

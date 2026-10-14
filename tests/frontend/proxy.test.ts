@@ -10,6 +10,7 @@
  * route reads the role here.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { NextRequest } from 'next/server';
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -21,7 +22,7 @@ vi.mock('@clerk/nextjs/server', () => ({
 const roles = vi.hoisted(() => ({ getRole: vi.fn() }));
 vi.mock('@/lib/roles', () => roles);
 
-import proxy from '@/proxy';
+import proxy, { config } from '@/proxy';
 
 type Handler = (auth: () => Promise<unknown>, req: NextRequest) => Promise<Response | undefined>;
 const handler = proxy as unknown as Handler;
@@ -49,11 +50,13 @@ describe('proxy.ts', () => {
   it('sends a signed-in user without a role from the dashboard to the waiting page, before anything renders', async () => {
     roles.getRole.mockResolvedValue(null);
     const requests: Array<Record<string, string>> = [{}, { RSC: '1' }];   // a page load, and a client-side navigation
-    for (const headers of requests) {
-      const res = await run('/dashboard', 'GET', 'user_pending', headers).result;
-      expect(res?.status).toBe(307);
-      expect(res?.headers.get('location')).toBe('https://prism.test/pending');
-      expect(await res?.text()).toBe('');
+    for (const path of ['/dashboard', '/dashboard/x']) {
+      for (const headers of requests) {
+        const res = await run(path, 'GET', 'user_pending', headers).result;
+        expect(res?.status).toBe(307);
+        expect(res?.headers.get('location')).toBe('https://prism.test/pending');
+        expect(await res?.text()).toBe('');
+      }
     }
   });
 
@@ -63,7 +66,7 @@ describe('proxy.ts', () => {
     const res = await run('/dashboard', 'GET', 'user_1').result;
     expect(res?.status).toBe(307);
     expect(res?.headers.get('location')).toBe('https://prism.test/pending');
-    expect(error).toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith('[proxy] access check failed:', expect.any(Error));
     error.mockRestore();
   });
 
@@ -97,5 +100,17 @@ describe('proxy.ts', () => {
       expect(await result).toBeUndefined();
       expect(auth).not.toHaveBeenCalled();
     }
+  });
+});
+
+describe("proxy.ts's matcher", () => {
+  it('runs the proxy for every request to the dashboard, which the role check depends on', async () => {
+    // Next.js's own matcher logic, as `next build` applies it; it expects AsyncLocalStorage on the global.
+    (globalThis as { AsyncLocalStorage?: unknown }).AsyncLocalStorage ??= AsyncLocalStorage;
+    const { unstable_doesMiddlewareMatch: matches } = await import('next/experimental/testing/server');
+    for (const url of ['/dashboard', '/dashboard?_rsc=abc', '/dashboard/x', '/pending', '/sign-in', '/api/users']) {
+      expect(matches({ config, url }), url).toBe(true);
+    }
+    expect(matches({ config, url: '/_next/static/chunks/app.js' })).toBe(false);
   });
 });

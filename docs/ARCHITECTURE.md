@@ -163,14 +163,15 @@ role in Settings (User management), which adds the row. While
 `PRISM_ALLOWED_EMAIL_DOMAINS` is set, only an address at one of its domains
 can be approved; a user who has a role keeps it. Admins change other users'
 roles, or take them away, which makes the user pending again; never their
-own. Each such change is one conditional statement in a serialisable
-transaction, made only while the user's access is still what the admin saw
-and the admin is still admin (`changeAccess` in `lib/roles.ts`), so two
-admins working at the same moment cannot leave PRISM without one. The Clerk
-webhook (`app/api/webhooks/clerk`) keeps a known user's email current and
-removes a deleted user's row. The first admin of a new database comes from
-`/api/admin/bootstrap`, for the address in `ADMIN_BOOTSTRAP_EMAIL` only;
-once an admin exists, it answers 409.
+own. The dashboard sends the access its list shows with each change, and
+the change is one conditional statement in a serialisable transaction, made
+only while the user's access is still that and the admin is still admin
+(`changeAccess` in `lib/roles.ts`): two admins working at the same moment
+cannot undo each other's changes unseen or leave PRISM without an admin. The
+Clerk webhook (`app/api/webhooks/clerk`) keeps a known user's email current
+and removes a deleted user's row. The first admin of a new database comes
+from `/api/admin/bootstrap`, for the address in `ADMIN_BOOTSTRAP_EMAIL`
+only; once an admin exists, it answers 409.
 
 `proxy.ts` checks the role for `/dashboard` against `user_roles` before the
 App Router renders anything, and sends a signed-in user without a role, and
@@ -243,8 +244,8 @@ The dashboard's server routes (`app/api`):
 | `PUT /api/drivers/{id}` | admin | Forwards a driver edit to the API with an admin token |
 | `PUT /api/journey` | admin | Forwards a journey save to the API with an admin token |
 | `GET /api/users` | admin | The Clerk users (up to 500) with their access, for the user list in Settings: pending users first, then the rest, newest first in each group |
-| `PATCH /api/users/{userId}/role` | admin | Gives a user a role or changes it (never the caller's own). For a pending user this is the approval: the row is added with the email Clerk holds (409 while it holds none or has not verified it; 403 for an address outside `PRISM_ALLOWED_EMAIL_DOMAINS` while that is set). 409 as well when the user's access, or the caller's own role, changed after the caller looked |
-| `DELETE /api/users/{userId}/role` | admin | Takes a role away (never the caller's own): the row goes and the user is pending again; 409 as for `PATCH` |
+| `PATCH /api/users/{userId}/role` | admin | Body `{role, from}`, `from` the access the caller's list shows. Gives a user a role or changes it (never the caller's own). For a pending user this is the approval: the row is added with the email Clerk holds (409 while it holds none or has not verified it; 403 for an address outside `PRISM_ALLOWED_EMAIL_DOMAINS` while that is set). 409 as well when the user's access is no longer `from`, or the caller's own role changed |
+| `DELETE /api/users/{userId}/role?from=` | admin | Takes a role away (never the caller's own): the row goes and the user is pending again; 409 as for `PATCH` |
 | `POST /api/webhooks/clerk` | Svix signature | Keeps a known user's email current in `user_roles` and removes a deleted user's row; adds none |
 | `POST /api/admin/bootstrap` | shared secret | Makes the address in `ADMIN_BOOTSTRAP_EMAIL` admin, once it has signed up and Clerk has verified it, while no admin exists; exists only while `ADMIN_BOOTSTRAP_SECRET` is set |
 

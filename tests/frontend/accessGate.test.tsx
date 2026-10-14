@@ -116,12 +116,13 @@ describe('/pending', () => {
     await expect(PendingPage()).rejects.toThrow('NEXT_REDIRECT /dashboard');
   });
 
-  it('reports a check that failed as such, not as a missing approval', async () => {
+  it('reports a check that failed as such, not as a missing approval, and logs the cause', async () => {
     signedIn('viewer');
     db.down = true;
     render(await PendingPage());
     expect(screen.getByRole('heading', { name: 'Access could not be checked' })).toBeTruthy();
     expect(screen.queryByText(/Waiting for approval/)).toBeNull();
+    expect(console.error).toHaveBeenCalledWith('[/pending] access check failed:', expect.any(Error));
   });
 
   it('sends a visitor without a session to sign in', async () => {
@@ -141,7 +142,7 @@ describe('/pending', () => {
     expect(screen.queryByRole('status')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
     expect(nav.push).toHaveBeenCalledWith('/dashboard');
-    expect((await screen.findByRole('status')).textContent).toBe('Still waiting: no admin has approved this account yet.');
+    expect((await screen.findByRole('status')).textContent).toBe('Still no access: an admin has to approve this account.');
   });
 
   it('says so when checking again finds the check still failing', async () => {

@@ -71,7 +71,7 @@ export default function PendingActions({ checkFailed }: { checkFailed: boolean }
       </button>
       {checkedAgain && !checking && (
         <p role="status" className="text-xs leading-relaxed text-center" style={{ color: S.onSurfaceVariant }}>
-          {checkFailed ? 'Your access still could not be checked.' : 'Still waiting: no admin has approved this account yet.'}
+          {checkFailed ? 'Your access still could not be checked.' : 'Still no access: an admin has to approve this account.'}
         </p>
       )}
       {signOutError && (

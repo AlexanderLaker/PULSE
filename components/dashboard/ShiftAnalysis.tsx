@@ -286,8 +286,8 @@ const ShiftAnalysis: FC<{
 
         {/* The three headline numbers; each band opens on hover, focus or tap.
             The portfolio band is the engine's joint percentile of the
-            portfolio shift. A band covers what the runs vary, each driver's
-            size and timing, and its note says so. */}
+            portfolio shift. A band covers what the Monte Carlo iterations
+            vary, each driver's size and timing, and its note says so. */}
         {headline && (
           <div
             className="mb-5 grid gap-3"

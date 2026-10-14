@@ -16,7 +16,10 @@ judgment, so an account alone must open nothing.
   viewer) lives in PRISM's database (`user_roles`). A user who signs up gets
   no row: they are pending until an admin gives them a role in Settings,
   which adds it, and an admin can take it away again. Each such change is
-  conditional and serialisable, so PRISM always keeps an admin. While
+  conditional and serialisable: it is made only while the user's access is
+  still what the admin's list shows, so two admins never undo each other's
+  changes unseen, and changes made in Settings never leave PRISM without an
+  admin. While
   `PRISM_ALLOWED_EMAIL_DOMAINS` is set, only an address at one of its
   domains can be approved. A Clerk webhook, verified by its signature, keeps
   a known user's email current and removes a deleted user's row. The first

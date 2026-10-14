@@ -68,8 +68,9 @@ export async function getRole(clerkUserId: string): Promise<Role | null> {
  * admin is still admin, in one statement of a serializable transaction: two
  * admins changing the same user, or demoting each other, at the same moment
  * cannot both succeed, as PostgreSQL fails one of them (SQLSTATE 40001), so
- * PRISM is never left without an admin. True when the change was made; false
- * when it was not because something changed in the meantime.
+ * changes made this way never leave PRISM without an admin. True when the
+ * change was made; false when it was not because something changed in the
+ * meantime.
  */
 export async function changeAccess(change: {
   actor: string; user: string; from: Access; to: Access; email?: string;

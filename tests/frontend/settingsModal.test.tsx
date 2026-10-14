@@ -239,10 +239,14 @@ describe('User management', () => {
 
     fireEvent.change(alan, { target: { value: 'viewer' } });
     expect(API.setUserRole).not.toHaveBeenCalled();
+    expect(alan.value).toBe('pending');   // the saved access, until the change is confirmed
     expect(confirmationFor('alan@example.com').getByText('Approve alan@example.com as a viewer?')).toBeTruthy();
+    expect(screen.getByText("Approve alan@example.com as a viewer? Confirm or cancel under the user's row.")
+      .getAttribute('role')).toBe('status');
+    expect(alan.getAttribute('aria-describedby')).toBe('confirm-user_alan');
     fireEvent.click(confirmationFor('alan@example.com').getByRole('button', { name: 'Confirm' }));
     expect(await screen.findByText('alan@example.com is approved as viewer.')).toBeTruthy();
-    expect(API.setUserRole).toHaveBeenCalledWith('user_alan', 'viewer');
+    expect(API.setUserRole).toHaveBeenCalledWith('user_alan', 'viewer', 'pending');
     expect(alan.value).toBe('viewer');
     expect(screen.getByText('All users (3)')).toBeTruthy();
   });
@@ -258,7 +262,7 @@ describe('User management', () => {
     fireEvent.click(confirmationFor('grace@example.com').getByRole('button', { name: 'Take access away' }));
     expect(await screen.findByText(/^grace@example\.com is pending again: from their next page load they see the waiting page/))
       .toBeTruthy();
-    expect(API.revokeUserRole).toHaveBeenCalledWith('user_grace');
+    expect(API.revokeUserRole).toHaveBeenCalledWith('user_grace', 'viewer');
     expect(API.setUserRole).not.toHaveBeenCalled();
     expect(grace.value).toBe('pending');
   });
@@ -280,6 +284,23 @@ describe('User management', () => {
     expect(API.setUserRole).not.toHaveBeenCalled();
   });
 
+  it('loads the list again when the route finds it out of date', async () => {
+    openModal(true);
+    openSection('User management');
+    const grace = await screen.findByRole('combobox', { name: 'Access of grace@example.com' }) as HTMLSelectElement;
+    API.revokeUserRole.mockRejectedValueOnce(Object.assign(new Error('changed in the meantime'), { status: 409 }));
+    // Meanwhile another admin made Grace an admin.
+    API.getUsers.mockResolvedValueOnce({ users: USERS.map((u) => (u.id === 'user_grace' ? { ...u, role: 'admin' } : u)) });
+
+    fireEvent.change(grace, { target: { value: 'pending' } });
+    fireEvent.click(confirmationFor('grace@example.com').getByRole('button', { name: 'Take access away' }));
+    expect(await screen.findByText(
+      'The access of grace@example.com, or your own role, changed in the meantime. The list now shows the current state.',
+    )).toBeTruthy();
+    expect(API.getUsers).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(grace.value).toBe('admin'));
+  });
+
   it('changes a role through api.setUserRole and shows a failure', async () => {
     openModal(true);
     openSection('User management');
@@ -289,7 +310,7 @@ describe('User management', () => {
     expect(confirmationFor('grace@example.com').getByText('Make grace@example.com an admin?')).toBeTruthy();
     fireEvent.click(confirmationFor('grace@example.com').getByRole('button', { name: 'Confirm' }));
     expect(await screen.findByText('Role updated.')).toBeTruthy();
-    expect(API.setUserRole).toHaveBeenCalledWith('user_grace', 'admin');
+    expect(API.setUserRole).toHaveBeenCalledWith('user_grace', 'admin', 'viewer');
     expect(grace.value).toBe('admin');
 
     API.setUserRole.mockRejectedValueOnce(new Error('Admin role required'));

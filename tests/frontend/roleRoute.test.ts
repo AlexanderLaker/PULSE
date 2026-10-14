@@ -11,9 +11,11 @@
  *     PRISM_ALLOWED_EMAIL_DOMAINS is set, a pending user at another domain is
  *     refused; a user who has a role keeps it.
  *   - DELETE removes the row: the user is pending again.
- *   - A request that would change nothing changes and logs nothing; a change
- *     the database refuses because the user's access, or the admin's own
- *     role, changed in the meantime answers 409 and logs nothing.
+ *   - Every request says which access the admin's list shows (`from`); when
+ *     the user's access is no longer that, or changes, or the admin's own
+ *     role does, before the write, the answer is 409 and nothing changes or
+ *     is logged. A request that would change nothing changes and logs
+ *     nothing.
  *   - Every change is written to the audit log.
  *
  * Clerk and the database are mocked at the module boundary. The fake
@@ -118,8 +120,8 @@ const patch = (userId: string, body: unknown) =>
   PATCH(new Request(`https://prism.test/api/users/${userId}/role`, { method: 'PATCH', body: JSON.stringify(body) }),
     { params: Promise.resolve({ userId }) });
 
-const revoke = (userId: string) =>
-  DELETE(new Request(`https://prism.test/api/users/${userId}/role`, { method: 'DELETE' }),
+const revoke = (userId: string, from?: string) =>
+  DELETE(new Request(`https://prism.test/api/users/${userId}/role${from ? `?from=${from}` : ''}`, { method: 'DELETE' }),
     { params: Promise.resolve({ userId }) });
 
 const signedInAs = (userId: string) => {
@@ -134,7 +136,7 @@ const clerkEmail = (address: string | null, status: string | null = 'verified') 
     emailAddresses: [],
   });
 
-const CHANGED_MEANWHILE = "This user's access, or your own role, changed in the meantime: reload the list and try again.";
+const CHANGED_MEANWHILE = "This user's access, or your own role, changed in the meantime.";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -185,20 +187,20 @@ describe('GET /api/users', () => {
 describe('PATCH /api/users/{userId}/role', () => {
   it('answers 401 without a session, and 403 for a viewer and for a pending user', async () => {
     clerk.auth.mockResolvedValue({ userId: null });
-    expect((await patch('viewer_1', { role: 'admin' })).status).toBe(401);
+    expect((await patch('viewer_1', { role: 'admin', from: 'viewer' })).status).toBe(401);
     signedInAs('viewer_1');
-    expect((await patch('viewer_1', { role: 'admin' })).status).toBe(403);
+    expect((await patch('viewer_1', { role: 'admin', from: 'viewer' })).status).toBe(403);
     signedInAs('user_pending');
-    expect((await patch('user_pending', { role: 'admin' })).status).toBe(403);
+    expect((await patch('user_pending', { role: 'admin', from: 'pending' })).status).toBe(403);
     expect(db.roles.get('viewer_1')!.role).toBe('viewer');
     expect(db.roles.has('user_pending')).toBe(false);
   });
 
   it("refuses a role that is not admin or viewer, and an admin's change of their own role", async () => {
     signedInAs('admin_1');
-    expect((await patch('viewer_1', { role: 'owner' })).status).toBe(400);
-    expect((await patch('viewer_1', { role: 'pending' })).status).toBe(400);
-    const own = await patch('admin_1', { role: 'viewer' });
+    expect((await patch('viewer_1', { role: 'owner', from: 'viewer' })).status).toBe(400);
+    expect((await patch('viewer_1', { role: 'pending', from: 'viewer' })).status).toBe(400);
+    const own = await patch('admin_1', { role: 'viewer', from: 'admin' });
     expect(own.status).toBe(400);
     expect((await own.json()).error).toBe("You can't change your own role. Ask another admin.");
     expect(db.roles.get('admin_1')!.role).toBe('admin');
@@ -206,7 +208,7 @@ describe('PATCH /api/users/{userId}/role', () => {
 
   it('changes the role and records who changed it', async () => {
     signedInAs('admin_1');
-    const res = await patch('viewer_1', { role: 'admin' });
+    const res = await patch('viewer_1', { role: 'admin', from: 'viewer' });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ role: 'admin' });
     expect(db.roles.get('viewer_1')!.role).toBe('admin');
@@ -216,7 +218,7 @@ describe('PATCH /api/users/{userId}/role', () => {
   it('changes and logs nothing when the user has that role already', async () => {
     signedInAs('admin_1');
     for (const [user, role] of [['viewer_1', 'viewer'], ['admin_1', 'admin']]) {
-      const res = await patch(user!, { role });
+      const res = await patch(user!, { role, from: role });
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ role });
     }
@@ -227,7 +229,7 @@ describe('PATCH /api/users/{userId}/role', () => {
   it('approves a pending user: their row, with the email Clerk holds, and the approval in the audit log', async () => {
     signedInAs('admin_1');
     clerkEmail('New.User@Example.com');
-    const res = await patch('user_new', { role: 'viewer' });
+    const res = await patch('user_new', { role: 'viewer', from: 'pending' });
     expect(res.status).toBe(200);
     expect(clerk.getUser).toHaveBeenCalledWith('user_new');
     expect(db.roles.get('user_new')).toEqual({ email: 'new.user@example.com', role: 'viewer' });
@@ -243,14 +245,14 @@ describe('PATCH /api/users/{userId}/role', () => {
         { emailAddress: 'ana@example.com', verification: { status: 'verified' } },
       ],
     });
-    expect((await patch('user_new', { role: 'viewer' })).status).toBe(200);
+    expect((await patch('user_new', { role: 'viewer', from: 'pending' })).status).toBe(200);
     expect(db.roles.get('user_new')!.email).toBe('ana@example.com');
   });
 
   it('refuses an id Clerk does not know, and adds nothing', async () => {
     signedInAs('admin_1');
     clerk.getUser.mockRejectedValue(Object.assign(new Error('Not Found'), { status: 404 }));
-    const res = await patch('user_unknown', { role: 'viewer' });
+    const res = await patch('user_unknown', { role: 'viewer', from: 'pending' });
     expect(res.status).toBe(404);
     expect(db.roles.has('user_unknown')).toBe(false);
     expect(db.audit).toEqual([]);
@@ -259,7 +261,7 @@ describe('PATCH /api/users/{userId}/role', () => {
   it('refuses a user without an email address, and adds nothing', async () => {
     signedInAs('admin_1');
     clerkEmail(null);
-    const res = await patch('user_no_email', { role: 'viewer' });
+    const res = await patch('user_no_email', { role: 'viewer', from: 'pending' });
     expect(res.status).toBe(409);
     expect((await res.json()).error).toMatch(/no email address/);
     expect(db.roles.has('user_no_email')).toBe(false);
@@ -270,7 +272,7 @@ describe('PATCH /api/users/{userId}/role', () => {
     signedInAs('admin_1');
     for (const status of ['unverified', 'expired', 'failed', null]) {
       clerkEmail('ana@henkel.com', status);
-      const res = await patch('user_unverified', { role: 'viewer' });
+      const res = await patch('user_unverified', { role: 'viewer', from: 'pending' });
       expect(res.status).toBe(409);
       expect((await res.json()).error)
         .toBe('Clerk has not verified ana@henkel.com yet; approve the user once they have confirmed it.');
@@ -279,17 +281,40 @@ describe('PATCH /api/users/{userId}/role', () => {
     expect(db.audit).toEqual([]);
   });
 
+  it('refuses a change made on a list that is out of date: the access it shows is no longer the user\'s', async () => {
+    signedInAs('admin_1');
+    clerkEmail('viewer_1@example.com');
+    // Another admin took viewer_1's access away after this list was loaded.
+    db.roles.delete('viewer_1');
+    const res = await patch('viewer_1', { role: 'admin', from: 'viewer' });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe(CHANGED_MEANWHILE);
+    expect(db.roles.has('viewer_1')).toBe(false);
+    expect(db.transactions).toBe(0);
+    expect(db.audit).toEqual([]);
+  });
+
+  it('refuses a request that does not say which access the list shows', async () => {
+    signedInAs('admin_1');
+    for (const from of [undefined, 'owner']) {
+      const res = await patch('viewer_1', { role: 'admin', from });
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toMatch(/^Say which access the list shows/);
+    }
+    expect(db.roles.get('viewer_1')!.role).toBe('viewer');
+  });
+
   it('answers 409 and logs nothing when the user was approved, changed or removed in the meantime', async () => {
     signedInAs('admin_1');
     clerkEmail('new@example.com');
     db.meanwhile = () => { db.roles.set('user_new', { email: 'new@example.com', role: 'admin' }); };
-    const approval = await patch('user_new', { role: 'viewer' });
+    const approval = await patch('user_new', { role: 'viewer', from: 'pending' });
     expect(approval.status).toBe(409);
     expect((await approval.json()).error).toBe(CHANGED_MEANWHILE);
     expect(db.roles.get('user_new')!.role).toBe('admin');
 
     db.meanwhile = () => { db.roles.delete('viewer_1'); };
-    expect((await patch('viewer_1', { role: 'admin' })).status).toBe(409);
+    expect((await patch('viewer_1', { role: 'admin', from: 'viewer' })).status).toBe(409);
     expect(db.roles.has('viewer_1')).toBe(false);
     expect(db.audit).toEqual([]);
   });
@@ -297,7 +322,7 @@ describe('PATCH /api/users/{userId}/role', () => {
   it('answers 409 when the admin lost their own role in the meantime', async () => {
     signedInAs('admin_2');
     db.meanwhile = () => { db.roles.get('admin_2')!.role = 'viewer'; };
-    const res = await patch('admin_1', { role: 'viewer' });
+    const res = await patch('admin_1', { role: 'viewer', from: 'admin' });
     expect(res.status).toBe(409);
     expect(db.roles.get('admin_1')!.role).toBe('admin');
     expect(db.audit).toEqual([]);
@@ -306,7 +331,7 @@ describe('PATCH /api/users/{userId}/role', () => {
   it('answers 409 to the loser of two changes at the same moment, so two admins cannot demote each other', async () => {
     signedInAs('admin_2');
     db.conflict = { code: '40001' };
-    const res = await patch('admin_1', { role: 'viewer' });
+    const res = await patch('admin_1', { role: 'viewer', from: 'admin' });
     expect(res.status).toBe(409);
     expect((await res.json()).error).toBe(CHANGED_MEANWHILE);
     expect(db.roles.get('admin_1')!.role).toBe('admin');
@@ -319,7 +344,7 @@ describe('PATCH /api/users/{userId}/role', () => {
     it('refuses to approve an address at another domain, and adds nothing', async () => {
       signedInAs('admin_1');
       clerkEmail('someone@gmail.com');
-      const res = await patch('user_outside', { role: 'viewer' });
+      const res = await patch('user_outside', { role: 'viewer', from: 'pending' });
       expect(res.status).toBe(403);
       expect((await res.json()).error)
         .toBe('Only addresses at henkel.com, consultancy.example can be given a role here (PRISM_ALLOWED_EMAIL_DOMAINS).');
@@ -330,13 +355,13 @@ describe('PATCH /api/users/{userId}/role', () => {
     it('approves an address at a listed domain', async () => {
       signedInAs('admin_1');
       clerkEmail('Ana@Henkel.com');
-      expect((await patch('user_inside', { role: 'viewer' })).status).toBe(200);
+      expect((await patch('user_inside', { role: 'viewer', from: 'pending' })).status).toBe(200);
       expect(db.roles.get('user_inside')).toEqual({ email: 'ana@henkel.com', role: 'viewer' });
     });
 
     it('still changes the role of a user who has one, whatever their domain', async () => {
       signedInAs('admin_1');
-      expect((await patch('viewer_1', { role: 'admin' })).status).toBe(200);
+      expect((await patch('viewer_1', { role: 'admin', from: 'viewer' })).status).toBe(200);
       expect(db.roles.get('viewer_1')!.role).toBe('admin');
       expect(clerk.getUser).not.toHaveBeenCalled();
     });
@@ -346,15 +371,15 @@ describe('PATCH /api/users/{userId}/role', () => {
 describe('DELETE /api/users/{userId}/role', () => {
   it('answers 401 without a session and 403 for a viewer, removing nothing', async () => {
     clerk.auth.mockResolvedValue({ userId: null });
-    expect((await revoke('viewer_1')).status).toBe(401);
+    expect((await revoke('viewer_1', 'viewer')).status).toBe(401);
     signedInAs('viewer_1');
-    expect((await revoke('admin_1')).status).toBe(403);
+    expect((await revoke('admin_1', 'admin')).status).toBe(403);
     expect(db.roles.get('admin_1')!.role).toBe('admin');
   });
 
   it("refuses an admin's removal of their own role", async () => {
     signedInAs('admin_1');
-    const own = await revoke('admin_1');
+    const own = await revoke('admin_1', 'admin');
     expect(own.status).toBe(400);
     expect((await own.json()).error).toBe("You can't change your own role. Ask another admin.");
     expect(db.roles.get('admin_1')!.role).toBe('admin');
@@ -362,7 +387,7 @@ describe('DELETE /api/users/{userId}/role', () => {
 
   it('takes the role away, so the user is pending again, and records who did it', async () => {
     signedInAs('admin_1');
-    const res = await revoke('viewer_1');
+    const res = await revoke('viewer_1', 'viewer');
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ role: 'pending' });
     expect(db.roles.has('viewer_1')).toBe(false);
@@ -371,9 +396,23 @@ describe('DELETE /api/users/{userId}/role', () => {
 
   it('changes nothing for a user who is pending already, and writes no audit entry', async () => {
     signedInAs('admin_1');
-    const res = await revoke('user_pending');
+    const res = await revoke('user_pending', 'pending');
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ role: 'pending' });
+    expect(db.transactions).toBe(0);
+    expect(db.audit).toEqual([]);
+  });
+
+  it('refuses a removal made on a list that is out of date, or that does not say what the list shows', async () => {
+    signedInAs('admin_1');
+    // Another admin made viewer_1 an admin after this list was loaded.
+    db.roles.get('viewer_1')!.role = 'admin';
+    const stale = await revoke('viewer_1', 'viewer');
+    expect(stale.status).toBe(409);
+    expect((await stale.json()).error).toBe(CHANGED_MEANWHILE);
+    expect(db.roles.get('viewer_1')!.role).toBe('admin');
+    expect((await revoke('viewer_1')).status).toBe(400);
+    expect((await revoke('viewer_1', 'owner')).status).toBe(400);
     expect(db.transactions).toBe(0);
     expect(db.audit).toEqual([]);
   });
@@ -381,12 +420,12 @@ describe('DELETE /api/users/{userId}/role', () => {
   it('answers 409 and removes nothing when the role changed in the meantime, or two admins act at once', async () => {
     signedInAs('admin_1');
     db.meanwhile = () => { db.roles.get('viewer_1')!.role = 'admin'; };
-    expect((await revoke('viewer_1')).status).toBe(409);
+    expect((await revoke('viewer_1', 'viewer')).status).toBe(409);
     expect(db.roles.get('viewer_1')!.role).toBe('admin');
 
     db.meanwhile = null;
     db.conflict = { code: '40001' };
-    expect((await revoke('admin_2')).status).toBe(409);
+    expect((await revoke('admin_2', 'admin')).status).toBe(409);
     expect(db.roles.get('admin_2')!.role).toBe('admin');
     expect(db.audit).toEqual([]);
   });
