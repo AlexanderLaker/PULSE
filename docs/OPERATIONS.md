@@ -622,9 +622,8 @@ user a new id, so the restored `user_roles` rows match nobody and still hold
 an admin, which keeps the bootstrap route refusing: empty the table
 (`DELETE FROM user_roles;`, after the dump that keeps the old rows), set up
 the first admin with the bootstrap route, then invite and approve everyone
-again. Rotate
-the credentials after the move, and check the deployment against the list
-under Deploying.
+again. Rotate the credentials after the move, and check the deployment
+against the list under Deploying.
 
 ## Hosting elsewhere
 

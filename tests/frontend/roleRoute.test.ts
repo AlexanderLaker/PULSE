@@ -263,7 +263,9 @@ describe('PATCH /api/users/{userId}/role', () => {
     clerkEmail(null);
     const res = await patch('user_no_email', { role: 'viewer', from: 'pending' });
     expect(res.status).toBe(409);
-    expect((await res.json()).error).toMatch(/no email address/);
+    const body = await res.json();
+    expect(body.error).toMatch(/no email address/);
+    expect(body.code).toBeUndefined();   // not the refusal of an out-of-date list
     expect(db.roles.has('user_no_email')).toBe(false);
     expect(db.audit).toEqual([]);
   });
@@ -274,8 +276,8 @@ describe('PATCH /api/users/{userId}/role', () => {
       clerkEmail('ana@henkel.com', status);
       const res = await patch('user_unverified', { role: 'viewer', from: 'pending' });
       expect(res.status).toBe(409);
-      expect((await res.json()).error)
-        .toBe('Clerk has not verified ana@henkel.com yet; approve the user once they have confirmed it.');
+      expect(await res.json())
+        .toEqual({ error: 'Clerk has not verified ana@henkel.com yet; approve the user once they have confirmed it.' });
     }
     expect(db.roles.has('user_unverified')).toBe(false);
     expect(db.audit).toEqual([]);
@@ -288,7 +290,7 @@ describe('PATCH /api/users/{userId}/role', () => {
     db.roles.delete('viewer_1');
     const res = await patch('viewer_1', { role: 'admin', from: 'viewer' });
     expect(res.status).toBe(409);
-    expect((await res.json()).error).toBe(CHANGED_MEANWHILE);
+    expect(await res.json()).toEqual({ error: CHANGED_MEANWHILE, code: 'changed' });
     expect(db.roles.has('viewer_1')).toBe(false);
     expect(db.transactions).toBe(0);
     expect(db.audit).toEqual([]);
@@ -310,7 +312,7 @@ describe('PATCH /api/users/{userId}/role', () => {
     db.meanwhile = () => { db.roles.set('user_new', { email: 'new@example.com', role: 'admin' }); };
     const approval = await patch('user_new', { role: 'viewer', from: 'pending' });
     expect(approval.status).toBe(409);
-    expect((await approval.json()).error).toBe(CHANGED_MEANWHILE);
+    expect(await approval.json()).toEqual({ error: CHANGED_MEANWHILE, code: 'changed' });
     expect(db.roles.get('user_new')!.role).toBe('admin');
 
     db.meanwhile = () => { db.roles.delete('viewer_1'); };
@@ -409,7 +411,7 @@ describe('DELETE /api/users/{userId}/role', () => {
     db.roles.get('viewer_1')!.role = 'admin';
     const stale = await revoke('viewer_1', 'viewer');
     expect(stale.status).toBe(409);
-    expect((await stale.json()).error).toBe(CHANGED_MEANWHILE);
+    expect(await stale.json()).toEqual({ error: CHANGED_MEANWHILE, code: 'changed' });
     expect(db.roles.get('viewer_1')!.role).toBe('admin');
     expect((await revoke('viewer_1')).status).toBe(400);
     expect((await revoke('viewer_1', 'owner')).status).toBe(400);

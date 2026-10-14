@@ -5,9 +5,10 @@
  * screen reader, and the list keeps showing the saved access until the
  * change is confirmed. Giving a pending user a role approves them; setting a
  * user back to pending takes their role away. Both go through the
- * dashboard's own route (lib/roles.ts) with the access the list shows, so the
- * route refuses an admin's change of their own role and a change made on a
- * list that is out of date; the list then loads again.
+ * dashboard's own route (lib/roles.ts), which refuses an admin's change of
+ * their own role; they send the access the list shows, so the route also
+ * refuses a change made on a list that is out of date, and the list then
+ * loads again.
  */
 import { useCallback, useEffect, useState, type FC } from 'react';
 import { UsersIcon } from 'lucide-react';
@@ -75,7 +76,7 @@ export const UsersSection: FC<{ currentUserId: string | null }> = ({ currentUser
             : 'Role updated.',
       });
     } catch (err) {
-      if ((err as { status?: unknown }).status === 409) {
+      if ((err as { code?: unknown }).code === 'changed') {
         // Someone changed this user's access, or the admin's own role, since the list was loaded.
         setStatus({
           kind: 'error',

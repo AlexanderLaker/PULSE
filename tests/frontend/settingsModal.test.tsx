@@ -288,7 +288,7 @@ describe('User management', () => {
     openModal(true);
     openSection('User management');
     const grace = await screen.findByRole('combobox', { name: 'Access of grace@example.com' }) as HTMLSelectElement;
-    API.revokeUserRole.mockRejectedValueOnce(Object.assign(new Error('changed in the meantime'), { status: 409 }));
+    API.revokeUserRole.mockRejectedValueOnce(Object.assign(new Error('changed in the meantime'), { status: 409, code: 'changed' }));
     // Meanwhile another admin made Grace an admin.
     API.getUsers.mockResolvedValueOnce({ users: USERS.map((u) => (u.id === 'user_grace' ? { ...u, role: 'admin' } : u)) });
 
@@ -299,6 +299,22 @@ describe('User management', () => {
     )).toBeTruthy();
     expect(API.getUsers).toHaveBeenCalledTimes(2);
     await waitFor(() => expect(grace.value).toBe('admin'));
+  });
+
+  it("shows the route's own reason for any other refusal, such as an address Clerk has not verified", async () => {
+    openModal(true);
+    openSection('User management');
+    const alan = await screen.findByRole('combobox', { name: 'Access of alan@example.com' }) as HTMLSelectElement;
+    API.setUserRole.mockRejectedValueOnce(Object.assign(
+      new Error('Clerk has not verified alan@example.com yet; approve the user once they have confirmed it.'),
+      { status: 409, code: null },
+    ));
+    fireEvent.change(alan, { target: { value: 'viewer' } });
+    fireEvent.click(confirmationFor('alan@example.com').getByRole('button', { name: 'Confirm' }));
+    expect(await screen.findByText('Clerk has not verified alan@example.com yet; approve the user once they have confirmed it.'))
+      .toBeTruthy();
+    expect(API.getUsers).toHaveBeenCalledTimes(1);
+    expect(alan.value).toBe('pending');
   });
 
   it('changes a role through api.setUserRole and shows a failure', async () => {

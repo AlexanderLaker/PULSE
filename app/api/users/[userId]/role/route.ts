@@ -16,14 +16,15 @@
  * cookie runs out within 30 minutes. Response: { role: 'pending' }.
  *
  * `from` is the access the admin's list shows ('admin', 'viewer' or
- * 'pending'). A change is made only while the user's access is still that,
- * and the admin is still admin, up to the moment it is written (lib/roles.ts
- * changeAccess); otherwise the answer is 409 and nothing changes, so two
- * admins working in Settings at the same moment cannot undo each other's
- * changes unseen, nor leave PRISM without an admin. An admin cannot change
- * or remove their own role. A request that would change nothing changes and
- * logs nothing. Every change is written to the audit log where possible: a
- * failed audit write is logged and the change stands.
+ * 'pending'; 400 without it). A change is made only while the user's access
+ * is still that, and the admin is still admin, up to the moment it is
+ * written (lib/roles.ts changeAccess); otherwise the answer is 409 with
+ * `code: 'changed'`, which tells it from the 409s above, and nothing
+ * changes, so two admins working in Settings at the same moment cannot undo
+ * each other's changes unseen, nor leave PRISM without an admin. An admin
+ * cannot change or remove their own role. A request that would change
+ * nothing changes and logs nothing. Every change is written to the audit log
+ * where possible: a failed audit write is logged and the change stands.
  */
 import { NextResponse } from 'next/server';
 import { clerkClient } from '@clerk/nextjs/server';
@@ -71,7 +72,7 @@ export async function PATCH(req: Request, { params }: Params) {
     }
 
     const existing: Access = (await getRole(targetUserId)) ?? 'pending';
-    if (existing !== shown) return NextResponse.json({ error: CHANGED_MEANWHILE }, { status: 409 });
+    if (existing !== shown) return NextResponse.json({ error: CHANGED_MEANWHILE, code: 'changed' }, { status: 409 });
     if (existing === nextRole) return NextResponse.json({ role: nextRole });
 
     let email: string | undefined;
@@ -105,7 +106,7 @@ export async function PATCH(req: Request, { params }: Params) {
     const changed = await changeAccess({
       actor: admin.clerkUserId, user: targetUserId, from: existing, to: nextRole, email,
     });
-    if (!changed) return NextResponse.json({ error: CHANGED_MEANWHILE }, { status: 409 });
+    if (!changed) return NextResponse.json({ error: CHANGED_MEANWHILE, code: 'changed' }, { status: 409 });
 
     await recordRoleChange({
       userId: targetUserId, from: existing === 'pending' ? null : existing, to: nextRole,
@@ -133,11 +134,11 @@ export async function DELETE(req: Request, { params }: Params) {
     }
 
     const existing = await getRole(targetUserId);
-    if ((existing ?? 'pending') !== shown) return NextResponse.json({ error: CHANGED_MEANWHILE }, { status: 409 });
+    if ((existing ?? 'pending') !== shown) return NextResponse.json({ error: CHANGED_MEANWHILE, code: 'changed' }, { status: 409 });
     if (existing === null) return NextResponse.json({ role: 'pending' });
 
     const changed = await changeAccess({ actor: admin.clerkUserId, user: targetUserId, from: existing, to: 'pending' });
-    if (!changed) return NextResponse.json({ error: CHANGED_MEANWHILE }, { status: 409 });
+    if (!changed) return NextResponse.json({ error: CHANGED_MEANWHILE, code: 'changed' }, { status: 409 });
 
     await recordRoleChange({
       userId: targetUserId, from: existing, to: null, via: 'via /api/users/[userId]/role',

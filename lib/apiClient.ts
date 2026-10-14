@@ -25,8 +25,9 @@ const REQUEST_TIMEOUT_MS = 20_000;
 export class ApiError extends Error {
   /** `outcomeUnknown`: a write went out and no answer came back from the API
    *  (a timeout, a lost connection, or a gateway that gave up with 502 or 504),
-   *  so it may still have been carried out. */
-  constructor(public status: number, message: string, public outcomeUnknown = false) {
+   *  so it may still have been carried out. `code`: the `code` of the error
+   *  body, where a route names its refusal (the role route's 'changed'). */
+  constructor(public status: number, message: string, public outcomeUnknown = false, public code: string | null = null) {
     super(message);
     this.name = 'ApiError';
   }
@@ -55,8 +56,9 @@ async function send<T>(url: string, init: RequestInit = {}, retried = false): Pr
     return send<T>(url, init, true);
   }
   if (!res.ok) {
-    throw new ApiError(res.status, errorDetail(await res.json().catch(() => null)) ?? `Request failed (${res.status})`,
-      write && GATEWAY_STATUSES.has(res.status));
+    const body = (await res.json().catch(() => null)) as { code?: unknown } | null;
+    throw new ApiError(res.status, errorDetail(body) ?? `Request failed (${res.status})`,
+      write && GATEWAY_STATUSES.has(res.status), typeof body?.code === 'string' ? body.code : null);
   }
   return (await res.json()) as T;
 }
@@ -199,7 +201,7 @@ export const getUsers = (): Promise<{ users: ManagedUser[] }> => send('/api/user
 const roleUrl = (userId: string) => `/api/users/${encodeURIComponent(userId)}/role`;
 
 /** Gives a user a role: for a pending user that is the approval. `from` is the access the admin's list
- *  shows; the route refuses the change (409) when the user's access is no longer that. */
+ *  shows; the route refuses the change (409, code 'changed') when the user's access is no longer that. */
 export const setUserRole = (userId: string, role: Role, from: Access): Promise<{ role: Role }> =>
   send(roleUrl(userId), { method: 'PATCH', body: JSON.stringify({ role, from }) });
 

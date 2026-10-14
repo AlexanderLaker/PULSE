@@ -8,7 +8,9 @@
  * an unknown outcome.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ApiError, getDrivers, getJourneyContent, saveJourneyContent, updateDriver } from '@/lib/apiClient';
+import {
+  ApiError, getDrivers, getJourneyContent, revokeUserRole, saveJourneyContent, setUserRole, updateDriver,
+} from '@/lib/apiClient';
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -160,5 +162,25 @@ describe('an error answer', () => {
     await expect(getDrivers()).rejects.toThrow('Admins only');
     answer(new Response('<html>Bad gateway</html>', { status: 502 }));
     await expect(getDrivers()).rejects.toThrow('Request failed (502)');
+  });
+});
+
+describe('the role calls', () => {
+  it('send the access the list shows with every change, and pass on the code of a refusal', async () => {
+    answer(json(200, { role: 'admin' }), json(200, { role: 'pending' }),
+      json(409, { error: "This user's access, or your own role, changed in the meantime.", code: 'changed' }));
+    await setUserRole('user 1', 'admin', 'viewer');
+    await revokeUserRole('user 1', 'admin');
+    const [patch, remove] = vi.mocked(fetch).mock.calls;
+    expect(patch![0]).toBe('/api/users/user%201/role');
+    expect((patch![1] as RequestInit).method).toBe('PATCH');
+    expect(JSON.parse(String((patch![1] as RequestInit).body))).toEqual({ role: 'admin', from: 'viewer' });
+    expect(remove![0]).toBe('/api/users/user%201/role?from=admin');
+    expect((remove![1] as RequestInit).method).toBe('DELETE');
+
+    const refusal = await setUserRole('user 1', 'viewer', 'viewer').catch((e: unknown) => e) as ApiError;
+    expect(refusal.status).toBe(409);
+    expect(refusal.code).toBe('changed');
+    expect(refusal.message).toBe("This user's access, or your own role, changed in the meantime.");
   });
 });
