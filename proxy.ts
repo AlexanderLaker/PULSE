@@ -20,7 +20,7 @@
  * components; without them Clerk would send visitors to its hosted pages.
  * These paths need no environment variable and win over Clerk's
  * NEXT_PUBLIC_CLERK_SIGN_IN_URL and NEXT_PUBLIC_CLERK_SIGN_UP_URL where a
- * deployment still sets them.
+ * deployment sets them.
  *
  * Public here:
  *   - /sign-in and /sign-up;

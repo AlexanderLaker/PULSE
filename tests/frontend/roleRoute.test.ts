@@ -335,7 +335,7 @@ describe('PATCH /api/users/{userId}/role', () => {
     db.conflict = { code: '40001' };
     const res = await patch('admin_1', { role: 'viewer', from: 'admin' });
     expect(res.status).toBe(409);
-    expect((await res.json()).error).toBe(CHANGED_MEANWHILE);
+    expect(await res.json()).toEqual({ error: CHANGED_MEANWHILE, code: 'changed' });
     expect(db.roles.get('admin_1')!.role).toBe('admin');
     expect(db.audit).toEqual([]);
   });
@@ -422,12 +422,16 @@ describe('DELETE /api/users/{userId}/role', () => {
   it('answers 409 and removes nothing when the role changed in the meantime, or two admins act at once', async () => {
     signedInAs('admin_1');
     db.meanwhile = () => { db.roles.get('viewer_1')!.role = 'admin'; };
-    expect((await revoke('viewer_1', 'viewer')).status).toBe(409);
+    const changed = await revoke('viewer_1', 'viewer');
+    expect(changed.status).toBe(409);
+    expect(await changed.json()).toEqual({ error: CHANGED_MEANWHILE, code: 'changed' });
     expect(db.roles.get('viewer_1')!.role).toBe('admin');
 
     db.meanwhile = null;
     db.conflict = { code: '40001' };
-    expect((await revoke('admin_2', 'admin')).status).toBe(409);
+    const lost = await revoke('admin_2', 'admin');
+    expect(lost.status).toBe(409);
+    expect(await lost.json()).toEqual({ error: CHANGED_MEANWHILE, code: 'changed' });
     expect(db.roles.get('admin_2')!.role).toBe('admin');
     expect(db.audit).toEqual([]);
   });

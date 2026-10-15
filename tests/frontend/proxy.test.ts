@@ -134,7 +134,9 @@ describe("Clerk's pages", () => {
     expect(clerk.options).toEqual({ signInUrl: '/sign-in', signUpUrl: '/sign-up' });
     const { default: RootLayout } = await import('@/app/layout');
     const provider = RootLayout({ children: null }) as ReactElement<Record<string, unknown>>;
-    expect(provider.props).toMatchObject({
+    // Every address the provider gives Clerk, so that no other redirect can be added unseen.
+    const addresses = Object.fromEntries(Object.entries(provider.props).filter(([name]) => /Url$/.test(name)));
+    expect(addresses).toEqual({
       signInUrl: '/sign-in',
       signUpUrl: '/sign-up',
       signInFallbackRedirectUrl: '/dashboard',

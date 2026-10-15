@@ -99,16 +99,20 @@ example: if step 6 has not confirmed the migrated service by then, roll back
 as Rollback describes and try again another day.
 
 0. **Compare the settings.** The Vercel project's environment variables
-   (Production) must hold every one README.md's table lists, the two
-   `ADMIN_BOOTSTRAP_*` only while a first admin is being set up and
-   `PRISM_ALLOWED_EMAIL_DOMAINS` only if wanted; the database URLs,
-   `PRISM_JWT_SECRET` and the Clerk keys keep their names. Note the ones this
-   release no longer needs, such as `BACKEND_URL`, `PRISM_BACKEND_URL`,
-   `FORCE_DEV_PROXY`, `NEXT_PUBLIC_SIGNUP_CODE`, `UNSPLASH_ACCESS_KEY` and
-   Clerk's page settings (`NEXT_PUBLIC_CLERK_SIGN_IN_URL` and the three like
-   it; the code names PRISM's pages itself). They do no harm, and step 6
-   deletes them, so that a rollback which redeploys the previous release
-   still finds them. Variables a connected integration manages, such as
+   (Production) must hold every one README.md's table lists for a
+   deployment (not the local `PRISM_LOCAL_API_URL`, `PRISM_DB_PATH` and
+   `PRISM_API_DOCS`): the two `ADMIN_BOOTSTRAP_*` only while a first admin is
+   being set up, `PRISM_ALLOWED_EMAIL_DOMAINS` and `PRISM_API_ORIGIN` only if
+   wanted. The database URLs, `PRISM_JWT_SECRET` and the Clerk keys keep
+   their names. Note the ones this release no longer needs, such as
+   `BACKEND_URL`, `PRISM_BACKEND_URL`, `FORCE_DEV_PROXY`,
+   `NEXT_PUBLIC_SIGNUP_CODE`, `UNSPLASH_ACCESS_KEY` and Clerk's four page
+   settings, `NEXT_PUBLIC_CLERK_SIGN_IN_URL`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL`,
+   `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` and
+   `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` (the code names PRISM's
+   pages itself). They do no harm, and they stay for a week after the
+   go-live (see below step 8), because a rollback to the previous release
+   reads some of them. Variables a connected integration manages, such as
    Neon's, stay while it is connected. In the Clerk
    dashboard (docs/OPERATIONS.md, Setting up Clerk), check that sign-up is
    restricted (Access mode: Invite-only, or an allowlist of the company's
@@ -265,8 +269,6 @@ as Rollback describes and try again another day.
    dashboard, whose reads and saves the current service refuses. Then
    review the accounts in Settings, User management: set back to pending
    anyone who should not read PRISM (docs/OPERATIONS.md, Roles and users).
-   Last, delete the Vercel variables step 0 noted; the running deployment
-   keeps what it was built with, so nothing needs a redeploy.
 
 7. **Write a fresh run** so the served run carries the current names and
    labels. With the drivers unchanged since the last run, the numbers stay
@@ -292,6 +294,10 @@ as Rollback describes and try again another day.
 A second `migrate.py --dry-run` now answers that the database is already on
 the driver schema.
 
+A week after the go-live, if nothing has called for a rollback, delete the
+Vercel variables step 0 noted. The running deployment keeps what it was
+built with, so nothing needs a redeploy.
+
 ## The local SQLite copy
 
 `--sqlite PATH` migrates a SQLite file and ignores any database URL in `.env`:
@@ -316,9 +322,20 @@ with the driver base, the first time a request needs the database.
   deployment in Vercel, or point every database URL the Vercel project sets
   (`POSTGRES_URL` and `DATABASE_URL`; the first wins where both are set) at
   that backup branch and redeploy the previous release: a deployment keeps
-  the settings it was built with. If Vercel holds that redeploy for the
-  Deployment Checks, which the previous release never ran, promote it with
-  Force Promote. The archive file of step 5 holds the dropped rows as well.
+  the settings it was built with. That redeploy reads the variables step 0
+  noted: if they have been deleted, set them again first (Clerk's four page
+  settings to `/sign-in`, `/sign-up`, `/dashboard` and `/dashboard`, and
+  `NEXT_PUBLIC_SIGNUP_CODE`, without which the previous release's sign-up
+  page falls back to its built-in code). If Vercel holds that redeploy for
+  the Deployment Checks, which the previous release never ran, promote it
+  with Force Promote. The archive file of step 5 holds the dropped rows as
+  well.
+
+A rollback also brings back the previous release's access rule: every
+signed-in Clerk account reads PRISM, whatever `user_roles` holds. Before you
+roll back, ban or delete in Clerk (Users) any account that must not read
+PRISM: those step 6 set back to pending, and any that signed up after the
+deploy and still waits for approval.
 
 Vercel puts no new push live after a rollback until it is undone (Undo
 Rollback on the project's production deployment tile).
