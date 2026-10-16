@@ -42,6 +42,14 @@ export const viewport: Viewport = {
  * to lands on the dashboard, which sends an account without a role on to the
  * waiting page. proxy.ts names the same pages for its redirects; neither
  * needs an environment variable.
+ *
+ * `dynamic` makes the provider read the request: the session state, which
+ * the pages then render with instead of waiting for the browser, and the
+ * nonce of the Content Security Policy (x-nonce, set by proxy.ts), which
+ * Clerk puts on the script tag it renders for its own code. Without it the
+ * tag carries no nonce, the browser refuses it, and Clerk loads the script a
+ * second time from code the policy already trusts: a refusal in the console
+ * and a delay on every page.
  */
 export default function RootLayout({
   children,
@@ -50,6 +58,7 @@ export default function RootLayout({
 }) {
   return (
     <ClerkProvider
+      dynamic
       signInUrl="/sign-in"
       signUpUrl="/sign-up"
       signInFallbackRedirectUrl="/dashboard"

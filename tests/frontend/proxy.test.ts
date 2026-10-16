@@ -14,7 +14,8 @@
  * and the 401 carry none. PRISM_CSP_REPORT_ONLY=1 renames the response header
  * to report-only, and the request header keeps its name. Clerk's redirects
  * and links lead to PRISM's own sign-in and sign-up pages, which the proxy
- * and the root layout name.
+ * and the root layout name, and the root layout's provider reads the
+ * request, so Clerk's script tag gets the nonce.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -239,6 +240,8 @@ describe("Clerk's pages", () => {
       signInFallbackRedirectUrl: '/dashboard',
       signUpFallbackRedirectUrl: '/dashboard',
     });
+    // The provider reads the request, so Clerk's own script tag carries the nonce the proxy sets.
+    expect(provider.props.dynamic).toBe(true);
     const root = path.resolve(__dirname, '../..');
     for (const page of ['app/(auth)/sign-in/[[...sign-in]]/page.tsx', 'app/(auth)/sign-up/[[...sign-up]]/page.tsx', 'app/dashboard/page.tsx']) {
       expect(existsSync(path.join(root, page)), page).toBe(true);

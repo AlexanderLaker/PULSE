@@ -44,8 +44,8 @@
  * 'strict-dynamic', frames and connections limited to Clerk's hosts. Next.js
  * reads the nonce from the request's content-security-policy header, so the
  * policy also goes on the request headers handed to the router, with the
- * nonce as x-nonce. A redirect and the 401 carry no policy; they render no
- * script. PRISM_CSP_REPORT_ONLY=1 sends the policy as
+ * nonce as x-nonce, where Clerk's provider reads it (app/layout.tsx). A
+ * redirect and the 401 carry no policy; they render no script. PRISM_CSP_REPORT_ONLY=1 sends the policy as
  * Content-Security-Policy-Report-Only, for a first deployment that watches
  * the browser console before enforcing; the request header keeps its name
  * either way. vercel.json carries no policy of its own; its X-Frame-Options:
