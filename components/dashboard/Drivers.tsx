@@ -101,16 +101,31 @@ const isMode = (v: string | undefined): v is ScoringMode => v === 'list' || v ==
 // never applied on their own.
 // ═══════════════════════════════════════════════════════════════════
 
-// The mode toggle; Review & Endorse is for admins.
+// The mode toggle; Review & Endorse is for admins. One row that scrolls
+// sideways where the three tabs do not fit (a phone), like the filter chips
+// under it, with the chosen tab kept in view; wrapped, the pill would break
+// into two rows.
 const ModeToggle: FC<{ mode: ScoringMode; onChange: (m: ScoringMode) => void; isAdmin: boolean }> = ({ mode, onChange, isAdmin }) => {
   const opts: Array<{ id: ScoringMode; label: string; dot: string }> = [
     { id: 'list', label: 'Driver List', dot: REVIEWED_COLOR },
     { id: 'rating', label: 'Expert Rating', dot: S.primary },
     ...(isAdmin ? [{ id: 'review' as ScoringMode, label: 'Review & Endorse', dot: EXPERT_COLOR }] : []),
   ];
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // Sideways only, by hand: scrollIntoView could also move the page.
+    const list = listRef.current;
+    const tab = list?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!list || !tab) return;
+    const l = list.getBoundingClientRect();
+    const t = tab.getBoundingClientRect();
+    if (t.left < l.left) list.scrollLeft += t.left - l.left - 5;
+    else if (t.right > l.right) list.scrollLeft += t.right - l.right + 5;
+  }, [mode]);
   return (
-    <div role="tablist" aria-label="Scoring mode" data-print-hide className="inline-flex flex-wrap" style={{
+    <div ref={listRef} role="tablist" aria-label="Scoring mode" data-print-hide className="inline-flex max-w-full" style={{
       gap: 4, padding: 5, borderRadius: 999, backgroundColor: S.surface, border: `1px solid ${S.cardBorder}`,
+      overflowX: 'auto', scrollbarWidth: 'none',
     }}>
       {opts.map((o) => {
         const active = mode === o.id;
@@ -118,7 +133,7 @@ const ModeToggle: FC<{ mode: ScoringMode; onChange: (m: ScoringMode) => void; is
           <button type="button" key={o.id} role="tab" aria-selected={active} onClick={() => onChange(o.id)}
             className="inline-flex items-center gap-2 transition-colors"
             style={{
-              padding: '9px 16px', borderRadius: 999, border: 'none', cursor: 'pointer',
+              padding: '9px 16px', borderRadius: 999, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
               fontFamily: HEADLINE_FONT, fontSize: 13, fontWeight: 700,
               backgroundColor: active ? S.primary : 'transparent', color: active ? S.onPrimary : S.onSurfaceVariant,
             }}>
