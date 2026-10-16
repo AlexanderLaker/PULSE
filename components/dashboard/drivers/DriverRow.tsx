@@ -76,6 +76,13 @@ const CardLabel: FC<{ children: React.ReactNode }> = ({ children }) => (
   </span>
 );
 
+/** The figure under its label in the card layout: one height for dots, numbers
+ *  and chips, so the four figures sit on one line. From xl the wrapper is gone
+ *  and the figure is the cell's content. */
+const CardValue: FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="flex items-center min-h-7 xl:contents">{children}</div>
+);
+
 // ── Collapsed-row cells: read-only in every mode; scoring and editing
 //    happen in the expanded panel ──
 const ProbCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverProposal }> = ({ driver, mode, myProposal }) => {
@@ -99,7 +106,7 @@ const ProbCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverPropo
   // The delta of what an endorsement would write: the mean rounded to a score.
   const delta = Math.round(agg.avg) - base;
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 flex-wrap">
       <ColorDots value={Math.round(agg.avg)} color={EXPERT_COLOR} title={`Expert mean ${agg.avg.toFixed(1)} / 5 · ${agg.count} scored`} />
       <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, color: EXPERT_COLOR }}>{agg.avg.toFixed(1)}</span>
       <DeltaChip value={delta} digits={0} />
@@ -259,15 +266,22 @@ export const DriverRow: FC<DriverRowProps> = ({
   const panelId = useId();
   const rowStyle = { '--row-grid': ROW_GRID[mode] } as React.CSSProperties;
 
+  // The list's last column carries the Edited chip, which most drivers do not
+  // have; the card layout leaves the empty slot out rather than show a label
+  // over nothing. From xl the cell stays, so the columns keep their template.
+  const lastCellEmpty = mode === 'list' && !driver.scores_edited;
+
   return (
     <div role="presentation" id={`driver-row-${driver.id}`}
-      style={{ boxShadow: isLast && !expanded ? 'none' : `inset 0 -1px 0 ${S.surfaceLow}` }}>
+      // The line between rows: a visible one between the tall cards below xl,
+      // the faint one between the dense table rows from xl; none after the last.
+      className={isLast && !expanded ? '' : 'border-b border-theme-card-border xl:border-theme-surface-low'}>
       {/* The whole row toggles the panel on click; the name is the button
           that does it for the keyboard and the screen reader. */}
       <div
         role="row"
         onClick={onToggle}
-        className="grid items-center gap-x-3 gap-y-2.5 px-4 md:px-8 py-3 xl:py-2 text-left transition-colors grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] xl:[grid-template-columns:var(--row-grid)]"
+        className="grid items-center gap-x-3 gap-y-3 px-4 md:px-8 py-4 xl:py-2 text-left transition-colors grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] xl:[grid-template-columns:var(--row-grid)]"
         style={{
           ...rowStyle,
           backgroundColor: expanded ? S.surfaceLow : S.surface,
@@ -283,23 +297,29 @@ export const DriverRow: FC<DriverRowProps> = ({
             <Icon size={16} strokeWidth={2} />
           </div>
           <div className="min-w-0 flex-1">
+            {/* On a phone the button wraps: the code and the chevron on the
+                first line, the name on its own lines below, so a short line
+                is not shared with the chip; from sm the code leads the name. */}
             <button
               type="button"
               aria-expanded={expanded}
               aria-controls={expanded ? panelId : undefined}
-              className="flex items-start gap-2 min-w-0 w-full text-left font-bold text-[15px]"
+              className="flex flex-wrap sm:flex-nowrap items-start gap-2 min-w-0 w-full text-left font-bold text-[15px]"
               style={{
                 fontFamily: HEADLINE_FONT, color: S.onSurface, background: 'transparent',
                 border: 'none', padding: 0, cursor: 'pointer', lineHeight: 1.3,
               }}
             >
               {code && <span className="mt-[2px] inline-flex shrink-0"><CodeChip code={code} /></span>}
-              {/* Two lines at most while collapsed, with the full name on
-                  hover; the whole name once the row is open. */}
-              <span className={expanded ? 'min-w-0' : 'min-w-0 line-clamp-2'} title={driver.name}>{driver.name}</span>
+              {/* While collapsed, two lines at most (three on a phone, where
+                  the line is short), with the full name on hover; the whole
+                  name once the row is open. */}
+              <span className={`min-w-0 basis-full order-3 sm:basis-auto sm:flex-1 sm:order-none ${expanded ? '' : 'line-clamp-3 sm:line-clamp-2'}`}
+                title={driver.name}>{driver.name}</span>
               <ChevronDown
                 size={14}
                 aria-hidden
+                className="ml-auto sm:ml-0"
                 style={{
                   flexShrink: 0, marginTop: 3,
                   color: S.onSurfaceVariant,
@@ -325,19 +345,19 @@ export const DriverRow: FC<DriverRowProps> = ({
         <div role="presentation" className={`col-span-1 sm:col-span-2 grid gap-3 ${CARD_FIGURES} xl:contents`}>
           <div role="cell">
             <CardLabel>Probability</CardLabel>
-            <ProbCell driver={driver} mode={mode} myProposal={myProposal} />
+            <CardValue><ProbCell driver={driver} mode={mode} myProposal={myProposal} /></CardValue>
           </div>
           <div role="cell" className="xl:text-right">
             <CardLabel>GP1 % affected</CardLabel>
-            <Gp1Cell driver={driver} mode={mode} myProposal={myProposal} />
+            <CardValue><Gp1Cell driver={driver} mode={mode} myProposal={myProposal} /></CardValue>
           </div>
           <div role="cell" className="xl:text-right">
             <CardLabel>Expected effect</CardLabel>
-            <ExpectedEffectCell driver={driver} mode={mode} myProposal={myProposal} />
+            <CardValue><ExpectedEffectCell driver={driver} mode={mode} myProposal={myProposal} /></CardValue>
           </div>
-          <div role="cell" className="xl:text-right">
+          <div role="cell" className={lastCellEmpty ? 'hidden xl:block xl:text-right' : 'xl:text-right'}>
             <CardLabel>{LAST_COLUMN_LABEL[mode]}</CardLabel>
-            <ReviewStatusCell driver={driver} mode={mode} myProposal={myProposal} />
+            <CardValue><ReviewStatusCell driver={driver} mode={mode} myProposal={myProposal} /></CardValue>
           </div>
         </div>
       </div>

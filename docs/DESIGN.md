@@ -146,9 +146,11 @@ tier) is never used as text on its own.
   chrome (`@media print` in `globals.css`, `data-print-hide` on controls) and
   prints an open dialog on its own.
 - Every layout holds at 1024 px (a laptop with a sidebar), 820 px (a tablet
-  in portrait) and 390 px (a phone): rows that cannot fit become cards,
-  rails that cannot shrink scroll sideways inside a visible edge, and no
-  text is made smaller than it is on a wide screen to fit.
+  in portrait) and 390 px (a phone): rows that cannot fit become cards
+  (parted by a visible line, with a label only over a figure that is there),
+  rails and controls that cannot shrink scroll sideways inside a visible
+  edge, a header's value drops under its title rather than squeezing it, and
+  no text is made smaller than it is on a wide screen to fit.
 - Tables: a `surfaceLow` header row with small uppercase labels, sortable
   headers with a direction icon.
 - Provenance and grades are chips with text (`components/dashboard/Chip.tsx`),

@@ -51,7 +51,10 @@ const SectionCard: FC<SectionCardProps> = ({
       borderRadius: z.radius,
       padding: z.padding,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: z.gap, marginBottom: z.headerGap }}>
+      {/* The header wraps: on a narrow screen the right slot moves under the
+          title rather than squeezing it into several lines. The title and
+          its info button stay together. */}
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: z.gap, rowGap: 6, marginBottom: z.headerGap }}>
         <span style={{
           width: z.iconBox, height: z.iconBox, borderRadius: z.iconRadius,
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -60,28 +63,30 @@ const SectionCard: FC<SectionCardProps> = ({
         }}>
           <Icon size={z.icon} strokeWidth={2.25} />
         </span>
-        <div style={{
-          fontFamily: HEADLINE_FONT,
-          fontSize: z.titleSize, fontWeight: 800, letterSpacing: z.tracking,
-          textTransform: 'uppercase',
-          color: S.onSurface,
-        }}>
-          {title}
+        <div style={{ display: 'flex', alignItems: 'center', gap: z.gap, minWidth: 0 }}>
+          <div style={{
+            fontFamily: HEADLINE_FONT,
+            fontSize: z.titleSize, fontWeight: 800, letterSpacing: z.tracking,
+            textTransform: 'uppercase',
+            color: S.onSurface,
+          }}>
+            {title}
+          </div>
+          {info && (
+            <button type="button" aria-label={`About ${title}`} aria-expanded={showInfo}
+              aria-controls={infoId}
+              onClick={() => setShowInfo((v) => !v)}
+              style={{
+                // A 24 px target (WCAG 2.5.8) around a 12 px glyph; the margin
+                // keeps the glyph where the smaller button sat.
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                width: 24, height: 24, marginLeft: -3, border: 'none', borderRadius: 999, background: 'none',
+                color: S.onSurfaceVariant, cursor: 'pointer',
+              }}>
+              <Info size={12} strokeWidth={2.4} />
+            </button>
+          )}
         </div>
-        {info && (
-          <button type="button" aria-label={`About ${title}`} aria-expanded={showInfo}
-            aria-controls={infoId}
-            onClick={() => setShowInfo((v) => !v)}
-            style={{
-              // A 24 px target (WCAG 2.5.8) around a 12 px glyph; the margin
-              // keeps the glyph where the smaller button sat.
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: 24, height: 24, marginLeft: -3, border: 'none', borderRadius: 999, background: 'none',
-              color: S.onSurfaceVariant, cursor: 'pointer',
-            }}>
-            <Info size={12} strokeWidth={2.4} />
-          </button>
-        )}
         {right != null && <span style={{ marginLeft: 'auto', flexShrink: 0 }}>{right}</span>}
       </div>
       {info && showInfo && (
