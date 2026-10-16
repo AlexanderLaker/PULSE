@@ -102,7 +102,7 @@ the token's user up in `user_roles` (Authentication and roles, below).
 |---|---|---|
 | `GET /api/v1/health` | anonymous | Status, version, the commit the deployment was built from, driver count, whether a run exists and its id; when the database cannot be used, status `degraded` and the reason (`migration_pending`, `no_database`, `drivers_missing` or `db_error`) |
 | `GET /api/v1/diagnostics` | anonymous | Whether this instance reaches the database, how many runs it holds and whether the latest can be served, with the same reasons as `/health` when the database cannot be used; it names nothing about the database itself |
-| `GET /api/v1/drivers` | a role | Every driver with its scores, sources, PRISM Analysis (from `prism/analysis_texts.py`, which ships with the code), baseline and a summary of the expert proposals |
+| `GET /api/v1/drivers` | a role | Every driver with its scores, sources, names and PRISM Analysis (from `prism/driver_names.py` and `prism/analysis_texts.py`, which ship with the code), baseline and a summary of the expert proposals |
 | `PUT /api/v1/drivers/{id}` | admin | An edit of the fields sent, made on the driver revision the request names (409 when the driver changed since); an exposure map changes only the cells it names; every changed field goes to the audit log. Name, force and onset are not edited here, and a peak year must fall after the onset |
 | `GET /api/v1/drivers/{id}/proposals` | a role | The caller's own proposal, the aggregate across experts and who scored what |
 | `PUT /api/v1/drivers/{id}/proposals` | a role | Merges the fields sent into the caller's own proposal (a field sent as null is cleared); never changes the driver |
@@ -203,7 +203,7 @@ figures, lives in `data/content/`, is generated into `prism/` and reaches
 the browser through `GET /api/v1/journey` and `GET /api/v1/explorer`, which
 answer a user with a role and nobody else; the driver code map
 (`data/driverCodeMap.ts`) holds a driver id and a force per code and no
-text. Until the API has answered, the Consumer Journey and the Explorer show
+text; the drivers' names come with the drivers from `GET /api/v1/drivers`. Until the API has answered, the Consumer Journey and the Explorer show
 nothing of the content, and when the call fails they show an unavailable
 notice with "Try again".
 

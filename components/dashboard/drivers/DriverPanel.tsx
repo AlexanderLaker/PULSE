@@ -31,6 +31,7 @@ import {
   EditedChip, FIELD_HELP, FieldLabel, MetaChip, SourceItem, TIER_CONFIG, TIER_LEGEND, TIER_OPTIONS,
 } from './cards';
 import { ANALYSIS_FOOTNOTE, PrismAnalysisReading } from './PrismAnalysis';
+import { DriverHeading } from './DriverHeading';
 
 
 interface DriverPanelProps {
@@ -39,6 +40,8 @@ interface DriverPanelProps {
   updateDriver: (driverId: string, update: DriverUpdate) => Promise<void>;
   /** Told when the editor starts or stops holding unsaved edits. */
   onDirtyChange?: (driverId: string, dirty: boolean) => void;
+  /** Opens another driver by its code (a code cited in the boundary sentence). */
+  onOpenCode?: (code: string) => void;
 }
 
 // ─── The admin editor's working copy: every field an edit can send ──
@@ -129,7 +132,7 @@ const pillButton = (kind: 'primary' | 'secondary' | 'tonal', disabled = false): 
   minHeight: 32,
 });
 
-export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDriver, onDirtyChange }) => {
+export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDriver, onDirtyChange, onOpenCode }) => {
   const base = driver.baseline;
   // Set when the drivers could not be reloaded, after a save among others:
   // the panel may then show the driver as it was before that save.
@@ -302,6 +305,8 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
         borderTop: `1px solid ${S.cardBorder}`,
       }}
     >
+      <DriverHeading driver={driver} onOpenCode={onOpenCode} />
+
       {/* Meta row: direction, confidence, the Edited chip, the evidence summary, the save status */}
       <div style={{
         display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center',

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from prism import database
 from prism.analysis_texts import TEXTS as ANALYSIS_TEXTS
+from prism.driver_names import NAMES as DRIVER_NAMES
 from prism.api import state
 from prism.api.auth import identity_from_user, require_admin, require_auth
 from prism.api.proposals import build_proposal_summary, build_proposals_response
@@ -20,11 +21,18 @@ EXPOSURE_KEYS = {"category_exposure": CATEGORIES, "regional_exposure": REGIONS}
 router = APIRouter()
 
 
+#: The names a driver the base does not know carries: none, so the dashboard shows its technical scope.
+NO_NAMES = {"short_name": "", "long_name": "", "descriptor": "", "boundary": ""}
+
+
 def _driver_json(d, proposals: list, user_id: str) -> dict:
     return {
         "id": d.id,
         "force": d.force,
+        # The technical scope, the precise title the driver was reviewed under (docs/DRIVERS.md, Names).
         "name": d.name,
+        # The names ship with the code like the PRISM Analysis; a driver the base does not know has none.
+        **DRIVER_NAMES.get(d.id, NO_NAMES),
         "description": d.description,
         "direction": d.direction,
         "probability": d.probability,

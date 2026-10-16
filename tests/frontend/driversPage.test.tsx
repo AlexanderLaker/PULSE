@@ -4,7 +4,9 @@
  * states a failed load leaves, and the Expert Rating panel's own proposal.
  *
  *   - A drill-through replaces the search and clears the category filter,
- *     every time, even for the same driver twice.
+ *     every time, even for the same driver twice; one by code opens that
+ *     driver through the address, and a code in the search or in a boundary
+ *     sentence opens its driver without dropping an admin's unsaved edits.
  *   - A list that failed to load says so instead of "no drivers match".
  *   - A source names the host it is published on.
  *   - The Expert Rating panel cannot be edited before the expert's stored
@@ -17,10 +19,12 @@
  *     as the session ends.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen, cleanup, fireEvent, waitFor, act, within } from '@testing-library/react';
 import type { DriverProposal, DriverProposalsResponse } from '@/types';
 import type { PrismStore } from '@/hooks/usePrism';
-import { categoryMap, makeDriver, makeStore } from './fixtures/prism';
+import { BASE_BY_CODE, categoryMap, makeDriver, makeStore } from './fixtures/prism';
 
 const STORE = vi.hoisted(() => ({ current: null as PrismStore | null }));
 const API = vi.hoisted(() => ({ getDriverProposals: vi.fn(), saveMyProposal: vi.fn() }));
@@ -33,6 +37,13 @@ vi.mock('@/lib/apiClient', async (importOriginal) => ({
 }));
 
 import Drivers from '@/components/dashboard/Drivers';
+import { ViewUrlProvider } from '@/hooks/useViewUrl';
+import { drillThroughParams } from '@/lib/driverNames';
+
+/** The address a drill-through writes, as the initial address of a provider (no empty keys). */
+const drillThroughAddress = (query: string): Record<string, string> =>
+  Object.fromEntries(Object.entries(drillThroughParams(query)).filter((e): e is [string, string] => e[1] != null));
+import { TECHNICAL_SCOPE_LABEL } from '@/components/dashboard/drivers/DriverHeading';
 import { ExpertRatingPanel } from '@/components/dashboard/drivers/ExpertRating';
 import { SourceItem, sourceHost } from '@/components/dashboard/drivers/cards';
 import { settleProposalSaves } from '@/lib/proposalSaves';
@@ -65,13 +76,13 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const rows = () => screen.queryAllByRole('button', { name: /Private label|GLP-1/ }).map((b) => b.textContent);
+const rows = () => screen.queryAllByRole('button', { name: /Private Label Share Gain|GLP-1/ }).map((b) => b.textContent);
 
 describe('a drill-through from another view', () => {
   it('replaces the search and clears the category filter, every time it arrives', () => {
     const { rerender } = render(<Drivers search={{ query: 'GLP-1', seq: 1 }} />);
     expect(rows().some((t) => t?.includes('GLP-1'))).toBe(true);
-    expect(rows().some((t) => t?.includes('Private label'))).toBe(false);
+    expect(rows().some((t) => t?.includes('Private Label Share Gain'))).toBe(false);
 
     // The user clears the search and picks a category the GLP-1 driver is not exposed to.
     fireEvent.change(screen.getByPlaceholderText('Search drivers…'), { target: { value: '' } });
@@ -82,6 +93,228 @@ describe('a drill-through from another view', () => {
     rerender(<Drivers search={{ query: 'GLP-1', seq: 2 }} />);
     expect((screen.getByPlaceholderText('Search drivers…') as HTMLInputElement).value).toBe('GLP-1');
     expect(rows().some((t) => t?.includes('GLP-1'))).toBe(true);
+  });
+});
+
+describe("a driver's names on the Drivers page", () => {
+  /** The last line of an opened driver's head, which only an opened driver shows. */
+  const opened = (technicalScope: string) => `${TECHNICAL_SCOPE_LABEL}: ${technicalScope}`;
+
+  it('opens the driver whose code is typed into the search, in either case, and shows it alone', async () => {
+    render(<Drivers />);
+    fireEvent.change(screen.getByPlaceholderText('Search drivers…'), { target: { value: 'c-02' } });
+    expect(rows().some((t) => t?.includes('GLP-1'))).toBe(true);
+    expect(rows().some((t) => t?.includes('Private Label Share Gain'))).toBe(false);
+    expect(await screen.findByText(opened(GLP1.name))).toBeTruthy();
+
+    fireEvent.change(screen.getByPlaceholderText('Search drivers…'), { target: { value: 'C-01' } });
+    expect(rows().some((t) => t?.includes('GLP-1'))).toBe(false);
+    expect(await screen.findByText(opened(PRIVATE_LABEL.name))).toBeTruthy();
+  });
+
+  it('builds the address of a drill-through: a code names its driver, any other query only searches', () => {
+    expect(drillThroughParams('C-01')).toEqual({ q: 'C-01', driver: 'consumer_r01' });
+    expect(drillThroughParams('c-02')).toEqual({ q: 'c-02', driver: 'consumer_r02' });
+    expect(drillThroughParams('C-99')).toEqual({ q: 'C-99', driver: null });
+    expect(drillThroughParams('Private label')).toEqual({ q: 'Private label', driver: null });
+  });
+
+  it('opens the driver a drill-through hands over by its code, through the address', async () => {
+    // As DashboardApp's openDriver opens the page: the search, and the address it builds.
+    render(
+      <ViewUrlProvider initial={{ view: 'drivers', params: drillThroughAddress('C-01') }}>
+        <Drivers search={{ query: 'C-01', seq: 1 }} />
+      </ViewUrlProvider>);
+    expect(rows().some((t) => t?.includes('GLP-1'))).toBe(false);
+    expect(await screen.findByText(opened(PRIVATE_LABEL.name))).toBeTruthy();
+  });
+
+  it('opens the driver of a later drill-through on a page already open', async () => {
+    const ui = (seq: number) => (
+      <ViewUrlProvider initial={{ view: 'drivers', params: {} }}>
+        <Drivers search={seq ? { query: 'C-02', seq } : null} />
+      </ViewUrlProvider>);
+    const { rerender } = render(ui(0));
+    expect(screen.queryByText(opened(GLP1.name))).toBeNull();
+    // The dashboard writes the drill-through's address, then hands down the search.
+    await act(async () => {
+      window.history.pushState(null, '', '/dashboard?view=drivers&q=C-02&driver=consumer_r02');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    rerender(ui(1));
+    expect(rows().some((t) => t?.includes('Private Label Share Gain'))).toBe(false);
+    expect(await screen.findByText(opened(GLP1.name))).toBeTruthy();
+  });
+
+  it('opens a typed code past an active filter, which it clears', async () => {
+    render(
+      <ViewUrlProvider initial={{ view: 'drivers', params: { force: 'Government' } }}>
+        <Drivers />
+      </ViewUrlProvider>);
+    expect(rows()).toHaveLength(0);   // the Government filter hides both drivers
+    fireEvent.change(screen.getByPlaceholderText('Search drivers…'), { target: { value: 'C-02' } });
+    expect(await screen.findByText(opened(GLP1.name))).toBeTruthy();
+    expect(rows().some((t) => t?.includes('GLP-1'))).toBe(true);
+    expect(window.location.search).not.toContain('force=');
+    expect(window.location.search).toContain('driver=consumer_r02');
+  });
+
+  it('wires the drill-through to the address: DashboardApp opens the Drivers page with drillThroughParams', () => {
+    // The dashboard shell needs Clerk to render; this pins the one line the drill-through depends on.
+    const source = readFileSync(resolve(__dirname, '../../app/dashboard/DashboardApp.tsx'), 'utf-8');
+    expect(source).toMatch(/openView\('drivers', \{ push: true, params: drillThroughParams\(query\) \}\)/);
+  });
+
+  it('asks before a boundary link drops unsaved edits: Keep editing stays, Discard opens the cited driver', async () => {
+    const k01 = BASE_BY_CODE['K-01'];
+    STORE.current = makeStore({
+      drivers: [PRIVATE_LABEL, GLP1, makeDriver({ id: k01.driverId, force: 'Customer', name: k01.name })],
+    });
+    render(
+      <ViewUrlProvider initial={{ view: 'drivers', params: { driver: 'consumer_r01' } }}>
+        <Drivers isAdmin />
+      </ViewUrlProvider>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    fireEvent.change(screen.getByDisplayValue(PRIVATE_LABEL.description), { target: { value: 'My wording.' } });
+    const link = () => screen.getByRole('button', { name: `K-01 ${k01.shortName}` });
+    fireEvent.click(link());
+    fireEvent.click(within(screen.getByRole('dialog', { name: /Discard the edits/ })).getByRole('button', { name: 'Keep editing' }));
+    expect(screen.getByDisplayValue('My wording.')).toBeTruthy();
+    expect(screen.queryByText(opened(k01.name))).toBeNull();
+    fireEvent.click(link());
+    fireEvent.click(within(screen.getByRole('dialog', { name: /Discard the edits/ })).getByRole('button', { name: 'Discard' }));
+    expect(await screen.findByText(opened(k01.name))).toBeTruthy();
+    expect(screen.queryByDisplayValue('My wording.')).toBeNull();
+  });
+
+  it('moves the focus to the driver a boundary link opens, and Back returns to the driver that cited it', async () => {
+    const k01 = BASE_BY_CODE['K-01'];
+    STORE.current = makeStore({
+      drivers: [PRIVATE_LABEL, GLP1, makeDriver({ id: k01.driverId, force: 'Customer', name: k01.name })],
+    });
+    window.history.replaceState(null, '', '/dashboard?view=drivers&driver=consumer_r01');
+    render(
+      <ViewUrlProvider initial={{ view: 'drivers', params: { driver: 'consumer_r01' } }}>
+        <Drivers />
+      </ViewUrlProvider>);
+    fireEvent.click(await screen.findByRole('button', { name: `K-01 ${k01.shortName}` }));
+    await waitFor(() => expect(document.activeElement?.getAttribute('aria-expanded')).toBe('true'));
+    expect(document.activeElement?.textContent).toContain(k01.shortName);
+    // A link is a step in the history: Back goes to the driver that cited it.
+    await act(async () => {
+      window.history.back();
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(await screen.findByText(opened(PRIVATE_LABEL.name))).toBeTruthy();
+  });
+
+  it('asks once for a typed code: a keystroke that leaves the same code does not ask again', async () => {
+    render(
+      <ViewUrlProvider initial={{ view: 'drivers', params: { driver: 'consumer_r01' } }}>
+        <Drivers isAdmin />
+      </ViewUrlProvider>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    fireEvent.change(screen.getByDisplayValue(PRIVATE_LABEL.description), { target: { value: 'My wording.' } });
+    const search = screen.getByPlaceholderText('Search drivers…');
+    fireEvent.change(search, { target: { value: 'C-02' } });
+    fireEvent.click(within(screen.getByRole('dialog', { name: /Discard the edits/ })).getByRole('button', { name: 'Keep editing' }));
+    fireEvent.change(search, { target: { value: 'C-02 ' } });
+    expect(screen.queryByRole('dialog', { name: /Discard the edits/ })).toBeNull();
+    expect(screen.getByDisplayValue('My wording.')).toBeTruthy();
+  });
+
+  it('asks before a code in the search drops an admin\'s unsaved edits', async () => {
+    render(
+      <ViewUrlProvider initial={{ view: 'drivers', params: { driver: 'consumer_r01' } }}>
+        <Drivers isAdmin />
+      </ViewUrlProvider>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    fireEvent.change(screen.getByDisplayValue(PRIVATE_LABEL.description), { target: { value: 'My wording.' } });
+    fireEvent.change(screen.getByPlaceholderText('Search drivers…'), { target: { value: 'C-02' } });
+    const dialog = screen.getByRole('dialog', { name: /Discard the edits/ });
+    expect(screen.getByDisplayValue('My wording.')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Discard' }));
+    expect(await screen.findByText(opened(GLP1.name))).toBeTruthy();
+    expect(screen.queryByDisplayValue('My wording.')).toBeNull();
+  });
+
+  it('finds a driver by its long name, its descriptor and its technical scope', () => {
+    render(<Drivers />);
+    const search = screen.getByPlaceholderText('Search drivers…');
+    for (const query of [BASE_BY_CODE['C-02'].longName, BASE_BY_CODE['C-02'].descriptor, 'reshapes personal-care']) {
+      fireEvent.change(search, { target: { value: query } });
+      expect(rows().some((t) => t?.includes('GLP-1'))).toBe(true);
+      expect(rows().some((t) => t?.includes('Private Label Share Gain'))).toBe(false);
+    }
+  });
+
+  it('opens a driver that a boundary sentence cites', async () => {
+    const k01 = BASE_BY_CODE['K-01'];
+    STORE.current = makeStore({
+      drivers: [PRIVATE_LABEL, GLP1, makeDriver({ id: k01.driverId, force: 'Customer', name: k01.name })],
+    });
+    render(
+      <ViewUrlProvider initial={{ view: 'drivers', params: drillThroughAddress('C-01') }}>
+        <Drivers search={{ query: 'C-01', seq: 1 }} />
+      </ViewUrlProvider>);
+    fireEvent.click(await screen.findByRole('button', { name: `K-01 ${k01.shortName}` }));
+    expect(await screen.findByText(opened(k01.name))).toBeTruthy();
+    expect((screen.getByPlaceholderText('Search drivers…') as HTMLInputElement).value).toBe('K-01');
+    expect(screen.queryByText(opened(PRIVATE_LABEL.name))).toBeNull();
+    expect(window.location.search).toContain(`driver=${k01.driverId}`);
+  });
+
+  it('labels a cited code with the code alone until the drivers it names have loaded', async () => {
+    render(
+      <ViewUrlProvider initial={{ view: 'drivers', params: { driver: 'consumer_r01' } }}>
+        <Drivers />
+      </ViewUrlProvider>);
+    expect(await screen.findByRole('button', { name: 'K-01' })).toBeTruthy();
+  });
+
+  it('opens a cited driver in Expert Rating and in Review & Endorse as well', async () => {
+    const k01 = BASE_BY_CODE['K-01'];
+    STORE.current = makeStore({
+      drivers: [PRIVATE_LABEL, GLP1, makeDriver({ id: k01.driverId, force: 'Customer', name: k01.name })],
+    });
+    for (const mode of ['rating', 'review']) {
+      const { unmount } = render(
+        <ViewUrlProvider initial={{ view: 'drivers', params: { driver: 'consumer_r01', mode } }}>
+          <Drivers isAdmin />
+        </ViewUrlProvider>);
+      // once the proposals have loaded, when the panel's head is the one that stays
+      await waitFor(() => expect(screen.queryByText(/^Loading/)).toBeNull());
+      fireEvent.click(await screen.findByRole('button', { name: `K-01 ${k01.shortName}` }));
+      expect(await screen.findByText(opened(k01.name))).toBeTruthy();
+      expect(screen.getByRole('tab', { selected: true }).textContent).toBe(
+        mode === 'rating' ? 'Expert Rating' : 'Review & Endorse');
+      unmount();
+    }
+  });
+
+  it('sorts the Driver column by short name, not by technical scope', () => {
+    const x15 = BASE_BY_CODE['X-15'];
+    STORE.current = makeStore({
+      drivers: [PRIVATE_LABEL, GLP1, makeDriver({ id: x15.driverId, force: 'Competitive', name: x15.name })],
+    });
+    render(<Drivers />);
+    const shortNames = [x15.shortName, BASE_BY_CODE['C-02'].shortName, BASE_BY_CODE['C-01'].shortName];
+    const order = () => screen.getAllByRole('button', { name: new RegExp(shortNames.join('|')) })
+      .map((row) => shortNames.find((n) => row.textContent?.includes(n)));
+    fireEvent.click(screen.getByRole('button', { name: /^Sort by Driver/ }));
+    // By technical scope X-15 ("Scale-leader innovation ...") would come last.
+    expect(order()).toEqual(shortNames);
+  });
+
+  it('opens the glossary of the names from the helper line and closes it with Escape or Close', () => {
+    render(<Drivers />);
+    fireEvent.click(screen.getByRole('button', { name: 'How the driver names work' }));
+    expect(within(screen.getByRole('dialog', { name: 'How the driver names work' })).getByText('Share Gain')).toBeTruthy();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'How the driver names work' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
 
@@ -121,7 +354,7 @@ describe('the states around the list', () => {
       + 'The list shows them as they were last loaded.Try again');
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(STORE.current.reload).toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Private Label Share Gain/ }));
     expect(await screen.findByText('The drivers could not be reloaded, so this may not show the latest save.')).toBeTruthy();
 
     // While the database cannot be used, the service notice says it for every view.
@@ -146,7 +379,7 @@ describe('the admin editor', () => {
     const driver = makeDriver({ revision: 7, category_exposure: categoryMap({ 'Hair: Care': 5, 'Hair: Color': 2 }) });
     STORE.current = makeStore({ drivers: [driver] });
     render(<Drivers isAdmin />);
-    fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Private Label Share Gain/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
     const color = screen.getByRole('radiogroup', { name: 'Hair: Color exposure: 2 of 5' });
     fireEvent.click(within(color).getByRole('radio', { name: '4 of 5' }));
@@ -164,7 +397,7 @@ describe('the admin editor', () => {
     const updateDriver = vi.fn<PrismStore['updateDriver']>(() => new Promise((resolve) => { resolveSave = resolve; }));
     STORE.current = makeStore({ drivers: [driver], updateDriver });
     const { rerender } = render(<Drivers isAdmin />);
-    fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Private Label Share Gain/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
     fireEvent.change(screen.getByDisplayValue(driver.description), { target: { value: 'My wording.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -180,7 +413,7 @@ describe('the admin editor', () => {
     const driver = makeDriver({ revision: 7 });
     STORE.current = makeStore({ drivers: [driver] });
     const { rerender } = render(<Drivers isAdmin />);
-    fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Private Label Share Gain/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
     fireEvent.change(screen.getByDisplayValue(driver.description), { target: { value: 'My wording.' } });
     // Another save reaches the driver first; the store brings it.
@@ -203,7 +436,7 @@ describe('the admin editor', () => {
     const updateDriver = vi.fn<PrismStore['updateDriver']>(() => new Promise((resolve) => { resolveSave = resolve; }));
     STORE.current = makeStore({ drivers: [driver], updateDriver });
     render(<Drivers isAdmin />);
-    fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Private Label Share Gain/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
     fireEvent.change(screen.getByDisplayValue(driver.description), { target: { value: 'My wording.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -218,7 +451,7 @@ describe('the admin editor', () => {
     const driver = makeDriver({ revision: 7 });
     STORE.current = makeStore({ drivers: [driver] });
     render(<Drivers isAdmin />);
-    fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Private Label Share Gain/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
     expect(screen.getByRole('button', { name: 'Comm' }).getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: 'Mktg' }));
@@ -233,7 +466,7 @@ describe('the admin editor checks what the API would refuse', () => {
   async function openEditor(driver = makeDriver({ revision: 7 })) {
     STORE.current = makeStore({ drivers: [driver] });
     render(<Drivers isAdmin />);
-    fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Private Label Share Gain/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
     return driver;
   }
@@ -292,7 +525,7 @@ describe('the admin editor checks what the API would refuse', () => {
 function openExpertRating() {
   render(<Drivers />);
   fireEvent.click(screen.getByRole('tab', { name: /Expert Rating/ }));
-  fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Private Label Share Gain/ }));
 }
 
 const probabilityDot = (n: number) =>

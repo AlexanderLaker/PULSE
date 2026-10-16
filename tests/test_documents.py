@@ -28,7 +28,7 @@ from prism.config import (BASE_YEAR, BETA_PRIOR_FLOOR, CATEGORIES, DEFAULT_CELL_
                           VALID_DIFFUSION_CURVES, ModelConfig, beta_prior_for, cell_weight_marginals,
                           compute_materialization_schedule)
 from prism.config_validation import SUM_TOLERANCE, model_config_problems
-from prism.driver_base import load_base
+from prism.driver_base import NAME_LIMITS, load_base
 from prism.drivers import DriverSet
 from prism.input_drift import WARNING_CHANGES
 from prism.seed_drivers import get_seed_drivers
@@ -82,6 +82,15 @@ def test_the_driver_counts():
                   f'`"driver_count": {n}`')
     table = re.findall(r"^\| (\w+)[^|\n]*\| [A-Z] \| (\d+) \|$", source("docs/DRIVERS.md"), re.M)
     assert {force: int(count) for force, count in table} == dict(by_force)
+
+
+def test_the_name_limits():
+    """The lengths docs/DRIVERS.md gives a driver's names are the ones prism/driver_base.py holds them to."""
+    assert_quotes("docs/DRIVERS.md",
+                  f"at most {NAME_LIMITS['short_name']} characters: the name people quote",
+                  f"at most {NAME_LIMITS['long_name']} characters, in sentence case",
+                  f"one sentence of at most {NAME_LIMITS['descriptor']} characters",
+                  f"(`boundary`, at most {NAME_LIMITS['boundary']} characters)")
 
 
 def test_the_sec_filings_graded_s():

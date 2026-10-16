@@ -140,6 +140,57 @@ class TestBaseValidation:
         with pytest.raises(InvalidBaseError, match=words):
             validate(bad, NUMBERING)
 
+    @pytest.mark.parametrize("change, words", [
+        ({"short_name": " "}, "C-01: no short name"),
+        ({"short_name": "Private Label Share Gain Now"[:27] + "ss"}, "short name longer than 28 characters"),
+        ({"long_name": "Private label takes share from brands in every channel now"},
+         "long name longer than 55 characters"),
+        ({"descriptor": "Private label is at record grocery share in Europe and adds premium tiers that compete "
+                        "with brands now."}, "descriptor longer than 100 characters"),
+        ({"descriptor": "Private label is at record grocery share in Europe"},
+         "descriptor does not end with a full stop"),
+        ({"long_name": "Private label takes share from brands."}, "long name ends with a full stop"),
+        ({"short_name": "Private Label  Share Gain"}, "has spaces at its ends or doubled"),
+        ({"boundary": "Counted in other drivers: a driver that left the base (C-99)."},
+         "cites C-99, which is not a driver of the base"),
+        ({"boundary": "Counted in other drivers: its own premium tiers (C-01)."}, "cites the driver itself"),
+        ({"boundary": "See K-01 for the discount channel's price ceiling."}, "does not open with"),
+        ({"boundary": "Counted in other drivers: the discount channel's price ceiling, K-01."},
+         "must cite each other driver by its code in brackets"),
+        ({"boundary": "Counted in other drivers: " + "a neighbouring effect (K-01), " * 8 + "and dupes (C-11)."},
+         "boundary longer than 240 characters"),
+    ])
+    def test_names_the_dashboard_could_not_show_are_refused(self, change, words):
+        """The short name, long name, descriptor and boundary sentence fit their place on the page
+        (NAME_LIMITS), and a boundary sentence cites only other drivers of the base."""
+        bad = copy.deepcopy(json.loads(BASE.read_text(encoding="utf-8"))["drivers"])
+        assert bad[0]["code"] == "C-01"
+        bad[0].update(change)
+        with pytest.raises(InvalidBaseError, match=words):
+            validate(bad, NUMBERING)
+
+    @pytest.mark.parametrize("field", ["short_name", "long_name", "descriptor"])
+    def test_a_driver_without_one_of_its_names_is_refused(self, field):
+        bad = copy.deepcopy(json.loads(BASE.read_text(encoding="utf-8"))["drivers"])
+        del bad[0][field]
+        with pytest.raises(InvalidBaseError, match=f"C-01: no {field}"):
+            validate(bad, NUMBERING)
+
+    @pytest.mark.parametrize("field, words", [("short_name", "two drivers have the short name"),
+                                              ("long_name", "two drivers have the long name")])
+    def test_two_drivers_never_share_a_name(self, field, words):
+        bad = copy.deepcopy(json.loads(BASE.read_text(encoding="utf-8"))["drivers"])
+        bad[1][field] = bad[0][field].upper()
+        with pytest.raises(InvalidBaseError, match=words):
+            validate(bad, NUMBERING)
+
+    def test_a_driver_without_a_boundary_sentence_is_accepted(self):
+        drivers = copy.deepcopy(json.loads(BASE.read_text(encoding="utf-8"))["drivers"])
+        assert sum("boundary" in d for d in drivers) > 0
+        for d in drivers:
+            d.pop("boundary", None)
+        validate(drivers, NUMBERING)
+
     def test_a_number_is_never_given_to_a_second_driver(self):
         """Every number up to a force's highest is a driver's or retired, and none is above it: a new driver
         can take only the next number and raises the highest, and a driver that leaves must retire its number,
@@ -149,7 +200,9 @@ class TestBaseValidation:
 
         def added(number: int) -> list:
             new = copy.deepcopy(technology)
-            new.update(id=f"technology_r{number}", code=f"T-{number}")
+            # a new driver brings names of its own: two drivers never share one
+            new.update(id=f"technology_r{number}", code=f"T-{number}", short_name=f"Test Driver {number}",
+                       long_name=f"A test driver numbered {number}")
             return drivers + [new]
 
         def numbering(force: str, **record) -> dict:
@@ -203,6 +256,25 @@ class TestCodeMap:
             assert info == {"driverId": d.id, "force": d.force}, code
         source = CODEMAP.read_text(encoding="utf-8")
         assert not any(d.name in source or d.description[:60] in source for d in drivers.values())
+        base = json.loads(BASE.read_text(encoding="utf-8"))["drivers"]
+        assert not any(d["short_name"] in source or d["long_name"] in source for d in base)
+
+    def test_the_names_module_carries_each_drivers_names(self):
+        """The API serves a driver's short name, long name, descriptor and boundary sentence from the
+        generated module, so each must be there exactly as the base holds it."""
+        from prism.driver_names import NAMES
+        base = {d["id"]: d for d in json.loads(BASE.read_text(encoding="utf-8"))["drivers"]}
+        assert set(NAMES) == set(base)
+        for driver_id, names in NAMES.items():
+            d = base[driver_id]
+            assert names == {"short_name": d["short_name"], "long_name": d["long_name"],
+                             "descriptor": d["descriptor"], "boundary": d.get("boundary", "")}, driver_id
+        assert sum(bool(n["boundary"]) for n in NAMES.values()) == sum("boundary" in d for d in base.values()) > 0
+
+    def test_the_names_stay_out_of_the_seed(self):
+        """The seed module, and so the database, carry only the technical scope (name)."""
+        src = (REPO / "prism" / "seed_drivers.py").read_text(encoding="utf-8")
+        assert all(word not in src for word in ("short_name", "long_name", "descriptor", "boundary"))
 
     def test_display_codes_come_from_the_id_and_the_force(self):
         assert display_code("consumer_r01", "Consumer") == "C-01"

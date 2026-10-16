@@ -36,7 +36,7 @@ window.scrollTo = (() => {}) as typeof window.scrollTo;
 
 afterEach(() => cleanup());
 
-const ROW = /Private label structural penetration/;
+const ROW = /Private Label Share Gain/;
 
 function openPanel(overrides: Partial<Driver> = {}, store: Partial<PrismStore> = {}) {
   const driver = makeDriver({ revision: 3, ...overrides });

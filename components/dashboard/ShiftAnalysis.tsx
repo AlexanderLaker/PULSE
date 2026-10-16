@@ -89,7 +89,7 @@ const parseCategory = (v: string | undefined): string | null => (v && CATEGORY_N
 const ShiftAnalysis: FC<{
   /** Admins see the operational reason when there is no run to show. */
   isAdmin?: boolean;
-  /** Opens the Drivers page searched for a driver's name; the drill-down's driver cards use it. */
+  /** Opens a driver on the Drivers page by its code; the drill-down's driver cards use it. */
   onNavigateToDriver?: (query: string) => void;
 }> = ({ isAdmin = false, onNavigateToDriver }) => {
   const {

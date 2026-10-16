@@ -34,6 +34,45 @@ highest to be a driver's or retired, never both, and none to be above it: a
 new driver takes the next number and raises the highest to it, and a driver
 that leaves moves its number to the retired list in the same change.
 
+## Names
+
+A driver has four names, each for its own place on the page:
+
+| Name | Base field | Rule | Where it shows |
+|---|---|---|---|
+| Short name | `short_name` | two to four words, at most 28 characters: the name people quote | wherever the dashboard names the driver: the Drivers list, the drill-down's contributing drivers, the Consumer Journey's driver cards, the Journey editor's list and both CSV exports |
+| Long name | `long_name` | at most 55 characters, in sentence case: who or what acts and what changes | under the short name in the Drivers list, on the Journey's driver cards and on the five top-ranked drill-down cards |
+| Descriptor | `descriptor` | one sentence of at most 100 characters: what the driver covers | the head of an opened driver in all three modes (under the mode's own header in Expert Rating and Review & Endorse), and the hover on a short name |
+| Technical scope | `name` | the precise title the driver was reviewed under | in an opened driver under the descriptor, labelled "Technical scope (the name until now)" |
+
+A driver that readers confuse with a neighbour also carries a boundary
+sentence (`boundary`, at most 240 characters). It opens with "Counted in
+other drivers:" and names each neighbouring effect with the code of the
+driver that carries it in brackets. It shows under the descriptor, each code
+as a link to that driver with its short name.
+
+The names are part of the base. `scripts/generate_seed.py` writes them into
+`prism/driver_names.py`, and the API serves them with every driver
+(`short_name`, `long_name`, `descriptor`, `boundary`) the way it serves the
+PRISM Analysis; no database holds them and no edit can change them, so a
+changed name reaches every database with the next deploy. A driver the base
+does not know gets empty names and shows its technical scope instead. The
+code map carries no name, since it ships in the dashboard's public code;
+where a view has only a code (a link in a boundary sentence, the Journey
+editor), it takes the names from the drivers it has loaded and shows the
+code alone until they arrive. The short
+and long names never end in a full stop and are unique in the base; the
+descriptor and the boundary sentence are sentences; a boundary sentence cites
+only other drivers of the base. `prism/driver_base.py` checks all of it.
+
+The Drivers page searches the code, the four names, the description and the
+force; a search that is exactly a code (`C-01`) shows that driver alone and
+opens it, and the other views open a driver on the Drivers page by its code.
+The Driver column sorts by short name, so the names that share a first word
+(AI, EU, European, High-Growth, US, Competitor) sit together. A link in the
+page's helper line opens a glossary of the words the short names end in and
+of EU against European.
+
 ## Fields
 
 The scores feed the model (docs/MODEL.md shows how); the texts and sources
@@ -41,7 +80,7 @@ explain them.
 
 | Field | Values | Meaning |
 |---|---|---|
-| `name` | text | A one-line statement of the mechanism |
+| `name` | text | The technical scope: the precise title the driver was reviewed under, with its laws, dates and regions (Names, above) |
 | `description` | text | The evidence and the reasoning, with dated figures |
 | `direction` | Expansion, Contraction | Whether the driver grows or shrinks the pool |
 | `probability` | 1 to 5 | How likely the effect is to materialise as described. The prior's mean is probability / 6: a 5 means five in six, not certainty |
@@ -149,16 +188,19 @@ them, and on top of those the id and code pattern, the numbering above, an
 onset and a peak inside the horizon, a known confidence, and sources the
 editor can save again (a title, an http(s) link, a tier on the scale or
 none, within the API's lengths), at least one of them of tier S, A or B.
-`scripts/generate_seed.py` writes two files from it that are never edited by
-hand:
+`scripts/generate_seed.py` writes three files from it that are never edited
+by hand:
 
 - `prism/seed_drivers.py`: the drivers a new database is seeded with, each
   with its baseline, the scores the Edited chip compares against;
 - `data/driverCodeMap.ts`: display code to driver id and force, and nothing
   else of the driver: the map ships in the dashboard's public code, so the
   names, directions and descriptions come from the drivers the API serves.
+- `prism/driver_names.py`: each driver's short name, long name, descriptor
+  and boundary sentence by driver id, which the API serves with the stored
+  drivers (Names, above).
 
-`generate_seed.py --check` fails when either differs from what the base
+`generate_seed.py --check` fails when any of them differs from what the base
 produces; CI runs it. Each driver's PRISM Analysis text is built from the
 base as well, by `scripts/build_driver_analysis.py` (docs/DRIVER_ANALYSIS.md),
 which writes `prism/analysis_texts.py`, the texts the API serves with the
@@ -205,8 +247,9 @@ texts. After an edit to `driver_base.json`, in this order:
 2. if a score, an exposure or the set of drivers changed, regenerate the
    PRISM Analysis as docs/DRIVER_ANALYSIS.md describes; an added driver needs
    its template in `data/drivers/driver_analysis.json` first;
-3. run `scripts/generate_seed.py`. A changed source needs only this step, a
-   changed description this step and step 4. A changed name also needs
+3. run `scripts/generate_seed.py`. A changed source, short name, long name,
+   descriptor or boundary sentence needs only this step, a changed
+   description this step and step 4. A changed technical scope (`name`) also needs
    `python3 scripts/build_driver_analysis.py` (without `--reference`: the
    attribution record carries each driver's name, the reference run does
    not depend on it). A changed score, exposure or set of drivers moves the

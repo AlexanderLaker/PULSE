@@ -83,8 +83,8 @@ describe('the filters and the count', () => {
     fireEvent.click(government);
     expect(government.getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByText('1 of 3 drivers')).toBeTruthy();
-    expect(rowNames().some((t) => t.includes('Packaging regulation'))).toBe(true);
-    expect(rowNames().some((t) => t.includes('Private label'))).toBe(false);
+    expect(rowNames().some((t) => t.includes('Packaging Rules & Fees'))).toBe(true);
+    expect(rowNames().some((t) => t.includes('Private Label Share Gain'))).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
     expect(screen.getByText('3 drivers')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Clear' })).toBeNull();
@@ -128,7 +128,7 @@ describe('the table', () => {
     expect(within(first).getByText('C-01')).toBeTruthy();
     expect(within(first).getByText('Consumer')).toBeTruthy();
     expect(within(first).getByText('22.0%')).toBeTruthy();
-    expect(rowButton(/Private label structural penetration/).getAttribute('aria-expanded')).toBe('false');
+    expect(rowButton(/Private Label Share Gain/).getAttribute('aria-expanded')).toBe('false');
   });
 });
 
@@ -139,7 +139,7 @@ describe('the address bar', () => {
   it('opens on the mode and the driver the address names', async () => {
     withUrl(<Drivers />, { mode: 'rating', driver: 'consumer_r01' });
     expect(screen.getByRole('tab', { name: /Expert Rating/ }).getAttribute('aria-selected')).toBe('true');
-    expect(rowButton(/Private label structural penetration/).getAttribute('aria-expanded')).toBe('true');
+    expect(rowButton(/Private Label Share Gain/).getAttribute('aria-expanded')).toBe('true');
     expect(await screen.findByText(/Expert Rating · your proposal/)).toBeTruthy();
   });
 
@@ -152,7 +152,7 @@ describe('the address bar', () => {
   it('writes a toggled row, the mode and the search back to the address', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     withUrl(<Drivers />, {});
-    fireEvent.click(rowButton(/GLP-1 adoption/));
+    fireEvent.click(rowButton(/GLP-1 Hair & Beauty Demand/));
     expect(window.location.search).toBe('?view=drivers&driver=consumer_r02');
     fireEvent.click(screen.getByRole('tab', { name: /Expert Rating/ }));
     expect(window.location.search).toBe('?view=drivers&driver=consumer_r02&mode=rating');
@@ -178,23 +178,25 @@ describe('the CSV export', () => {
     const filter = 'Filter: force Consumer; in the base order';
     const { preamble, header, rows } = driversCsvParts([PRIVATE_LABEL], filter, new Date('2026-10-15T12:00:00Z'));
     expect(preamble).toEqual([['PRISM drivers'], ['15 Oct 2026'], [filter], [CSV_NOTE]]);
-    expect(header.slice(0, 12)).toEqual([
-      'id', 'code', 'name', 'force', 'direction', 'confidence', 'probability', 'GP1 % affected', 'expected effect',
+    expect(header.slice(0, 14)).toEqual([
+      'id', 'code', 'short name', 'long name', 'technical scope', 'force', 'direction', 'confidence', 'probability',
+      'GP1 % affected', 'expected effect',
       'peak year', 'diffusion curve', 'uncertainty',
     ]);
     expect(header).toContain('Fabric Clean (FCN) exposure');
     expect(header).toContain('Europe exposure');
     expect(header.slice(-3)).toEqual(['value-chain epicentre', 'sources', 'edited']);
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.slice(0, 12)).toEqual([
-      'consumer_r01', 'C-01', 'Private label structural penetration', 'Consumer', 'Contraction', 'Medium',
+    expect(rows[0]!.slice(0, 14)).toEqual([
+      'consumer_r01', 'C-01', 'Private Label Share Gain', 'Private label takes share from brands',
+      'Private label structural penetration', 'Consumer', 'Contraction', 'Medium',
       '5', '22.0%', '-18.3%', '2030', 'S-Curve', '2',
     ]);
     expect(rows[0]!.slice(-3)).toEqual(['Commercial', '1', 'no']);
     const text = driversCsvText([PRIVATE_LABEL], filter, new Date('2026-10-15T12:00:00Z'));
     // The note holds commas, so it is quoted; an empty line separates the preamble from the table.
     expect(text.split('\r\n').slice(0, 5)).toEqual(['PRISM drivers', '15 Oct 2026', filter, `"${CSV_NOTE}"`, '']);
-    expect(text.split('\r\n')[5]).toMatch(/^id,code,name,force,/);
+    expect(text.split('\r\n')[5]).toMatch(/^id,code,short name,long name,technical scope,force,/);
   });
 });
 
@@ -202,7 +204,7 @@ describe('a radio group', () => {
   it('has one tab stop and moves the check with the arrow keys', async () => {
     STORE.current = makeStore({ drivers: [makeDriver({ category_exposure: categoryMap({ 'Hair: Color': 2 }) })] });
     render(<Drivers isAdmin />);
-    fireEvent.click(rowButton(/Private label structural penetration/));
+    fireEvent.click(rowButton(/Private Label Share Gain/));
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
     const group = screen.getByRole('radiogroup', { name: 'Hair: Color exposure: 2 of 5' });
     const radios = within(group).getAllByRole('radio');
@@ -218,7 +220,7 @@ describe('a radio group', () => {
 
   it('marks the baseline score on its dot', async () => {
     render(<Drivers isAdmin />);
-    fireEvent.click(rowButton(/Private label structural penetration/));
+    fireEvent.click(rowButton(/Private Label Share Gain/));
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
     const group = screen.getByRole('radiogroup', { name: 'Hair: Care exposure: 3 of 5' });
     expect(within(group).getByText('Baseline 3 of 5')).toBeTruthy();
@@ -239,7 +241,7 @@ describe('Expert Rating', () => {
     expect(screen.getByRole('status').textContent).toBe('1 of 3 rated');
     fireEvent.click(screen.getByRole('button', { name: 'Not rated' }));
     expect(screen.getByText('2 of 3 drivers')).toBeTruthy();
-    expect(rowNames().some((t) => t.includes('Private label'))).toBe(false);
+    expect(rowNames().some((t) => t.includes('Private Label Share Gain'))).toBe(false);
   });
 
   it('keeps the row being scored in the list under "Not rated" until another opens', async () => {
@@ -249,7 +251,7 @@ describe('Expert Rating', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Expert Rating/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Not rated' }));
     expect(screen.getByText('3 of 3 drivers')).toBeTruthy();
-    fireEvent.click(rowButton(/Private label structural penetration/));
+    fireEvent.click(rowButton(/Private Label Share Gain/));
     const group = await screen.findByRole('radiogroup', { name: /^Probability/ });
     fireEvent.click(within(group).getByRole('radio', { name: '4 of 5' }));
     const slider = screen.getByRole('slider', { name: /GP1/ });
@@ -258,11 +260,11 @@ describe('Expert Rating', () => {
     fireEvent.click(within(hair).getByRole('radio', { name: '4 of 5' }));
     // Rated now, and still open in the list.
     expect(screen.getByText('1 of 3 rated')).toBeTruthy();
-    expect(rowButton(/Private label structural penetration/).getAttribute('aria-expanded')).toBe('true');
-    expect(rowNames().some((t) => t.includes('Private label'))).toBe(true);
+    expect(rowButton(/Private Label Share Gain/).getAttribute('aria-expanded')).toBe('true');
+    expect(rowNames().some((t) => t.includes('Private Label Share Gain'))).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Next unrated' }));
-    await waitFor(() => expect(rowNames().some((t) => t.includes('Private label'))).toBe(false));
-    expect(rowButton(/GLP-1 adoption/).getAttribute('aria-expanded')).toBe('true');
+    await waitFor(() => expect(rowNames().some((t) => t.includes('Private Label Share Gain'))).toBe(false));
+    expect(rowButton(/GLP-1 Hair & Beauty Demand/).getAttribute('aria-expanded')).toBe('true');
   });
 
   it('moves to the next unrated driver in the list order, and says when none is left', async () => {
@@ -271,10 +273,10 @@ describe('Expert Rating', () => {
     STORE.current = ratedStore();
     render(<Drivers />);
     fireEvent.click(screen.getByRole('tab', { name: /Expert Rating/ }));
-    fireEvent.click(rowButton(/Private label structural penetration/));
+    fireEvent.click(rowButton(/Private Label Share Gain/));
     fireEvent.click(await screen.findByRole('button', { name: 'Next unrated' }));
-    expect(rowButton(/Private label structural penetration/).getAttribute('aria-expanded')).toBe('false');
-    expect(rowButton(/GLP-1 adoption/).getAttribute('aria-expanded')).toBe('true');
+    expect(rowButton(/Private Label Share Gain/).getAttribute('aria-expanded')).toBe('false');
+    expect(rowButton(/GLP-1 Hair & Beauty Demand/).getAttribute('aria-expanded')).toBe('true');
 
     cleanup();
     STORE.current = makeStore({ drivers: [
@@ -283,7 +285,7 @@ describe('Expert Rating', () => {
     ] });
     render(<Drivers />);
     fireEvent.click(screen.getByRole('tab', { name: /Expert Rating/ }));
-    fireEvent.click(rowButton(/Private label structural penetration/));
+    fireEvent.click(rowButton(/Private Label Share Gain/));
     const next = await screen.findByRole('button', { name: 'Next unrated' }) as HTMLButtonElement;
     expect(next.disabled).toBe(true);
     expect(screen.getByText('Every other driver in this list is rated')).toBeTruthy();
@@ -294,7 +296,7 @@ describe('Expert Rating', () => {
     API.saveMyProposal.mockRejectedValueOnce(new Error('offline')).mockImplementation(async (id: string) => response(id, null));
     render(<Drivers />);
     fireEvent.click(screen.getByRole('tab', { name: /Expert Rating/ }));
-    fireEvent.click(rowButton(/Private label structural penetration/));
+    fireEvent.click(rowButton(/Private Label Share Gain/));
     const group = await screen.findByRole('radiogroup', { name: /^Probability/ });
     fireEvent.click(within(group).getByRole('radio', { name: '4 of 5' }));
     await act(async () => { vi.advanceTimersByTime(700); });
@@ -309,7 +311,7 @@ describe('Expert Rating', () => {
 describe('the unsaved-edit guard', () => {
   async function startEditing() {
     render(<Drivers isAdmin />);
-    fireEvent.click(rowButton(/Private label structural penetration/));
+    fireEvent.click(rowButton(/Private Label Share Gain/));
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
     fireEvent.change(screen.getByDisplayValue(PRIVATE_LABEL.description), { target: { value: 'My wording.' } });
   }
@@ -317,12 +319,12 @@ describe('the unsaved-edit guard', () => {
   it('asks before a row toggle drops the edits, and Keep editing keeps them', async () => {
     await startEditing();
     expect(screen.getByText('Unsaved changes')).toBeTruthy();
-    fireEvent.click(rowButton(/Private label structural penetration/));
-    const dialog = screen.getByRole('dialog', { name: 'Discard the edits to Private label structural penetration?' });
+    fireEvent.click(rowButton(/Private Label Share Gain/));
+    const dialog = screen.getByRole('dialog', { name: 'Discard the edits to Private Label Share Gain?' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Keep editing' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getByDisplayValue('My wording.')).toBeTruthy();
-    expect(rowButton(/Private label structural penetration/).getAttribute('aria-expanded')).toBe('true');
+    expect(rowButton(/Private Label Share Gain/).getAttribute('aria-expanded')).toBe('true');
   });
 
   it('asks before a mode change, and Discard goes ahead', async () => {
@@ -338,19 +340,19 @@ describe('the unsaved-edit guard', () => {
 
   it('does not ask when nothing was edited', async () => {
     render(<Drivers isAdmin />);
-    fireEvent.click(rowButton(/Private label structural penetration/));
+    fireEvent.click(rowButton(/Private Label Share Gain/));
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
     expect(screen.getByText('No changes yet')).toBeTruthy();
-    fireEvent.click(rowButton(/Private label structural penetration/));
+    fireEvent.click(rowButton(/Private Label Share Gain/));
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(rowButton(/Private label structural penetration/).getAttribute('aria-expanded')).toBe('false');
+    expect(rowButton(/Private Label Share Gain/).getAttribute('aria-expanded')).toBe('false');
   });
 
   it('keeps a dirty row in the list when a search or filter would drop it', async () => {
     await startEditing();
     fireEvent.change(screen.getByPlaceholderText('Search drivers…'), { target: { value: 'GLP' } });
     expect(screen.getByText('2 of 3 drivers')).toBeTruthy();   // GLP-1 and the pinned editor
-    expect(rowButton(/GLP-1 adoption/)).toBeTruthy();
+    expect(rowButton(/GLP-1 Hair & Beauty Demand/)).toBeTruthy();
     expect(screen.getByDisplayValue('My wording.')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Government' }));
     expect(screen.getByText('1 of 3 drivers')).toBeTruthy();   // the pinned editor alone (the search still applies)
@@ -372,7 +374,7 @@ describe('the unsaved-edit guard', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Discard' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(window.location.search).toBe('?view=drivers');
-    expect(rowButton(/Private label structural penetration/).getAttribute('aria-expanded')).toBe('false');
+    expect(rowButton(/Private Label Share Gain/).getAttribute('aria-expanded')).toBe('false');
   });
 
   it('warns before the page unloads with edits, except while the session is ending', async () => {
@@ -395,7 +397,7 @@ describe('the Edited chip', () => {
     fireEvent.click(chip);
     const popover = screen.getByRole('dialog', { name: 'Changed from the baseline' });
     expect(within(popover).getByText('Probability: 4 / 5 (baseline 5 / 5)')).toBeTruthy();
-    expect(rowButton(/Private label structural penetration/).getAttribute('aria-expanded')).toBe('false');   // the row did not toggle
+    expect(rowButton(/Private Label Share Gain/).getAttribute('aria-expanded')).toBe('false');   // the row did not toggle
     fireEvent.keyDown(popover, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(chip);

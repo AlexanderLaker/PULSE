@@ -136,7 +136,7 @@ def fields(source: str, interface: str, optional: bool | None = None) -> tuple:
     """The field names of one interface, in order: all of them, or only the
     optional (True) or the required ones (False). The fields of a nested
     object type (indented further) are not the interface's own."""
-    match = re.search(rf"export interface {interface} \{{(.*?)\n\}}", source, re.S)
+    match = re.search(rf"export interface {interface}(?: extends \w+)? \{{(.*?)\n\}}", source, re.S)
     assert match, interface
     body = re.sub(r"/\*.*?\*/", "", match.group(1), flags=re.S)
     return tuple(name for name, mark in re.findall(r"^ {2}(\w+)(\??):", body, re.M)
@@ -152,6 +152,20 @@ def test_driver_request_shapes():
     assert fields(drivers, "DriverScores") == SCORE_FIELDS
     assert fields(drivers, "DriverUpdate") == tuple(DriverUpdate.model_fields)
     assert fields(drivers, "DriverProposal") == tuple(ProposalUpdate.model_fields)
+
+
+def test_the_driver_type_names_what_the_api_serves():
+    """Every field of a served driver (_driver_json in prism/api/routers/drivers.py) is a field of the
+    dashboard's Driver type (types/drivers.ts, with the scores it extends), and the other way round, so a
+    renamed field cannot leave the dashboard reading a key the API no longer sends."""
+    import inspect
+    from prism.api.routers import drivers as router
+    source = inspect.getsource(router._driver_json)
+    served = set(re.findall(r'^\s*"(\w+)":', source, re.M)) | set(router.NO_NAMES)
+    ts = (REPO / "types" / "drivers.ts").read_text(encoding="utf-8")
+    typed = set(fields(ts, "Driver")) | set(fields(ts, "DriverScores"))
+    assert served == typed, (sorted(served - typed), sorted(typed - served))
+    assert {"short_name", "long_name", "descriptor", "boundary", "analysis"} <= served
 
 
 def test_journey_tile_shape():

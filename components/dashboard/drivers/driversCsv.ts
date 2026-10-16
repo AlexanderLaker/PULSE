@@ -6,8 +6,9 @@
  */
 import { csvText, rowsToCsv } from '@/lib/exportCsv';
 import { CATEGORIES, REGIONS, fmtDate, fmtPct, fmtShift } from '@/lib/format';
+import { driverNames } from '@/lib/driverNames';
 import type { Driver } from '@/types';
-import { curveLabel, driverCode } from './shared';
+import { curveLabel } from './shared';
 
 /** A category's filter label: the label with its code for Laundry & Home
  *  Care ("Fabric Clean (FCN)"), the label alone for Hair ("Care"). */
@@ -27,31 +28,36 @@ export interface DriversCsvParts {
 /** The preamble, the columns and the rows of the Drivers export. */
 export function driversCsvParts(drivers: readonly Driver[], filterText: string, now: Date = new Date()): DriversCsvParts {
   const header = [
-    'id', 'code', 'name', 'force', 'direction', 'confidence', 'probability', 'GP1 % affected', 'expected effect',
+    'id', 'code', 'short name', 'long name', 'technical scope', 'force', 'direction', 'confidence', 'probability', 'GP1 % affected', 'expected effect',
     'peak year', 'diffusion curve', 'uncertainty',
     ...CATEGORIES.map((c) => `${categoryChipLabel(c)} exposure`),
     ...REGIONS.map((r) => `${r} exposure`),
     'value-chain epicentre', 'sources', 'edited',
   ];
-  const rows = drivers.map((d) => [
-    d.id,
-    driverCode(d) ?? '',
-    csvText(d.name),
-    d.force,
-    d.direction,
-    d.confidence,
-    String(d.probability),
-    fmtPct(d.gp1_pct_affected),
-    fmtShift(d.expected_effect),
-    String(d.peak_year),
-    curveLabel(d.diffusion_curve),
-    String(d.uncertainty),
-    ...CATEGORIES.map((c) => String(d.category_exposure[c.name] ?? '')),
-    ...REGIONS.map((r) => String(d.regional_exposure[r] ?? '')),
-    d.vc_epicentre,
-    String(d.sources.length),
-    d.scores_edited ? 'yes' : 'no',
-  ]);
+  const rows = drivers.map((d) => {
+    const names = driverNames(d);
+    return [
+      d.id,
+      names.code,
+      csvText(names.shortName),
+      csvText(names.longName),
+      csvText(names.technicalScope),
+      d.force,
+      d.direction,
+      d.confidence,
+      String(d.probability),
+      fmtPct(d.gp1_pct_affected),
+      fmtShift(d.expected_effect),
+      String(d.peak_year),
+      curveLabel(d.diffusion_curve),
+      String(d.uncertainty),
+      ...CATEGORIES.map((c) => String(d.category_exposure[c.name] ?? '')),
+      ...REGIONS.map((r) => String(d.regional_exposure[r] ?? '')),
+      d.vc_epicentre,
+      String(d.sources.length),
+      d.scores_edited ? 'yes' : 'no',
+    ];
+  });
   return {
     preamble: [['PRISM drivers'], [fmtDate(now)], [csvText(filterText)], [CSV_NOTE]],
     header,

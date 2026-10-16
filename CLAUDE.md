@@ -49,8 +49,9 @@ README.md; the documents in `docs/` explain everything below in full.
 - **Generated files are never edited by hand**: `prism/seed_drivers.py`,
   `prism/analysis_texts.py`, `prism/overlap_correction.py`,
   `prism/cell_weight_estimate.py`, `prism/journey_content.py`,
-  `prism/explorer_content.py`, `data/driverCodeMap.ts`,
-  `data/parameters/*.json`, `lib/cellWeightProvenance.ts`,
+  `prism/explorer_content.py`, `prism/driver_names.py`,
+  `data/driverCodeMap.ts`, `data/parameters/*.json`,
+  `lib/cellWeightProvenance.ts`,
   `data/drivers/driver_attribution.json` and
   `tests/frontend/fixtures/driverAttribution.fixture.json`. Change the input
   and run the generator; every generator has `--check`.

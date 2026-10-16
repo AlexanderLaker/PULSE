@@ -29,9 +29,11 @@ import { sessionEnding } from '@/lib/session';
 import { CATEGORIES, FORCES, FORCE_COLORS, HORIZON } from '@/lib/format';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import type { Driver, DriverProposal, ForceName } from '@/types';
-import { EXPERT_COLOR, REVIEWED_COLOR, driverCode, isRated, type ScoringMode } from './drivers/shared';
+import { driverIdForCode, driverNames, exactDriverCode, matchesDriverSearch } from '@/lib/driverNames';
+import { EXPERT_COLOR, REVIEWED_COLOR, isRated, type ScoringMode } from './drivers/shared';
 import { FIELD_HELP } from './drivers/cards';
 import { DriverRow, LAST_COLUMN_LABEL, ROW_GRID } from './drivers/DriverRow';
+import { NamesGlossary } from './drivers/NamesGlossary';
 import { downloadText, safeFilename } from '@/lib/exportCsv';
 import { categoryChipLabel, driversCsvText } from './drivers/driversCsv';
 
@@ -71,7 +73,7 @@ const SORT_OPTIONS: Array<{ value: string; label: string }> = [
 
 function sortValue(d: Driver, key: SortKey): string | number {
   switch (key) {
-    case 'name':        return d.name;
+    case 'name':        return driverNames(d).shortName;
     case 'direction':   return d.direction;
     case 'probability': return d.probability;
     case 'gp1':         return d.gp1_pct_affected;
@@ -156,7 +158,8 @@ export interface DriverSearch {
 
 interface DriversProps {
   /** A search to apply on arrival: the drill-through from the Consumer
-   *  Journey and the Shift Analysis hands down a driver name. */
+   *  Journey and the Shift Analysis hands down a driver code, which shows
+   *  that driver alone and opens it. */
   search?: DriverSearch | null;
   /** Admins get the driver editor and the Review & Endorse mode. */
   isAdmin?: boolean;
@@ -166,8 +169,16 @@ interface DriversProps {
 type PendingAction =
   | { kind: 'toggle'; id: string | null }
   | { kind: 'mode'; mode: ScoringMode }
+  /** A driver's code, typed or cited in a boundary sentence: that driver, alone in the list and open. */
+  | { kind: 'code'; code: string; how: OpenByCode }
   /** Back, Forward or a drill-through moved the address away from the dirty editor. */
   | { kind: 'address'; driver: string | null; mode: ScoringMode };
+
+/** How a code opens its driver: the search it leaves, and whether it came from a link. */
+interface OpenByCode {
+  search: string;
+  link: boolean;
+}
 
 /** How long the search waits before it reaches the address bar. */
 const SEARCH_URL_DELAY_MS = 300;
@@ -202,9 +213,11 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
 
   // Adopt a drill-through whenever a new one arrives: its query replaces the
   // search and the filters are cleared, so the driver is never hidden by a
-  // filter left from an earlier visit. Adjusted during render against the
-  // last one adopted, so the list is already filtered in the pass that
-  // follows the navigation.
+  // filter left from an earlier visit. A query that is exactly a driver's
+  // code also names that driver in the address (DashboardApp's openDriver),
+  // which opens it the way Back and Forward do, below. Adjusted during render
+  // against the last one adopted, so the list is already filtered in the
+  // pass that follows the navigation.
   const [adoptedSeq, setAdoptedSeq] = useState(opened?.seq ?? 0);
   if (opened && opened.seq !== adoptedSeq) {
     setAdoptedSeq(opened.seq);
@@ -221,6 +234,9 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
   useEffect(() => {
     if (openedSeq != null) setParamsRef.current({ category: null, force: null });
   }, [openedSeq]);
+
+  // The glossary of the names, opened from the helper line.
+  const [glossaryOpen, setGlossaryOpen] = useState(false);
 
   // ── Unsaved edits: the editors that hold some, and the action waiting on
   //    the admin's answer before it unmounts one. The editor is in the Driver
@@ -318,19 +334,14 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
     }
   };
 
-  // Whether a driver passes the search and the filters.
+  // Whether a driver passes the search and the filters. The search reads the
+  // code, the four names, the description and the force; a query that is
+  // exactly a code matches that driver alone (lib/driverNames.ts).
   const matches = useCallback((d: Driver): boolean => {
-    const q = search.trim().toLowerCase();
     if (forceFilter != null && d.force !== forceFilter) return false;
     if (categoryFilter != null && d.category_exposure[categoryFilter] === 0) return false;
     if (mode === 'rating' && notRatedOnly && isRated(myProposalOf(d))) return false;
-    if (!q) return true;
-    return (
-      d.name.toLowerCase().includes(q) ||
-      d.description.toLowerCase().includes(q) ||
-      d.force.toLowerCase().includes(q) ||
-      (driverCode(d)?.toLowerCase().includes(q) ?? false)
-    );
+    return matchesDriverSearch(d, search);
   }, [search, forceFilter, categoryFilter, mode, notRatedOnly, myProposalOf]);
 
   // The open row stays in the list while it is in use, whatever the filter
@@ -363,6 +374,15 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
   // Where "Next unrated" scrolls once the rows have settled (see openNextUnrated).
   const scrollAfterExit = useRef<string | null>(null);
   const scrollAfterCommit = useRef<string | null>(null);
+  // The row a code link opened, which takes the focus once it has rendered
+  // (the link itself unmounts with the panel it sat in).
+  const focusAfterOpen = useRef<string | null>(null);
+  useEffect(() => {
+    const id = focusAfterOpen.current;
+    if (id == null || id !== expandedId) return;
+    focusAfterOpen.current = null;
+    document.getElementById(`driver-row-${id}`)?.querySelector<HTMLButtonElement>('button[aria-expanded]')?.focus();
+  }, [expandedId]);
 
   // ── The question before an action drops unsaved edits ──
   const dirtyDriver = editorDirty ? drivers.find((d) => d.id === expandedId) ?? null : null;
@@ -405,12 +425,35 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
     if (dirtyDriver) { setPending({ kind: 'mode', mode: m }); return; }
     applyMode(m);
   };
+  // A driver's code, typed into the search or cited in a boundary sentence,
+  // opens that driver alone in the list: the search holds the code and the
+  // filters that could hide the driver clear. A link is a step the reader can
+  // go Back from and moves the focus to the opened row; typing keeps the
+  // focus in the field and the history as it is.
+  const applyOpenCode = (code: string, how: OpenByCode) => {
+    const id = driverIdForCode(code) ?? null;
+    setSearch(how.search);
+    setCategoryFilter(null);
+    setForceFilter(null);
+    setExpandedId(id);
+    if (how.link) focusAfterOpen.current = id;
+    setParams({ q: how.search, category: null, force: null, driver: id }, { push: how.link });
+  };
+  const openCode = (code: string, how: OpenByCode = { search: code, link: true }) => {
+    const id = driverIdForCode(code);
+    if (id == null) return;
+    scrollAfterExit.current = null;
+    // Unsaved edits to another driver: ask first, as a row toggle does.
+    if (dirtyDriver && id !== expandedId) { setPending({ kind: 'code', code, how }); return; }
+    applyOpenCode(code, how);
+  };
   const discardAndContinue = () => {
     const action = pending;
     setPending(null);
     if (!action) return;
     if (action.kind === 'toggle') applyToggle(action.id);
     else if (action.kind === 'mode') applyMode(action.mode);
+    else if (action.kind === 'code') applyOpenCode(action.code, action.how);
     else {
       setExpandedId(action.driver);
       setMode(action.mode);
@@ -545,7 +588,15 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
                 type="search"
                 aria-label="Search drivers"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setSearch(next);
+                  // A driver's code, typed exactly, opens that driver; a
+                  // keystroke that leaves the same code (a trailing space)
+                  // does not open it, or ask, again.
+                  const code = exactDriverCode(next);
+                  if (code && code !== exactDriverCode(search)) openCode(code, { search: next, link: false });
+                }}
                 placeholder="Search drivers…"
                 className="w-full pl-11 pr-4 py-2.5 rounded-full text-sm focus:outline-none focus:ring-2"
                 style={{
@@ -589,12 +640,15 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
               </span>
               <FilterChip label="Not rated" active={notRatedOnly} onClick={() => setNotRatedOnly((v) => !v)} />
               <span className="hidden sm:inline">Open a row to score it; changes save as you make them.</span>
+              <GlossaryLink onOpen={() => setGlossaryOpen(true)} />
             </div>
           ) : (
             <p style={{ fontSize: 13, color: S.onSurfaceVariant, maxWidth: '42rem', lineHeight: 1.5 }}>
               {mode === 'list'
                 ? 'The scores that feed the model. Scores an admin has changed from the baseline show in green; hover a score for its baseline.'
                 : 'Compare the expert mean with the baseline and endorse one driver at a time. Who scored what is listed under each driver.'}
+              {' '}
+              <GlossaryLink onOpen={() => setGlossaryOpen(true)} />
             </p>
           )}
         </div>
@@ -737,6 +791,7 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
                     reason: nextUnratedId ? null : 'Every other driver in this list is rated',
                     go: openNextUnrated,
                   } : undefined}
+                  onOpenCode={openCode}
                 />
               );
             })}
@@ -757,7 +812,7 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
             style={{ backgroundColor: S.surface, boxShadow: SHADOW.dialog, color: S.onSurface }}
           >
             <h2 id="discard-edits-title" style={{ margin: 0, fontFamily: HEADLINE_FONT, fontSize: 17, fontWeight: 800, lineHeight: 1.3 }}>
-              Discard the edits to {dirtyDriver.name}?
+              Discard the edits to {driverNames(dirtyDriver).shortName}?
             </h2>
             <p style={{ margin: '10px 0 0', fontSize: 13.5, lineHeight: 1.55, color: S.onSurfaceVariant }}>
               The editor holds changes that have not been saved. Keep editing to save them first, or discard them.
@@ -779,9 +834,21 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
           </div>
         </div>
       )}
+      <NamesGlossary open={glossaryOpen} onClose={() => setGlossaryOpen(false)} />
     </div>
   );
 };
+
+// ─── The link to the glossary of the names, in every mode's helper line ──
+const GlossaryLink: FC<{ onOpen: () => void }> = ({ onOpen }) => (
+  <button type="button" onClick={onOpen} data-print-hide style={{
+    display: 'inline', padding: 0, border: 'none', background: 'none', cursor: 'pointer',
+    fontFamily: BODY_FONT, fontSize: 13, fontWeight: 600, color: S.primary,
+    textDecoration: 'underline', textUnderlineOffset: 2, minHeight: 24,
+  }}>
+    How the driver names work
+  </button>
+);
 
 // ─── Filter chip ───────────────────────────────────────────────────
 const FilterChip: FC<{ label: string; active: boolean; onClick: () => void; dot?: string }> = ({ label, active, onClick, dot }) => (

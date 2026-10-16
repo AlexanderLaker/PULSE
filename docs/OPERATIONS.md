@@ -121,7 +121,7 @@ compares:
 
 | Command | Files it checks |
 |---|---|
-| `python3 scripts/generate_seed.py --check` | `prism/seed_drivers.py`, `data/driverCodeMap.ts` |
+| `python3 scripts/generate_seed.py --check` | `prism/seed_drivers.py`, `data/driverCodeMap.ts`, `prism/driver_names.py` |
 | `python3 scripts/build_cell_weights.py --check` | the cell-weight record, `lib/cellWeightProvenance.ts`, `prism/cell_weight_estimate.py` |
 | `python3 scripts/compute_overlap_correction.py --check` | the overlap-correction record, `prism/overlap_correction.py` |
 | `python3 scripts/build_driver_analysis.py --check` | the attribution record, the PRISM Analysis texts (`prism/analysis_texts.py`), the parity fixture |

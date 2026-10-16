@@ -28,6 +28,7 @@ import { S, SHADOW, HEADLINE_FONT, BODY_FONT, FIGURES } from '@/lib/theme';
 import { cellWeightsBasis, rowShares } from '@/lib/cellWeights';
 import type { RunAttribution } from '@/lib/driverAttribution';
 import { csvText, downloadText, safeFilename, tablesToCsv } from '@/lib/exportCsv';
+import { driverNames } from '@/lib/driverNames';
 import { downloadNodeAsPng } from '@/lib/exportImage';
 import useOverlay from '@/hooks/useOverlay';
 import useViewUrl from '@/hooks/useViewUrl';
@@ -50,8 +51,8 @@ interface CategoryDetailPanelProps {
   /** The drivers' parts of the shift at the score means, or the input they lack. */
   attribution: RunAttribution;
   onClose: () => void;
-  /** Opens the Drivers page searched for a driver's name; makes every driver card a link. */
-  onOpenDriver?: (name: string) => void;
+  /** Opens a driver on the Drivers page by its code; makes every driver card a link. */
+  onOpenDriver?: (code: string) => void;
 }
 
 /** A difference of two shifts in percentage points, signed like fmtShift: 0.0012 -> "+0.1 pt". */
@@ -116,9 +117,10 @@ export function drillDownCsv({ category, year, simulation, forceDecomposition, c
       rows: forces.map((f) => [f, fmtShift(forceDecomposition[f] ?? 0, 1)]),
     },
     {
-      header: ['Rank', 'Driver', 'Code', 'Force', 'Exposure', 'Share of movement', `Contribution ${HORIZON}`],
+      header: ['Rank', 'Driver', 'Long name', 'Code', 'Force', 'Exposure', 'Share of movement', `Contribution ${HORIZON}`],
       rows: contributors.map((c, i) => [
-        String(i + 1), csvText(c.driver.name), driverCode(c.driver) ?? '', c.driver.force, `${c.exposure}/5`,
+        String(i + 1), csvText(driverNames(c.driver).shortName), csvText(c.driver.long_name),
+        driverCode(c.driver) ?? '', c.driver.force, `${c.exposure}/5`,
         c.share > 0 ? fmtPct(c.share, c.share >= 0.1 ? 0 : 1) : NO_VALUE,
         c.contribution !== 0 ? fmtShift(c.contribution, 1) : NO_VALUE,
       ]),

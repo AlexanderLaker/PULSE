@@ -68,7 +68,7 @@ async function openReview(driver: Driver, store: Partial<PrismStore> = {}) {
   STORE.current = makeStore({ drivers: [driver], ...store });
   render(<Drivers isAdmin />);
   fireEvent.click(screen.getByRole('tab', { name: /Review & Endorse/ }));
-  fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Private Label Share Gain/ }));
 }
 
 async function endorse() {
