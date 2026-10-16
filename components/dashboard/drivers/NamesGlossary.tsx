@@ -86,14 +86,20 @@ export const NamesGlossary: FC<{ open: boolean; onClose: () => void }> = ({ open
         </p>
 
         <h3 style={heading}>Words that mean the same in every name</h3>
-        <div role="table" aria-label="Words that mean the same in every name" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.9fr) minmax(0, 2fr)', columnGap: 16, rowGap: 6 }}>
-          {NAME_WORDS.map((w) => (
-            <div key={w.words} role="row" style={{ display: 'contents' }}>
-              <span role="cell" style={{ fontFamily: HEADLINE_FONT, fontWeight: 700, fontSize: 12.5, color: S.onSurface }}>{w.words}</span>
-              <span role="cell" style={{ fontSize: 12.5, lineHeight: 1.5, color: S.onSurfaceVariant }}>{w.meaning}</span>
-            </div>
-          ))}
-        </div>
+        <table aria-label="Words that mean the same in every name" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead className="sr-only">
+            <tr><th scope="col">Word</th><th scope="col">What it means</th></tr>
+          </thead>
+          <tbody>
+            {NAME_WORDS.map((w) => (
+              <tr key={w.words}>
+                <th scope="row" style={{ textAlign: 'left', verticalAlign: 'top', padding: '3px 16px 3px 0', width: '31%',
+                  fontFamily: HEADLINE_FONT, fontWeight: 700, fontSize: 12.5, color: S.onSurface }}>{w.words}</th>
+                <td style={{ padding: '3px 0', fontSize: 12.5, lineHeight: 1.5, color: S.onSurfaceVariant }}>{w.meaning}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
         <h3 style={heading}>EU and European</h3>
         <p style={body}>

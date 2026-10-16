@@ -117,10 +117,11 @@ export function drillDownCsv({ category, year, simulation, forceDecomposition, c
       rows: forces.map((f) => [f, fmtShift(forceDecomposition[f] ?? 0, 1)]),
     },
     {
-      header: ['Rank', 'Driver', 'Long name', 'Code', 'Force', 'Exposure', 'Share of movement', `Contribution ${HORIZON}`],
+      header: ['Rank', 'Driver', 'Long name', 'Technical scope', 'Code', 'Force', 'Exposure', 'Share of movement',
+        `Contribution ${HORIZON}`],
       rows: contributors.map((c, i) => [
-        String(i + 1), csvText(driverNames(c.driver).shortName), csvText(c.driver.long_name),
-        driverCode(c.driver) ?? '', c.driver.force, `${c.exposure}/5`,
+        String(i + 1), csvText(driverNames(c.driver).shortName), csvText(driverNames(c.driver).longName),
+        csvText(driverNames(c.driver).technicalScope), driverCode(c.driver) ?? '', c.driver.force, `${c.exposure}/5`,
         c.share > 0 ? fmtPct(c.share, c.share >= 0.1 ? 0 : 1) : NO_VALUE,
         c.contribution !== 0 ? fmtShift(c.contribution, 1) : NO_VALUE,
       ]),

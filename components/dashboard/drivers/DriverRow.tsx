@@ -293,7 +293,7 @@ export const DriverRow: FC<DriverRowProps> = ({
           cursor: 'pointer',
         }}
       >
-        {/* Driver identity: the force tile, the code, the name, the force */}
+        {/* Driver identity: the force tile, the short name and its code, the long name, the force */}
         <div role="cell" className="flex items-start gap-3 min-w-0">
           <div
             className="w-8 h-8 flex-shrink-0 rounded-lg flex items-center justify-center mt-0.5"

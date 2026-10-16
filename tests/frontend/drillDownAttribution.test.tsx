@@ -59,8 +59,8 @@ const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'dri
 };
 const FCN = 'LHC: FCN';
 
-/** The fixture's drivers, each named by its id: a card shows the code map's short name of a driver the
- *  map holds and the name of any other, so cardOrder can read every card back to its driver's id. */
+/** The fixture's drivers, each named by its id: a card shows the short name the base gives a driver it
+ *  holds and the name of any other, so cardOrder can read every card back to its driver's id. */
 function fixtureDrivers(): Driver[] {
   return FIXTURE.inputs.drivers.map((d) => makeDriver({
     ...d,
@@ -99,7 +99,7 @@ function openFabricClean(container: HTMLElement): HTMLElement {
   return aside;
 }
 
-/** The driver id behind each short name of the code map. */
+/** The driver id behind each short name of the base. */
 const ID_BY_SHORT_NAME: Record<string, string> = Object.fromEntries(
   Object.values(BASE_BY_CODE).map((info) => [info.shortName, info.driverId]),
 );
@@ -246,11 +246,11 @@ describe('the drill-down header actions', () => {
       expect(lines).toContain('Year,Median,P10,P90');
       expect(lines.filter((l) => /^20\d\d,[+-]?\d+\.\d%,[+-]?\d+\.\d%,[+-]?\d+\.\d%$/.test(l))).toHaveLength(10);
       expect(lines).toContain('Force,Attribution 2035');
-      const rankHeader = lines.indexOf('Rank,Driver,Long name,Code,Force,Exposure,Share of movement,Contribution 2035');
+      const rankHeader = lines.indexOf('Rank,Driver,Long name,Technical scope,Code,Force,Exposure,Share of movement,Contribution 2035');
       expect(rankHeader).toBeGreaterThan(0);
       // the short name and the long name, never the technical scope
       const x15 = BASE_BY_CODE['X-15'];
-      expect(lines[rankHeader + 1].startsWith(`1,${x15.shortName},${x15.longName},X-15,Competitive,`)).toBe(true);
+      expect(lines[rankHeader + 1].startsWith(`1,${x15.shortName},${x15.longName},competitive_r15,X-15,Competitive,`)).toBe(true);
       expect(lines[rankHeader + 1]).toMatch(/,\d\/5,\d+%,-\d+\.\d%$/);
       // Every exposed driver is in the file, not only the ten on screen.
       const exposed = FIXTURE.inputs.drivers.filter((d) => d.category_exposure[FCN] > 0).length;

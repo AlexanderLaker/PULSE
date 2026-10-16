@@ -309,7 +309,12 @@ describe("a driver's names on the Drivers page", () => {
   it('opens the glossary of the names from the helper line and closes it with Escape or Close', () => {
     render(<Drivers />);
     fireEvent.click(screen.getByRole('button', { name: 'How the driver names work' }));
-    expect(within(screen.getByRole('dialog', { name: 'How the driver names work' })).getByText('Share Gain')).toBeTruthy();
+    const glossary = within(screen.getByRole('dialog', { name: 'How the driver names work' }));
+    expect(glossary.getByText('Share Gain')).toBeTruthy();
+    // a table a screen reader can walk: a header per column, each word the header of its row
+    const words = within(glossary.getByRole('table', { name: 'Words that mean the same in every name' }));
+    expect(words.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Word', 'What it means']);
+    expect(words.getByRole('rowheader', { name: 'Share Gain' })).toBeTruthy();
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'How the driver names work' }));
