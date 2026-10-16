@@ -18,7 +18,8 @@
  * Next.js reads the nonce from the request's content-security-policy header
  * and puts it on the scripts it renders, so the proxy sets the policy on the
  * request it forwards as well as on the response; the request also carries
- * the nonce as x-nonce for a component that renders a script of its own.
+ * the nonce as x-nonce, where Clerk's provider (`dynamic` in app/layout.tsx)
+ * reads it for the script tag it renders for its own code.
  */
 
 /** The response header that enforces the policy. */

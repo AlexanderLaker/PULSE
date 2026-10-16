@@ -343,9 +343,11 @@ true`, and `curl -sI https://prism-hcb.vercel.app/sign-in` must show the
 security headers of `vercel.json` and the proxy's policy
 (`content-security-policy: default-src 'self'; script-src 'self' 'nonce-`
 and so on, or `content-security-policy-report-only` while
-`PRISM_CSP_REPORT_ONLY=1` is set). Then open the dashboard and check that the
-Shift Analysis shows the expected run. `/api/v1/diagnostics` explains a
-problem (see Troubleshooting).
+`PRISM_CSP_REPORT_ONLY=1` is set). Then open the sign-in page with the
+browser console open (no `Refused to` line: Clerk's script carries the
+nonce) and the dashboard, and check that the Shift Analysis shows the
+expected run. `/api/v1/diagnostics` explains a problem (see
+Troubleshooting).
 
 **The first deployment of a changed policy.** Set `PRISM_CSP_REPORT_ONLY=1`
 in the project's environment variables for that deployment, then open the

@@ -414,8 +414,11 @@ Cloudflare's bot check; no plugins, no other base URL, forms to the site
 only, no framing (`frame-ancestors 'none'`, so `vercel.json` carries no
 policy of its own, which could replace the proxy's). Next.js reads the nonce
 from the request's `content-security-policy` header, so the proxy forwards
-the policy on the request as well, with the nonce as `x-nonce`; a redirect
-and the 401 carry no policy. `PRISM_CSP_REPORT_ONLY=1` sends it as
+the policy on the request as well, with the nonce as `x-nonce`, which Clerk's
+provider reads for the script tag it renders (`dynamic` on `ClerkProvider`
+in `app/layout.tsx`; without it the tag has no nonce, the browser refuses it
+once, and Clerk loads its script again from trusted code); a redirect and
+the 401 carry no policy. `PRISM_CSP_REPORT_ONLY=1` sends it as
 `Content-Security-Policy-Report-Only`, for a first deployment that watches
 the browser console before enforcing. In production, for a Clerk host
 `clerk.example.com` and a nonce `abc`, the header is:
