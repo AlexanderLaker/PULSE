@@ -57,9 +57,9 @@ NAMES = {
     },
     "consumer_r05": {
         "short_name": "Ageing Consumers",
-        "long_name": "Older consumers spend more on hair and laundry",
-        "descriptor": "Older consumers need more grey coverage and ageing-hair care; laundry and home care gain a little.",
-        "boundary": "",
+        "long_name": "Older consumers buy more laundry and hand dish care",
+        "descriptor": "Older people more often live alone and buy more laundry, dish and cleaning products per head.",
+        "boundary": "Counted in other drivers: fewer children and population decline (C-25), thinning-hair care and men's grey blending (C-10), dupe buying across age groups (C-11) and first-time dishwasher owners (C-27).",
     },
     "consumer_r06": {
         "short_name": "Cost-of-Living Squeeze",

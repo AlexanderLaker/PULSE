@@ -59,16 +59,16 @@ class TestGoldenValues:
 
     PINS = {
         # category:    (median,          p10,             p90)
-        "Hair: Color": (-0.003827122339, -0.005863915896, -0.001850712454),
-        "Hair: Care":  (-0.004869676012, -0.006488172273, -0.003198774599),
-        "LHC: FCN":    (-0.007031953073, -0.008618985362, -0.005290401870),
+        "Hair: Color": (-0.003779976872, -0.005804170322, -0.001819783075),
+        "Hair: Care":  (-0.004825253038, -0.006435612853, -0.003157892180),
+        "LHC: FCN":    (-0.006979070921, -0.008556546145, -0.005248480889),
     }
     #: The joint portfolio band, the number the dashboard headline shows.
-    PORTFOLIO_PIN = (-0.005762680071, -0.007472267097, -0.004048590652)
+    PORTFOLIO_PIN = (-0.005715456934, -0.007413341000, -0.004009810673)
 
     def test_engine_identity(self, mock_model_config, mock_driver_set):
         r = _run(mock_model_config, mock_driver_set)
-        assert r["model_version"] == "2.12.0"
+        assert r["model_version"] == "2.13.0"
         assert r["engine_name"] == "beta_copula"
         assert r["seed"] == SEED
         assert r["numerics_backend"].startswith("scipy ")

@@ -178,7 +178,7 @@ A reading never contains:
   the text, no exclamation marks, no filler words.
 
 Contributions are stated in points of the portfolio shift with two decimals
-("0.90 of the 5.6 points"), so that close drivers can be told apart; the
+("0.89 of the 5.6 points"), so that close drivers can be told apart; the
 portfolio totals keep the headline's one decimal. Shares are whole
 percentages, except a force's pass-through and a cell's share of the pool,
 which carry one decimal; ranks are ordinals. Cells and categories are named

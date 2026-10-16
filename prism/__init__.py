@@ -7,4 +7,4 @@ they agree. It is a literal here rather than imported from the engine because
 the engine needs scipy, and the API runtime, which never simulates, does not
 install scipy.
 """
-__version__ = "2.12.0"
+__version__ = "2.13.0"

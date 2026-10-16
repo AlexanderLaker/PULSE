@@ -328,7 +328,7 @@ class TestRoleRecheck:
 class TestHealthAndDiagnostics:
     def test_a_new_database_is_seeded(self, api):
         body = api.get("/api/v1/health").json()
-        assert body == {"status": "ok", "version": "2.12.0", "commit": None, "driver_count": 51,
+        assert body == {"status": "ok", "version": "2.13.0", "commit": None, "driver_count": 51,
                         "has_simulation": False, "simulation_reason": "no_rows", "latest_run_id": None}
 
     def test_health_names_the_deployed_commit(self, api, monkeypatch):

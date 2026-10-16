@@ -32,8 +32,8 @@ arithmetic.
 | Parameter | Default | Where it comes from |
 |---|---|---|
 | Force weights | 1/6 for each of the six forces | Equal by design |
-| Attenuation per force | Consumer 0.487, Customer 0.417, Technology 0.412, Government 0.446, Environmental 0.378, Competitive 0.479 | The overlap correction (below), `scripts/compute_overlap_correction.py` |
-| Within-force overlap | Consumer 0.100, Customer 0.221, Technology 0.384, Government 0.123, Environmental 0.401, Competitive 0.100 | The same |
+| Attenuation per force | Consumer 0.487, Customer 0.413, Technology 0.409, Government 0.443, Environmental 0.375, Competitive 0.477 | The overlap correction (below), `scripts/compute_overlap_correction.py` |
+| Within-force overlap | Consumer 0.100, Customer 0.232, Technology 0.393, Government 0.135, Environmental 0.409, Competitive 0.100 | The same |
 | Correlation within a force | 0.3 | Structured judgment |
 | Correlation across forces | a 6 x 6 matrix, values 0.04 to 0.22 | Structured judgment; positive definite as entered |
 | Cell weights | the estimated HCB gross-profit mix, 13 x 4 | `scripts/build_cell_weights.py`; replaced by the finance file at run time |
@@ -181,7 +181,7 @@ zero (one force removing more than the whole pool of a cell) is floored at
 zero, which is -100 percent, and the run counts such cases in an integrity
 event.
 
-The product `w_f x a_f` is the force's pass-through: 6.3 percent
+The product `w_f x a_f` is the force's pass-through: 6.2 percent
 (Environmental) to 8.1 percent (Consumer). A driver drawn at probability 1
 with a GP1 share of 1 and full exposure moves its force's factor by that much.
 This is why a driver's contribution to the portfolio is a small fraction of
@@ -342,9 +342,9 @@ those drivers, in the same commit.
 ## The reference result
 
 On the current driver base, the estimated HCB mix and the production recipe
-(3 x 50,000 iterations, seed 42), the 2035 portfolio median is -5.58 percent,
-with a P10 to P90 band of -6.16 to -4.89 percent. Europe, the most exposed
-region and half of the estimated pool, carries 3.65 of the 5.58 points. This
+(3 x 50,000 iterations, seed 42), the 2035 portfolio median is -5.63 percent,
+with a P10 to P90 band of -6.21 to -4.93 percent. Europe, the most exposed
+region and half of the estimated pool, carries 3.68 of the 5.63 points. This
 figure rests on the estimated mix, not on Henkel P&L, and it changes when
 the finance shares are loaded. `tests/test_driver_analysis.py` checks that
 this paragraph states the reference run of the attribution record.
