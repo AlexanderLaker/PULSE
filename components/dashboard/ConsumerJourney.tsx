@@ -10,9 +10,13 @@
  * simulated) and the stage context. Nothing here feeds or reads the Shift
  * Matrix.
  *
- * The tiles come from data/consumerJourney.ts until an admin saves an edit;
- * from then on the newest saved version replaces them. The stage contexts
- * always come from the module.
+ * Nothing of the content is in the bundle: the tiles and the stage contexts
+ * come from the API (GET /api/v1/journey), which a signed-in user with a role
+ * may read. The tiles are the newest version an admin saved, else the base
+ * content (data/content/consumer_journey.json); the stage contexts always
+ * come from the base content and are not editable. Until the API has
+ * answered the board shows nothing; when it cannot be reached the board
+ * shows a notice with "Try again" and no tiles.
  *
  * This view sits one tab away from computed output, so it has to read as
  * authored judgment, never as model output.
@@ -30,9 +34,8 @@ import usePrism from '@/hooks/usePrism';
 import useOverlay, { PaneActiveContext } from '@/hooks/useOverlay';
 import { useViewParams } from '@/hooks/useViewUrl';
 import { ApiError, getJourneyContent, saveJourneyContent } from '@/lib/apiClient';
-import {
-  LHC_JOURNEY, HAIR_JOURNEY, type JourneyContent, type JourneyKey, type JourneyStageDef, type JourneyTile,
-  type TileType,
+import type {
+  JourneyContent, JourneyContexts, JourneyKey, JourneyStageDef, JourneyTile, TileType,
 } from '@/data/consumerJourney';
 import { S, SHADOW, EXPANSION_RGB, CONTRACTION_RGB, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import {
@@ -51,6 +54,10 @@ interface ConsumerJourneyProps {
 
 /** The journey an address names; the Laundry journey when it names none. */
 const journeyOf = (param: string | undefined): JourneyKey => (param === 'hair' ? 'hair' : 'lhc');
+
+/** The board before the API has answered, and when it could not be reached: no tiles, no contexts. */
+const NO_CONTENT: JourneyContent = { lhc: [], hair: [] };
+const NO_CONTEXTS: JourneyContexts = { lhc: {}, hair: {} };
 
 /** A tile of a journey by id, with its stage and side, or null. */
 const locateTile = (stages: JourneyStageDef[], id: string): SelectedTile | null => {
@@ -85,36 +92,40 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
-  // The bundled content, replaced by the newest saved version once it arrives.
-  // `version` is the stored version the content on screen started from (0 for
-  // the bundled copy); a save names it, so a save made by someone else in the
-  // meantime is never overwritten unseen.
-  const [content, setContent] = useState<JourneyContent>({ lhc: LHC_JOURNEY, hair: HAIR_JOURNEY });
+  // The content the API serves: the newest saved version, else the base
+  // content, with the stage contexts. `version` is the stored version the
+  // content on screen started from (0 for the base content); a save names it,
+  // so a save made by someone else in the meantime is never overwritten
+  // unseen. A failed load leaves the board empty: there is no copy to fall
+  // back on, and the notice says so.
+  const [content, setContent] = useState<JourneyContent>(NO_CONTENT);
+  const [contexts, setContexts] = useState<JourneyContexts>(NO_CONTEXTS);
   const [version, setVersion] = useState(0);
   const [origin, setOrigin] = useState<ContentOrigin>('loading');
   const [loadAttempt, setLoadAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
     getJourneyContent()
-      .then((stored) => {
+      .then((served) => {
         if (cancelled) return;
-        if (stored.content) setContent({ lhc: stored.content.lhc, hair: stored.content.hair });
-        else setContent({ lhc: LHC_JOURNEY, hair: HAIR_JOURNEY });
-        setVersion(stored.version);
-        setOrigin(stored.content ? 'stored' : 'bundled');
+        setContent({ lhc: served.content.lhc, hair: served.content.hair });
+        setContexts(served.contexts);
+        setVersion(served.version);
+        setOrigin(served.source);
       })
       .catch(() => {
         if (cancelled) return;
-        // What the notice then says is on screen: the bundled texts.
-        setContent({ lhc: LHC_JOURNEY, hair: HAIR_JOURNEY });
+        setContent(NO_CONTENT);
+        setContexts(NO_CONTEXTS);
         setOrigin('unavailable');
       });
     return () => { cancelled = true; };
   }, [loadAttempt]);
   const stages = content[tab];
-  // Nothing is shown from the bundled copy while the saved journey loads: it
-  // would flash, and a tile opened from it would stay the old text.
+  // Nothing is shown while the journey loads: the board waits for the API's
+  // answer, so a tile opened from a link opens the text the API serves.
   const ready = origin !== 'loading';
+  const contentKnown = origin === 'stored' || origin === 'base';
 
   const driversLoaded = drivers.length > 0;
   const driversById = useMemo(() => new Map(drivers.map(d => [d.id, d])), [drivers]);
@@ -177,14 +188,16 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
     });
   }, [guarded, setParams]);
 
-  /** Load the stored content again, dropping unsaved edits (after a conflict or a failed load). */
+  /** Load the journey again, dropping unsaved edits (after a conflict or a
+   *  failed load). An open dialog closes; after a failed load none is open,
+   *  and a tile the address names stays there for the load to open. */
   const loadStored = useCallback(() => {
-    hideTile();
+    if (selected) hideTile();
     setSaveState('idle');
     setSaveMsg(null);
     setOrigin('loading');
     setLoadAttempt((n) => n + 1);
-  }, [hideTile]);
+  }, [selected, hideTile]);
 
   // Adopt a journey the address names anew.
   const [prevJourneyParam, setPrevJourneyParam] = useState(params.journey);
@@ -198,10 +211,11 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
     }
   }
   // Adopt a tile the address names anew: opened once the content is known (a
-  // pasted link arrives before the saved journey does), closed when the
+  // pasted link arrives before the journey does, and a journey that could not
+  // be loaded keeps the link's tile for a load that succeeds), closed when the
   // address drops it. `null` marks the first render, so a link opens its tile.
   const [prevTileParam, setPrevTileParam] = useState<string | undefined | null>(null);
-  if (params.tile !== prevTileParam && (!params.tile || ready)) {
+  if (params.tile !== prevTileParam && (!params.tile || contentKnown)) {
     setPrevTileParam(params.tile);
     if (!params.tile) {
       if (selected) { setSelected(null); setEditing(false); setPending(null); }
@@ -354,7 +368,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
   /** Saves the whole tile map for every user; the route answers 403 unless the
    *  caller is an admin, and 409 when someone saved after this content loaded. */
   const saveToServer = useCallback(async () => {
-    if (origin !== 'stored' && origin !== 'bundled') return;
+    if (origin !== 'stored' && origin !== 'base') return;
     const sent = content;
     setSaveState('saving');
     setSaveMsg(null);
@@ -391,7 +405,6 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
       setSaveMsg(`Save failed${status}. ${(e as Error).message.slice(0, 160)}`);
     }
   }, [content, version, origin]);
-  const contentKnown = origin === 'stored' || origin === 'bundled';
   const canSave = contentKnown && !needsReload;
 
   // ════════════════════════════════════════════════════════════════════
@@ -427,20 +440,22 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
           </p>
         </div>
 
-        {origin === 'unavailable' && (
+        {/* The journey could not be loaded: the notice stands in for the whole
+            board. There is no copy in the bundle to show instead. */}
+        {origin === 'unavailable' ? (
           <div role="status" className="mb-5 flex items-center justify-between gap-3 flex-wrap rounded-xl px-4 py-3"
             style={{ backgroundColor: S.amberContainer, color: S.onAmberContainer }}>
             <p className="text-[12.5px]" style={{ lineHeight: 1.55, margin: 0 }}>
-              The saved journey could not be loaded, so these are the texts shipped with PRISM; an admin may
-              have changed them since.
+              The journey could not be loaded from the PRISM service, so there are no tiles to show; the tiles
+              and the stage contexts appear once it answers.
             </p>
             <button type="button" onClick={loadStored} className="px-3 py-1.5 rounded-full text-[12px] font-bold"
               style={{ backgroundColor: S.surface, color: S.primary, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}>
               Try again
             </button>
           </div>
-        )}
-
+        ) : (
+        <>
         {/* ─── Tabs and filters ─── */}
         <section className="mb-3 flex items-center justify-between gap-4 flex-wrap" data-print-hide>
           <div className="flex items-center gap-2 flex-wrap">
@@ -449,8 +464,8 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
             {isAdmin && (
               <button type="button"
                 onClick={() => { if (editMode) guarded(() => { setEditing(false); setEditMode(false); }); else setEditMode(true); }}
-                // Editing starts once the saved journey is known: an edit made on
-                // the bundled copy while it loads would be replaced when it arrives.
+                // Editing starts once the journey has arrived: there is nothing
+                // to edit before, and the version a save names is not known.
                 disabled={!editMode && origin === 'loading'}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all duration-200"
                 style={{
@@ -462,7 +477,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                 title={editMode
                   ? 'Editing is on: click to hide the add / edit / save controls'
                   : origin === 'loading'
-                    ? 'Loading the saved journey…'
+                    ? 'Loading the journey…'
                     : 'Show the editing controls (add tiles, edit tiles, save to server)'}
               >
                 <Edit3 size={11} strokeWidth={2.5} /> Edit board
@@ -516,7 +531,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
           {!ready ? (
             <div role="status" className="px-8 py-16 text-center text-[13px]"
               style={{ color: S.onSurfaceVariant, fontFamily: BODY_FONT }}>
-              Loading the saved journey…
+              Loading the journey…
             </div>
           ) : (
           <div style={{ position: 'relative' }}>
@@ -694,11 +709,12 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
               </span>
             </div>
             <div className="flex items-center gap-3">
+              {/* The save bar is part of the board, so the journey is either
+                  known or loading again (after a conflict or a save that got
+                  no answer). */}
               {!contentKnown && (
-                <span className="text-[11.5px] font-bold" style={{ color: origin === 'unavailable' ? S.error : S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
-                  {origin === 'loading'
-                    ? 'Loading the saved journey…'
-                    : 'The saved journey could not be loaded; saving is off so it cannot be overwritten.'}
+                <span className="text-[11.5px] font-bold" style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
+                  Loading the journey…
                 </span>
               )}
               {saveMsg && (
@@ -706,10 +722,10 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                   {saveMsg}
                 </span>
               )}
-              {(saveState === 'conflict' || saveState === 'uncertain' || origin === 'unavailable') && (
+              {(saveState === 'conflict' || saveState === 'uncertain') && (
                 <button type="button" onClick={loadStored} className="px-3 py-1.5 rounded-full text-[12px] font-bold"
                   style={{ backgroundColor: S.surfaceLow, color: S.primary, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}>
-                  {origin === 'unavailable' ? 'Try again' : 'Load the saved version'}
+                  Load the saved version
                 </button>
               )}
               {saveState === 'saved' && !saveMsg && (
@@ -732,6 +748,8 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
               </button>
             </div>
           </div>
+        )}
+        </>
         )}
       </main>
 
@@ -775,6 +793,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                 <PanelBody
                   selected={selected}
                   journeyKey={tab}
+                  contexts={contexts}
                   driversById={driversById}
                   driversLoaded={driversLoaded}
                   canEdit={isAdmin && editMode}

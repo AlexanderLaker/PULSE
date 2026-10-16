@@ -1,13 +1,17 @@
 /**
- * The Profit Pool Explorer's data (lib/profitPoolData.ts): every view's
- * shares add up, every figure has a clickable source with a grade, and the
- * pool arithmetic is the one the explorer states.
+ * The Profit Pool Explorer's data (data/content/profit_pools.json, served by
+ * the API) and arithmetic (lib/profitPoolData.ts): every view's shares add
+ * up, every figure has a clickable source with a grade, and the pool
+ * arithmetic is the one the explorer states.
  */
 import { describe, it, expect } from 'vitest';
 import {
-  PROFIT_POOL_VIEWS, POOL_HORIZON_YEARS, gp1Terminal, poolCagr, itemRevenueEurBn,
-  viewPoolSummary, toPoolRating, toGp1Rating,
+  POOL_HORIZON_YEARS, gp1Terminal, poolCagr, itemRevenueEurBn,
+  viewPoolSummary, toPoolRating, toGp1Rating, type PoolView,
 } from '@/lib/profitPoolData';
+import pools from '@/data/content/profit_pools.json';
+
+const PROFIT_POOL_VIEWS = (pools as unknown as { views: PoolView[] }).views;
 
 const GRADES = ['reported', 'derived', 'estimate'];
 const DENOMINATIONS = ['RSP', 'MSP', 'scanner-POS', 'salon-mfr', 'model'];

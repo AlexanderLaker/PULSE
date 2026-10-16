@@ -8,7 +8,7 @@
  */
 import { useEffect, useRef, useSyncExternalStore, type CSSProperties, type FC } from 'react';
 import { TrendingUp, TrendingDown, X, Edit3, PenLine, ChevronLeft, ChevronRight } from 'lucide-react';
-import type { JourneyKey } from '@/data/consumerJourney';
+import type { JourneyContexts, JourneyKey } from '@/data/consumerJourney';
 import type { Driver } from '@/types';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import Chip from '@/components/dashboard/Chip';
@@ -58,6 +58,8 @@ const useKeyboardSeen = (): boolean =>
 export const PanelBody: FC<{
   selected: SelectedTile;
   journeyKey: JourneyKey;
+  /** The stage contexts the API served with the journey. */
+  contexts: JourneyContexts;
   driversById: Map<string, Driver>;
   driversLoaded: boolean;
   canEdit: boolean;
@@ -74,7 +76,7 @@ export const PanelBody: FC<{
   onDraftDirty: (dirty: boolean) => void;
   onNavigateToDriver?: (query: string) => void;
 }> = ({
-  selected, journeyKey, driversById, driversLoaded,
+  selected, journeyKey, contexts, driversById, driversLoaded,
   canEdit, editing, position, question, onPrev, onNext, onClose, onEdit, onCancelEdit, onApplyEdits, onRemove,
   onDraftDirty, onNavigateToDriver,
 }) => {
@@ -186,7 +188,7 @@ export const PanelBody: FC<{
               </div>
             </DetailSection>
 
-            <StageContextBlock stageId={stageId} stageLabel={stageLabel} journeyKey={journeyKey} />
+            <StageContextBlock context={contexts[journeyKey]?.[stageId]} stageLabel={stageLabel} />
 
             {canEdit && !editing && (
               <button type="button"
@@ -203,6 +205,7 @@ export const PanelBody: FC<{
                 <DetailSection title="Edit tile" accent={S.primary}>
                   <TileEditor
                     initial={tile}
+                    driversById={driversById}
                     onSave={onApplyEdits}
                     onCancel={onCancelEdit}
                     onRemove={onRemove}

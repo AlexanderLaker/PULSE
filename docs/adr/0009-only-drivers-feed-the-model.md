@@ -17,7 +17,8 @@ scored drivers.
 - The Consumer Journey is qualitative: its tiles are authored, carry their
   provenance and an evidence grade, cite drivers by code and say that nothing
   in them is simulated.
-- The Profit Pool Explorer has its own graded data (`lib/profitPoolData.ts`)
+- The Profit Pool Explorer has its own graded data (`data/content/profit_pools.json`,
+  served by `GET /api/v1/explorer`; the arithmetic is `lib/profitPoolData.ts`)
   and does not read or write the simulation.
 
 ## Consequences

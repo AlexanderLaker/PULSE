@@ -32,13 +32,17 @@ export const WhyChain: FC<{
   const isExp = side === 'benefiting';
   const accent = isExp ? S.expansion : S.error;
 
-  // The net effect counts each cited driver by its own direction, independent of the tile's side.
+  // The net effect counts each cited driver by its own direction, independent
+  // of the tile's side. The direction is the live driver's, so the counts wait
+  // for the drivers; the forces come with the code map and are known at once.
   const drivers = citedDrivers(tile, driversById);
-  const up = drivers.filter(d => (d.live?.direction ?? d.info.direction) === 'Expansion').length;
-  const down = drivers.length - up;
+  const live = drivers.filter(d => d.live);
+  const up = live.filter(d => d.live?.direction === 'Expansion').length;
+  const down = live.length - up;
+  const directionsKnown = live.length === drivers.length;
   const forceCounts: Record<string, number> = {};
   drivers.forEach(d => {
-    const force = d.live?.force ?? d.info.force;
+    const force = d.live?.force ?? d.force;
     forceCounts[force] = (forceCounts[force] ?? 0) + 1;
   });
   const dominant = Object.entries(forceCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
@@ -87,14 +91,26 @@ export const WhyChain: FC<{
           <StepDot n={2} />
           <div style={stepLabel}>Net effect</div>
           <div className="rounded-xl" style={{ marginTop: 8, backgroundColor: S.surfaceContainer, padding: '12px 14px' }}>
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span className="inline-flex items-center gap-1" style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: S.expansion }}>
-                <TrendingUp size={14} strokeWidth={2.5} /> {up} tailwind
-              </span>
-              <span className="inline-flex items-center gap-1" style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: S.error }}>
-                <TrendingDown size={14} strokeWidth={2.5} /> {down} headwind
-              </span>
-            </div>
+            {/* A tile that cites no driver has its zero counts at once. */}
+            {driversLoaded || drivers.length === 0 ? (
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span className="inline-flex items-center gap-1" style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: S.expansion }}>
+                  <TrendingUp size={14} strokeWidth={2.5} /> {up} tailwind
+                </span>
+                <span className="inline-flex items-center gap-1" style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: S.error }}>
+                  <TrendingDown size={14} strokeWidth={2.5} /> {down} headwind
+                </span>
+                {!directionsKnown && (
+                  <span style={{ fontSize: 11, color: S.mutedText, fontStyle: 'italic' }}>
+                    counting the drivers the service holds
+                  </span>
+                )}
+              </div>
+            ) : (
+              <p style={{ fontSize: 12, color: S.mutedText, fontStyle: 'italic', margin: 0 }}>
+                The tailwind and headwind count follows once the drivers have loaded.
+              </p>
+            )}
             <p style={{ fontSize: 12.5, color: S.onSurface, lineHeight: 1.5, margin: '9px 0 0' }}>
               {dominant ? <>Dominant force <strong style={{ fontFamily: HEADLINE_FONT }}>{dominant}</strong>. </> : null}
               The strategist classifies this moment as <strong style={{ fontFamily: HEADLINE_FONT, color: accent }}>{isExp ? 'a tailwind' : 'a headwind'}</strong>.

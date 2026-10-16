@@ -1,21 +1,28 @@
 /**
- * proxy.ts: which requests need a Clerk session, and the role check in front
- * of the dashboard. Pages without a session go to the sign-in page, the
- * waiting page included, and dashboard routes answer 401; the sign-in pages,
- * the webhook, the bootstrap route and the PRISM API are left to their own
- * checks, and so is expiring the viewer cookie, which a page whose session
- * has ended must still be able to do. /dashboard also needs a role: a
- * signed-in user without one, and everyone while user_roles cannot be read,
- * is redirected to /pending before the App Router renders anything. No other
- * route reads the role here. Clerk's redirects and links lead to PRISM's own
- * sign-in and sign-up pages, which the proxy and the root layout name.
+ * proxy.ts: which requests need a Clerk session, the role check in front of
+ * the dashboard, and the Content Security Policy on every response that
+ * passes. Pages without a session go to the sign-in page, the waiting page
+ * included, and dashboard routes answer 401; the sign-in pages, the webhook,
+ * the bootstrap route and the PRISM API are left to their own checks, and so
+ * is expiring the viewer cookie, which a page whose session has ended must
+ * still be able to do. /dashboard also needs a role: a signed-in user without
+ * one, and everyone while user_roles cannot be read, is redirected to
+ * /pending before the App Router renders anything. No other route reads the
+ * role here. A request that passes gets a response with the policy and a
+ * fresh nonce, and the request headers handed to Next.js carry the same
+ * policy (where Next.js reads the nonce) and the nonce as x-nonce; a redirect
+ * and the 401 carry none. PRISM_CSP_REPORT_ONLY=1 renames the response header
+ * to report-only, and the request header keeps its name. Clerk's redirects
+ * and links lead to PRISM's own sign-in and sign-up pages, which the proxy
+ * and the root layout name.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { existsSync } from 'fs';
 import path from 'path';
 import type { ReactElement } from 'react';
 import { NextRequest } from 'next/server';
+import { NONCE_HEADER, POLICY_HEADER, REPORT_ONLY_HEADER, REQUEST_POLICY_HEADER } from '@/lib/csp';
 
 const clerk = vi.hoisted(() => ({ options: undefined as unknown }));
 vi.mock('@clerk/nextjs/server', () => ({
@@ -48,17 +55,40 @@ function run(path: string, method = 'GET', userId: string | null = null, headers
   return { result, auth, redirectToSignIn };
 }
 
+/** The response that lets the request through to Next.js, as NextResponse.next() marks it. */
+function passesThrough(res: Response | undefined): Response {
+  expect(res?.status).toBe(200);
+  expect(res?.headers.get('x-middleware-next')).toBe('1');
+  return res!;
+}
+
+/** The request header the proxy forwards to Next.js, as NextResponse.next({ request }) carries it. */
+const forwarded = (res: Response, name: string) => res.headers.get(`x-middleware-request-${name}`);
+
+const NONCE_SOURCE = /'nonce-([A-Za-z0-9+/]{22}==)'/;
+
+// The variables the policy reads, as the tests found them.
+const ENV = ['PRISM_CSP_REPORT_ONLY', 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY'] as const;
+const found = Object.fromEntries(ENV.map((name) => [name, process.env[name]]));
+
 beforeEach(() => {
   vi.clearAllMocks();
   roles.getRole.mockResolvedValue('viewer');
 });
 
+afterEach(() => {
+  for (const name of ENV) {
+    if (found[name] === undefined) delete process.env[name];
+    else process.env[name] = found[name];
+  }
+});
+
 describe('proxy.ts', () => {
   it('lets a signed-in user through, and a user with a role on to the dashboard', async () => {
-    expect(await run('/dashboard', 'GET', 'user_1').result).toBeUndefined();
+    passesThrough(await run('/dashboard', 'GET', 'user_1').result);
     expect(roles.getRole).toHaveBeenCalledWith('user_1');
-    expect(await run('/pending', 'GET', 'user_1').result).toBeUndefined();
-    expect(await run('/api/users', 'GET', 'user_1').result).toBeUndefined();
+    passesThrough(await run('/pending', 'GET', 'user_1').result);
+    passesThrough(await run('/api/users', 'GET', 'user_1').result);
   });
 
   it('sends a signed-in user without a role from the dashboard to the waiting page, before anything renders', async () => {
@@ -87,7 +117,7 @@ describe('proxy.ts', () => {
   it('reads the role for the dashboard only', async () => {
     roles.getRole.mockResolvedValue(null);
     for (const path of ['/pending', '/api/users', '/api/prism-cookie', '/dashboards']) {
-      expect(await run(path, 'GET', 'user_pending').result).toBeUndefined();
+      passesThrough(await run(path, 'GET', 'user_pending').result);
     }
     expect(roles.getRole).not.toHaveBeenCalled();
   });
@@ -111,9 +141,76 @@ describe('proxy.ts', () => {
       ['/api/admin/bootstrap', 'POST'], ['/api/v1/drivers', 'GET'], ['/api/prism-cookie', 'DELETE'],
     ]) {
       const { result, auth } = run(path!, method);
-      expect(await result).toBeUndefined();
+      passesThrough(await result);
       expect(auth).not.toHaveBeenCalled();
     }
+  });
+});
+
+describe('the Content Security Policy', () => {
+  it('goes on every response that passes through, with a nonce of its own', async () => {
+    const nonces = new Set<string>();
+    for (const [path, userId] of [['/dashboard', 'user_1'], ['/pending', 'user_1'], ['/api/users', 'user_1'],
+      ['/sign-in', null], ['/api/v1/drivers', null]] as const) {
+      const res = passesThrough(await run(path, 'GET', userId).result);
+      const policy = res.headers.get(POLICY_HEADER);
+      expect(policy, path).toMatch(/^default-src 'self'; script-src 'self' 'nonce-[^']+' 'strict-dynamic' https: 'unsafe-inline'/);
+      expect(policy).toContain("; frame-ancestors 'none'");
+      expect(policy).not.toMatch(/;$/);
+      expect(res.headers.get(REPORT_ONLY_HEADER)).toBeNull();
+      nonces.add(NONCE_SOURCE.exec(policy!)![1]!);
+    }
+    expect(nonces.size).toBe(5);
+  });
+
+  it('forwards the same policy and the nonce on the request headers Next.js renders with', async () => {
+    const res = passesThrough(await run('/dashboard', 'GET', 'user_1', { accept: 'text/html' }).result);
+    const policy = res.headers.get(POLICY_HEADER)!;
+    const nonce = NONCE_SOURCE.exec(policy)![1]!;
+    expect(forwarded(res, REQUEST_POLICY_HEADER)).toBe(policy);
+    expect(forwarded(res, NONCE_HEADER)).toBe(nonce);
+    expect(forwarded(res, 'accept')).toBe('text/html');   // the incoming headers are kept
+    const overridden = res.headers.get('x-middleware-override-headers')!.split(',');
+    expect(overridden).toEqual(expect.arrayContaining([REQUEST_POLICY_HEADER, NONCE_HEADER, 'accept']));
+  });
+
+  it('names the Clerk frontend API from the publishable key', async () => {
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = `pk_test_${btoa('clerk.example.com$')}`;
+    const withClerk = passesThrough(await run('/sign-in').result).headers.get(POLICY_HEADER)!;
+    expect(withClerk).toContain("connect-src 'self' https://clerk.example.com https://clerk-telemetry.com");
+    expect(withClerk).toContain("frame-src 'self' https://challenges.cloudflare.com https://clerk.example.com;");
+    delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    const without = passesThrough(await run('/sign-in').result).headers.get(POLICY_HEADER)!;
+    expect(without).toContain("connect-src 'self' https://clerk-telemetry.com");
+    expect(without).not.toContain('clerk.example.com');
+  });
+
+  it('is left off a redirect and the 401, which render no script', async () => {
+    roles.getRole.mockResolvedValue(null);
+    const pending = await run('/dashboard', 'GET', 'user_pending').result;
+    expect(pending?.status).toBe(307);
+    const signIn = await run('/dashboard').result;
+    expect(signIn?.status).toBe(307);
+    const unauthorised = await run('/api/users').result;
+    expect(unauthorised?.status).toBe(401);
+    for (const res of [pending, signIn, unauthorised]) {
+      expect(res?.headers.get(POLICY_HEADER)).toBeNull();
+      expect(res?.headers.get(REPORT_ONLY_HEADER)).toBeNull();
+      expect(res?.headers.get('x-middleware-override-headers')).toBeNull();
+    }
+  });
+
+  it('is sent as report-only with PRISM_CSP_REPORT_ONLY=1, while the request header keeps its name', async () => {
+    process.env.PRISM_CSP_REPORT_ONLY = '1';
+    const res = passesThrough(await run('/dashboard', 'GET', 'user_1').result);
+    const policy = res.headers.get(REPORT_ONLY_HEADER);
+    expect(policy).toMatch(NONCE_SOURCE);
+    expect(res.headers.get(POLICY_HEADER)).toBeNull();
+    expect(forwarded(res, REQUEST_POLICY_HEADER)).toBe(policy);
+    expect(forwarded(res, 'content-security-policy-report-only')).toBeNull();
+    expect(forwarded(res, NONCE_HEADER)).toBe(NONCE_SOURCE.exec(policy!)![1]);
+    process.env.PRISM_CSP_REPORT_ONLY = '0';
+    expect(passesThrough(await run('/dashboard', 'GET', 'user_1').result).headers.get(POLICY_HEADER)).toMatch(NONCE_SOURCE);
   });
 });
 

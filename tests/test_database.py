@@ -1,4 +1,4 @@
-"""Persistence: schema, drivers, proposals, runs, journey, audit.
+"""Persistence: schema, drivers, proposals, runs, journey, audit, the role lookup.
 
 The tests run on SQLite. With PRISM_TEST_POSTGRES_URL set, the last test runs
 this whole module again in a fresh interpreter against an empty PostgreSQL
@@ -556,6 +556,62 @@ class TestRunsJourneyAudit:
             db.load_drivers()
         diag = db.diagnose_connection()
         assert diag["reason"] == "no_database" and diag["error"] == "no database URL is set for this deployment"
+
+
+class TestUserRoles:
+    """The API's one read of the dashboard's table (prism/api/auth.py re-checks a token's role with it)."""
+
+    @staticmethod
+    def _create_user_roles(db) -> None:
+        """The table as lib/roles.ts creates it, without the timestamp defaults SQLite lacks a function for."""
+        with db.get_db_connection() as conn:
+            conn.cursor().execute(
+                "CREATE TABLE user_roles (clerk_user_id TEXT PRIMARY KEY, email TEXT NOT NULL, "
+                "role TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('admin', 'viewer')))")
+
+    def test_without_the_table_every_user_is_without_a_role(self, db):
+        """Only the dashboard creates user_roles, on its first role check: until then no row exists, and the
+        missing table is answered like no row, with the connection left usable."""
+        with db.get_db_connection() as conn:
+            assert "user_roles" not in db.table_names(conn.cursor())
+        assert db.load_user_role("user_1") is None
+        assert db.load_user_role("user_1") is None
+        assert db.load_drivers()[0].id == "consumer_r01"   # the next read works
+        with db.get_db_connection() as conn:
+            assert "user_roles" not in db.table_names(conn.cursor())   # and nothing created the table
+
+    def test_the_stored_role_by_clerk_user_id(self, db):
+        self._create_user_roles(db)
+        with db.get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"INSERT INTO user_roles (clerk_user_id, email, role) VALUES ({db.ph(3)})",
+                           ("user_admin", "a@example.com", "admin"))
+            cursor.execute(f"INSERT INTO user_roles (clerk_user_id, email, role) VALUES ({db.ph(3)})",
+                           ("user_viewer", "v@example.com", "viewer"))
+        assert db.load_user_role("user_admin") == "admin"
+        assert db.load_user_role("user_viewer") == "viewer"
+        assert db.load_user_role("user_pending") is None
+        assert db.load_user_role("") is None
+        assert db.load_user_role("USER_ADMIN") is None   # the id is matched exactly, as the dashboard matches it
+        with db.get_db_connection() as conn:
+            conn.cursor().execute("DELETE FROM user_roles WHERE clerk_user_id = 'user_admin'")
+        assert db.load_user_role("user_admin") is None   # a role taken away is gone at the next lookup
+
+    def test_the_lookup_is_one_parameterised_read(self, db):
+        """The id goes in as a parameter: an id shaped like SQL finds nothing and changes nothing."""
+        self._create_user_roles(db)
+        with db.get_db_connection() as conn:
+            conn.cursor().execute(f"INSERT INTO user_roles (clerk_user_id, email, role) VALUES ({db.ph(3)})",
+                                  ("user_admin", "a@example.com", "admin"))
+        assert db.load_user_role("user_admin' OR '1'='1") is None
+        assert db.load_user_role("x'; DELETE FROM user_roles; --") is None
+        assert _count(db, "SELECT COUNT(*) FROM user_roles") == 1
+
+    def test_a_database_out_of_reach_raises_as_every_read_does(self, db, monkeypatch):
+        monkeypatch.setattr(db, "_connect", lambda: (_ for _ in ()).throw(RuntimeError("no route to host")))
+        monkeypatch.setattr(db.time, "sleep", lambda s: None)
+        with pytest.raises(db.DatabaseUnavailableError):
+            db.load_user_role("user_admin")
 
 
 @pytest.mark.parametrize("url, sslmode, timeout", [

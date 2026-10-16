@@ -45,9 +45,10 @@ import useViewUrl, { ViewUrlProvider } from '@/hooks/useViewUrl';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import type { Role } from '@/types';
 
-// The Consumer Journey and the Explorer load on their first visit: their
-// content (data/consumerJourney.ts, lib/profitPoolData.ts) does not belong in
-// the initial bundle.
+// The Consumer Journey and the Explorer load on their first visit: their code
+// (the board, the chart and the drawer) does not belong in the initial bundle.
+// Their content is not in any bundle: each fetches it from the API when it
+// opens (GET /api/v1/journey, GET /api/v1/explorer).
 const ConsumerJourney = dynamic(
   () => import('@/components/dashboard/ConsumerJourney'),
   { loading: () => <PaneSkeleton />, ssr: false },

@@ -2,12 +2,12 @@
  * The journey board's small parts: the journey switch and type filter, a
  * stage's roll-up, a tile in the stage rail, the sections of the tile dialog,
  * the text of a Strategist Read, a cited driver's card and the stage context.
+ * The stage contexts arrive with the journey the API serves and reach the
+ * context block as a prop; nothing here imports content.
  */
 import type { FC, ReactNode } from 'react';
 import { TrendingUp, TrendingDown, ExternalLink } from 'lucide-react';
-import {
-  LHC_CTX, HAIR_CTX, type JourneyKey, type JourneyTile, type PoolImpactGrade, type TileType,
-} from '@/data/consumerJourney';
+import type { JourneyTile, PoolImpactGrade, StageContext, TileType } from '@/data/consumerJourney';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT, FIGURES } from '@/lib/theme';
 import Chip from '@/components/dashboard/Chip';
 import {
@@ -212,20 +212,19 @@ export const TilePill: FC<{
 // ════════════════════════════════════════════════════════════════════════
 
 /**
- * A driver behind the moment: the live driver once the drivers have loaded
- * (the code map's name and first sentence until then), with its own direction
- * chip, what that direction means for this moment, and a link to the Drivers
- * page.
+ * A driver behind the moment: its code and force from the code map and, once
+ * the drivers have loaded, the live driver's name, direction chip, what that
+ * direction means for this moment and its description; until then the code
+ * and the force only. A link opens the Drivers page searched for the driver
+ * (its name, or its code while the name is not known).
  */
 export const DriverForceCard: FC<{
   driver: CitedDriver;
   driversLoaded: boolean;
   onNavigateToDriver?: (query: string) => void;
-}> = ({ driver: { code, info, live }, driversLoaded, onNavigateToDriver }) => {
-  const c = forceColor(info.force);
-  const name = live?.name ?? info.name;
-  const isExp = (live?.direction ?? info.direction) === 'Expansion';
-  const description = live?.description ?? (driversLoaded ? '' : info.firstSentence);
+}> = ({ driver: { code, force, live }, driversLoaded, onNavigateToDriver }) => {
+  const c = forceColor(force);
+  const isExp = live?.direction === 'Expansion';
   const sourceCount = live?.sources.length ?? 0;
 
   return (
@@ -239,33 +238,42 @@ export const DriverForceCard: FC<{
         >
           {code}
         </span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: S.onSurface, fontFamily: HEADLINE_FONT, lineHeight: 1.3, flex: 1, minWidth: 0 }}>{name}</span>
+        {live && (
+          <span style={{ fontSize: 12, fontWeight: 700, color: S.onSurface, fontFamily: HEADLINE_FONT, lineHeight: 1.3, flex: 1, minWidth: 0 }}>{live.name}</span>
+        )}
         <span
           className="inline-flex items-center gap-1.5 rounded-full font-bold"
-          style={{ fontSize: 11, padding: '1px 7px', backgroundColor: `${c}14`, color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap' }}
+          style={{ fontSize: 11, padding: '1px 7px', backgroundColor: `${c}14`, color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap', marginLeft: live ? undefined : 'auto' }}
         >
           <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: c, display: 'inline-block' }} />
-          {info.force}
+          {force}
         </span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 9, flexWrap: 'wrap' }}>
-        <Chip kind={isExp ? 'expansion' : 'contraction'} compact />
-        <span className="inline-flex items-center gap-1" style={{ fontSize: 11, color: isExp ? S.expansionInk : S.contractionInk, fontWeight: 600 }}>
-          {isExp ? <TrendingUp size={11} strokeWidth={2.5} aria-hidden="true" /> : <TrendingDown size={11} strokeWidth={2.5} aria-hidden="true" />}
-          {isExp ? 'tailwind for this moment' : 'headwind for this moment'}
-        </span>
-      </div>
-      {description && (
-        <p style={{ fontSize: 11.5, color: S.onSurfaceVariant, lineHeight: 1.5, margin: '9px 0 0' }}>
-          {description}
-          {!live && !driversLoaded && (
-            <span style={{ color: S.mutedText, fontStyle: 'italic' }}> (the drivers have not loaded yet)</span>
+      {live ? (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 9, flexWrap: 'wrap' }}>
+            <Chip kind={isExp ? 'expansion' : 'contraction'} compact />
+            <span className="inline-flex items-center gap-1" style={{ fontSize: 11, color: isExp ? S.expansionInk : S.contractionInk, fontWeight: 600 }}>
+              {isExp ? <TrendingUp size={11} strokeWidth={2.5} aria-hidden="true" /> : <TrendingDown size={11} strokeWidth={2.5} aria-hidden="true" />}
+              {isExp ? 'tailwind for this moment' : 'headwind for this moment'}
+            </span>
+          </div>
+          {live.description && (
+            <p style={{ fontSize: 11.5, color: S.onSurfaceVariant, lineHeight: 1.5, margin: '9px 0 0' }}>
+              {live.description}
+            </p>
           )}
+        </>
+      ) : (
+        <p style={{ fontSize: 11.5, color: S.mutedText, fontStyle: 'italic', lineHeight: 1.5, margin: '9px 0 0' }}>
+          {driversLoaded
+            ? 'The service holds no driver with this code.'
+            : 'The drivers have not loaded yet: the name, direction and description follow.'}
         </p>
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 9, flexWrap: 'wrap' }}>
         <button type="button"
-          onClick={() => onNavigateToDriver?.(name)}
+          onClick={() => onNavigateToDriver?.(live?.name ?? code)}
           className="inline-flex items-center gap-1.5"
           style={{
             fontSize: 11, fontWeight: 700, color: S.primary, background: 'none',
@@ -288,12 +296,12 @@ export const DriverForceCard: FC<{
 };
 
 // ════════════════════════════════════════════════════════════════════════
-// Stage context (always visible), looked up by stage id
+// Stage context (always visible): the stage's entry of the contexts the API
+// served with the journey; a stage without one shows no block
 // ════════════════════════════════════════════════════════════════════════
-export const StageContextBlock: FC<{ stageId: string; stageLabel: string; journeyKey: JourneyKey }> = ({
-  stageId, stageLabel, journeyKey,
+export const StageContextBlock: FC<{ context: StageContext | undefined; stageLabel: string }> = ({
+  context: ctx, stageLabel,
 }) => {
-  const ctx = (journeyKey === 'lhc' ? LHC_CTX : HAIR_CTX)[stageId];
   if (!ctx) return null;
   const rows: Array<{ label: string; value: string }> = [
     { label: 'Henkel brands', value: ctx.henkelBrands },

@@ -44,31 +44,13 @@ def region_map(scores: dict | None = None) -> dict:
     return {r: (scores or {}).get(r, 0) for r in REGIONS}
 
 
-def bundled_journey() -> dict:
-    """The Consumer Journey tile map the dashboard ships: LHC_JOURNEY and
-    HAIR_JOURNEY from data/consumerJourney.ts, which are JSON literals."""
-    src = (REPO / "data" / "consumerJourney.ts").read_text(encoding="utf-8")
+#: The hand-authored content files the API's content modules are generated from.
+JOURNEY_CONTENT = REPO / "data" / "content" / "consumer_journey.json"
+POOLS_CONTENT = REPO / "data" / "content" / "profit_pools.json"
 
-    def extract(name):
-        start = src.index("[", src.index("=", src.index(f"export const {name}")))
-        depth, in_string, escaped = 0, False, False
-        for i in range(start, len(src)):
-            ch = src[i]
-            if in_string:
-                if escaped:
-                    escaped = False
-                elif ch == "\\":
-                    escaped = True
-                elif ch == '"':
-                    in_string = False
-                continue
-            if ch == '"':
-                in_string = True
-            elif ch in "[{":
-                depth += 1
-            elif ch in "]}":
-                depth -= 1
-                if depth == 0:
-                    return json.loads(src[start:i + 1])
-        raise AssertionError(f"{name} not found in data/consumerJourney.ts")
-    return {"lhc": extract("LHC_JOURNEY"), "hair": extract("HAIR_JOURNEY")}
+
+def bundled_journey() -> dict:
+    """The base Consumer Journey tile map, {lhc: [stage...], hair: [stage...]}:
+    the tiles of data/content/consumer_journey.json, which the API serves
+    until an admin saves an edit."""
+    return json.loads(JOURNEY_CONTENT.read_text(encoding="utf-8"))["tiles"]

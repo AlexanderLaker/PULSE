@@ -1,22 +1,28 @@
 /**
  * The driver code map (data/driverCodeMap.ts, generated from
  * data/drivers/driver_base.json): one code per driver of the base, each code
- * built from its driver's force and id and agreeing with the driver's name,
- * force and direction, and every code the Consumer Journey content cites or
- * names is a live driver. tests/test_driver_base.py checks the same map
- * against prism/seed_drivers.py.
+ * built from its driver's force and id, and nothing else of the driver (no
+ * name, direction or text: the map ships in the public bundle, the drivers
+ * come from the API). Every code the Consumer Journey content
+ * (data/content/consumer_journey.json) cites or names is a live driver.
+ * tests/test_driver_base.py checks the same map against prism/seed_drivers.py.
  */
 import { describe, it, expect } from 'vitest';
+import * as fs from 'fs';
+import * as path from 'path';
 import { DRIVER_CODE_MAP, codeForDriverId } from '@/data/driverCodeMap';
-import { LHC_JOURNEY, HAIR_JOURNEY, LHC_CTX, HAIR_CTX } from '@/data/consumerJourney';
+import type { JourneyContent, JourneyContexts } from '@/data/consumerJourney';
 import driverBase from '@/data/drivers/driver_base.json';
+import journey from '@/data/content/consumer_journey.json';
 
 const LETTER: Record<string, string> = {
   Consumer: 'C', Customer: 'K', Technology: 'T', Government: 'G', Environmental: 'E', Competitive: 'X',
 };
 
 const CODES = Object.keys(DRIVER_CODE_MAP);
-const TILES = [...LHC_JOURNEY, ...HAIR_JOURNEY].flatMap((s) => [...s.benefiting, ...s.negativelyImpacted]);
+const { tiles, contexts } = journey as unknown as { tiles: JourneyContent; contexts: JourneyContexts };
+const TILES = [...tiles.lhc, ...tiles.hair].flatMap((s) => [...s.benefiting, ...s.negativelyImpacted]);
+const MAP_SOURCE = fs.readFileSync(path.resolve(__dirname, '..', '..', 'data', 'driverCodeMap.ts'), 'utf8');
 
 describe('DRIVER_CODE_MAP', () => {
   it('holds one code per driver of the base', () => {
@@ -35,16 +41,21 @@ describe('DRIVER_CODE_MAP', () => {
     }
   });
 
-  it("agrees with each driver's id, name, force, direction and description", () => {
+  it("agrees with each driver's id and force", () => {
     for (const d of driverBase.drivers) {
       const info = DRIVER_CODE_MAP[d.code];
       expect(info.driverId).toBe(d.id);
-      expect(info.name).toBe(d.name);
       expect(info.force).toBe(d.force);
-      expect(info.direction).toBe(d.direction);
-      expect(info.firstSentence.length).toBeGreaterThan(0);
-      expect(d.description.startsWith(info.firstSentence.replace(/…$/, ''))).toBe(true);
     }
+  });
+
+  it('carries no name, direction or text of a driver: the id and the force only', () => {
+    for (const code of CODES) expect(Object.keys(DRIVER_CODE_MAP[code]).sort()).toEqual(['driverId', 'force']);
+    for (const d of driverBase.drivers) {
+      expect(MAP_SOURCE.includes(d.name), d.code).toBe(false);
+      expect(MAP_SOURCE.includes(d.description.slice(0, 40)), d.code).toBe(false);
+    }
+    expect(MAP_SOURCE).not.toMatch(/"(?:name|direction|firstSentence|description)":/);
   });
 
   it('finds the code of a driver id, and nothing for an unknown one', () => {
@@ -63,7 +74,7 @@ describe('Consumer Journey content', () => {
   it('names only live driver codes in its notes, reads and stage contexts', () => {
     const texts = [
       ...TILES.flatMap((t) => [t.name, t.driverNote, t.analysis ?? '']),
-      ...[LHC_CTX, HAIR_CTX].flatMap((ctx) => Object.values(ctx).flatMap((c) => [c.henkelBrands, c.competitors, c.opportunity])),
+      ...[contexts.lhc, contexts.hair].flatMap((ctx) => Object.values(ctx).flatMap((c) => [c.henkelBrands, c.competitors, c.opportunity])),
     ];
     const named = new Set(texts.flatMap((t) => t.match(/\b[CKTGEX]-\d\d\b/g) ?? []));
     expect(named.size).toBeGreaterThan(0);

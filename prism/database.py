@@ -830,7 +830,7 @@ def latest_run_summary() -> dict[str, Any] | None:
 
 def load_journey_content() -> dict[str, Any]:
     """{"version": id of the newest row, "content": its tile map}; version 0 and
-    content None while nothing is stored (the dashboard's bundled content applies)."""
+    content None while nothing is stored (the API's base content, prism/journey_content.py, applies)."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT id, content FROM journey_content ORDER BY id DESC LIMIT 1")
@@ -845,7 +845,7 @@ def save_journey_content(content: dict, updated_by: str, base_version: int,
                          audit: Callable[[int], AuditEntry] | None = None) -> int:
     """Store a new version of the journey content ({lhc, hair}); returns its version.
 
-    ``base_version`` is the version the editor loaded (0 for the bundled
+    ``base_version`` is the version the editor loaded (0 for the base
     content). If another save has happened since, StaleVersionError is raised
     and nothing is written. The check and the insert run under a lock that
     serialises saves (PostgreSQL) or under SQLite's write lock. ``audit``
@@ -873,6 +873,34 @@ def save_journey_content(content: dict, updated_by: str, base_version: int,
             insert_audit(cursor, [audit(version)])
     logger.info("Saved journey content version %d (by %s)", version, updated_by or "unknown")
     return version
+
+
+# ── User roles ──────────────────────────────────────────────────────────────
+# The dashboard owns user_roles (lib/roles.ts creates it and writes it); the
+# API only reads it, to check a token's role on every request (prism/api/auth.py).
+
+def load_user_role(clerk_user_id: str) -> str | None:
+    """The stored role of a Clerk user id (admin or viewer), or None: no row,
+    the user is pending or was set back to pending; or no user_roles table
+    yet, which only the dashboard creates, on its first role check.
+
+    One indexed read of the primary key. A database that cannot be reached
+    raises DatabaseUnavailableError, as every read does.
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f"SELECT role FROM user_roles WHERE clerk_user_id = {placeholder()}", (clerk_user_id,))
+        except Exception as e:
+            if not is_missing_table(e):
+                raise
+            conn.rollback()   # PostgreSQL abandons the transaction after the error; nothing was written
+            return None
+        row = cursor.fetchone()
+    if row is None:
+        return None
+    role = _row(row)["role"]
+    return None if role is None else str(role)
 
 
 # ── Expert score proposals ──────────────────────────────────────────────────

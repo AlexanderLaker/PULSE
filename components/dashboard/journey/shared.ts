@@ -8,7 +8,7 @@
 import type {
   JourneyKey, JourneyStageDef, JourneyTile, TileType, PoolImpactGrade, ProvenanceGrade,
 } from '@/data/consumerJourney';
-import { DRIVER_CODE_MAP, type DriverCodeInfo } from '@/data/driverCodeMap';
+import { DRIVER_CODE_MAP } from '@/data/driverCodeMap';
 import type { Driver, ForceName } from '@/types';
 import { S, EXPANSION_RGB, CONTRACTION_RGB } from '@/lib/theme';
 import { FORCE_COLORS } from '@/lib/format';
@@ -69,15 +69,17 @@ export interface TileEdits {
  *  version must be loaded before the next save. */
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error' | 'forbidden' | 'conflict' | 'uncertain';
 
-/** Where the content on screen came from: the stored version, the bundled copy
- *  (nothing stored yet), or the bundled copy because the stored one could not
- *  be loaded. Saving is possible only once the answer is known. */
-export type ContentOrigin = 'loading' | 'stored' | 'bundled' | 'unavailable';
+/** Where the content on screen came from: the newest stored version, the base
+ *  content the API serves while nothing is stored yet, or nowhere, because
+ *  the API could not be reached (the board then shows no tiles). Saving is
+ *  possible only once the content is known. */
+export type ContentOrigin = 'loading' | 'stored' | 'base' | 'unavailable';
 
-/** A cited driver: its code-map entry and, once the drivers have loaded, the live row. */
+/** A cited driver: its code and force from the code map and, once the drivers
+ *  have loaded, the live row, which carries the name, direction and description. */
 export interface CitedDriver {
   code: string;
-  info: DriverCodeInfo;
+  force: ForceName;
   live: Driver | undefined;
 }
 
@@ -133,8 +135,8 @@ export const stageSpan = (s: JourneyStageDef, journeyKey: JourneyKey): 1 | 2 =>
  *  has is left out rather than drawn as a driver. */
 export const citedDrivers = (tile: JourneyTile, driversById: Map<string, Driver>): CitedDriver[] =>
   Array.from(new Set(tile.driverCodes)).flatMap(code => {
-    const info = DRIVER_CODE_MAP[code];
-    return info ? [{ code, info, live: driversById.get(info.driverId) }] : [];
+    const entry = DRIVER_CODE_MAP[code];
+    return entry ? [{ code, force: entry.force, live: driversById.get(entry.driverId) }] : [];
   });
 
 /** The words for a tile's intensity, 1 to 3. */

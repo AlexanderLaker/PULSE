@@ -6,7 +6,11 @@
  * /api/prism-cookie sets (see hooks/usePrism.tsx). The cookie lasts thirty
  * minutes; a /api/v1 request answered 401 asks for a new one and is sent
  * once more, so a dashboard left open keeps working while the session lasts,
- * and signing out expires the cookie first (clearViewerCookie). Admin writes
+ * and signing out expires the cookie first (clearViewerCookie). The API also
+ * looks the user's role up on every request, so a role taken away shows at
+ * the next request: a /api/v1 request answered 403 with the code no_role
+ * takes the page to /dashboard, whose role check shows the waiting page
+ * (accessWithdrawn). Admin writes
  * go to the dashboard's own routes under /api, which check the signed-in
  * user's role and forward the write with a short-lived admin token
  * (lib/adminWrite.ts): the viewer cookie can never authorise an admin write.
@@ -16,7 +20,8 @@ import type {
   DiagnosticsResult, Driver, DriverProposal, DriverProposalsResponse, DriverUpdate,
   Access, HealthStatus, ModelConfig, Role, SimulationPayload, SimulationResult,
 } from '@/types';
-import type { JourneyContent } from '@/data/consumerJourney';
+import type { JourneyContent, JourneyContexts } from '@/data/consumerJourney';
+import type { PoolView } from '@/lib/profitPoolData';
 import { errorDetail } from '@/lib/apiError';
 
 /** No request may hang: 20 s covers a serverless database waking up. */
@@ -57,8 +62,13 @@ async function send<T>(url: string, init: RequestInit = {}, retried = false): Pr
   }
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { code?: unknown } | null;
-    throw new ApiError(res.status, errorDetail(body) ?? `Request failed (${res.status})`,
+    const error = new ApiError(res.status, errorDetail(body) ?? `Request failed (${res.status})`,
       write && GATEWAY_STATUSES.has(res.status), typeof body?.code === 'string' ? body.code : null);
+    // The API checks the stored role on every request: a /api/v1 request
+    // refused because the user has no role any more ends the page's stay on
+    // the dashboard, whatever view made it.
+    if (error.status === 403 && error.code === 'no_role' && url.startsWith('/api/v1/')) accessWithdrawn();
+    throw error;
   }
   return (await res.json()) as T;
 }
@@ -85,9 +95,10 @@ let priming: Promise<void> | null = null;
 const expireViewerCookie = (): Promise<void> =>
   fetch('/api/prism-cookie', { method: 'DELETE' }).then(() => undefined, () => undefined);
 
-/** The user's role was taken away while the page was open: a full navigation
- *  to /dashboard, where the role check (proxy.ts) sends them to the waiting
- *  page instead of leaving a dashboard whose reads fail. */
+/** The user's role was taken away while the page was open (a viewer cookie
+ *  refused, or a /api/v1 request answered 403 with the code no_role): a full
+ *  navigation to /dashboard, where the role check (proxy.ts) sends them to
+ *  the waiting page instead of leaving a dashboard whose reads fail. */
 const accessWithdrawn = (): void => { window.location.replace('/dashboard'); };
 
 /** Sets the viewer cookie the /api/v1 reads need. When it cannot be set, any
@@ -166,11 +177,14 @@ export const getConfig = (): Promise<ModelConfig> => send('/api/v1/config');
 
 // ── Consumer Journey content ────────────────────────────────────────────────
 
-/** The stored journey content and its version; content null and version 0
- *  while the bundled content applies. */
+/** The journey as the API serves it: the tiles of the newest saved version
+ *  (`source` 'stored'), else the base content with version 0 (`source`
+ *  'base'), and the stage contexts, which are not editable. */
 export interface StoredJourney {
   version: number;
-  content: JourneyContent | null;
+  source: 'stored' | 'base';
+  content: JourneyContent;
+  contexts: JourneyContexts;
 }
 
 export const getJourneyContent = (): Promise<StoredJourney> => send('/api/v1/journey');
@@ -182,6 +196,12 @@ export const saveJourneyContent = (
   content: JourneyContent, baseVersion: number,
 ): Promise<{ status: 'saved'; version: number; tiles: number }> =>
   send('/api/journey', put({ base_version: baseVersion, content }));
+
+// ── Profit Pool Explorer content ────────────────────────────────────────────
+
+/** The Explorer's views (data/content/profit_pools.json, served by the API);
+ *  the arithmetic on them is lib/profitPoolData.ts. */
+export const getExplorerViews = (): Promise<{ views: PoolView[] }> => send('/api/v1/explorer');
 
 // ── Users (dashboard routes) ────────────────────────────────────────────────
 

@@ -1034,7 +1034,7 @@ class TestShippedEditFiles:
             assert sha(e["text"]) not in e["previous_sha256"], driver_id
 
     def test_journey_edits_end_on_the_shipped_content(self):
-        """Every entry ends on the text the dashboard ships: a tile's name, driver note or read, or a stage's
+        """Every entry ends on the text of the base content: a tile's name, driver note or read, or a stage's
         label."""
         edits = json.loads((MIGRATION_DIR / "journey_edits.json").read_text(encoding="utf-8"))["edits"]
         journeys = bundled_journey().values()
@@ -1053,12 +1053,12 @@ class TestShippedEditFiles:
 
     def test_nothing_a_release_shipped_is_left_behind(self):
         """Every tile and stage shipped since release 2.11.0 (by its deployment and the two of 2.12.0;
-        shipped_journey_sha256.json holds SHA-256 prefixes) ends as the dashboard ships it. Its texts (a
+        shipped_journey_sha256.json holds SHA-256 prefixes) ends as the base content has it. Its texts (a
         tile's name, driver note and read, a stage's label) are the current ones or journey_edits.json
         carries them there; everything else it holds after the migration's own changes ("rest") already
-        equals the bundled item, because the migration carries nothing else. A text changed in
-        data/consumerJourney.ts without an entry, or any other change to a tile or stage, would stay
-        behind in a migrated database."""
+        equals the base item, because the migration carries nothing else. A text changed in
+        data/content/consumer_journey.json without an entry, or any other change to a tile or stage, would
+        stay behind in a migrated database."""
         shipped = json.loads((MIGRATION_DIR / "shipped_journey_sha256.json").read_text(encoding="utf-8"))
         edits = {(e.get("tile") or e["stage"], e["field"]): e for e in json.loads(
             (MIGRATION_DIR / "journey_edits.json").read_text(encoding="utf-8"))["edits"]}

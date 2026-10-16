@@ -125,10 +125,11 @@ compares:
 | `python3 scripts/build_cell_weights.py --check` | the cell-weight record, `lib/cellWeightProvenance.ts`, `prism/cell_weight_estimate.py` |
 | `python3 scripts/compute_overlap_correction.py --check` | the overlap-correction record, `prism/overlap_correction.py` |
 | `python3 scripts/build_driver_analysis.py --check` | the attribution record, the PRISM Analysis texts (`prism/analysis_texts.py`), the parity fixture |
+| `python3 scripts/build_content.py --check` | the Consumer Journey and Profit Pool Explorer content the API serves (`prism/journey_content.py`, `prism/explorer_content.py`, from `data/content/*.json`) |
 
 CI (`.github/workflows/ci.yml`) runs two jobs on every push to `main` and on
 every pull request: the dashboard checks and a production build, and the
-Python lint, suite (with a PostgreSQL service) and the four generator checks.
+Python lint, suite (with a PostgreSQL service) and the five generator checks.
 Started by hand (Actions, ci, Run workflow), it also runs the full production
 run against the reference run.
 The build prerenders pages inside ClerkProvider, which needs a publishable
@@ -158,8 +159,8 @@ A few rules the suite holds:
   category names the PRISM Analysis uses, the uncertainty tables, the
   per-driver attribution, the PRISM Analysis labels, the driver request
   shapes, the estimate's label, the earliest peak year, the token secret's
-  minimum length and the Consumer Journey tile shape exist in Python and
-  TypeScript; tests keep each pair identical.
+  minimum length, the Consumer Journey tile shape and the Explorer's view
+  shape exist in Python and TypeScript; tests keep each pair identical.
 - **Colours** come from `lib/theme.ts` (the force and category palettes
   from `lib/format.ts`): a literal colour anywhere else in the dashboard's
   code, a named one or a class of Tailwind's own palette included, fails
@@ -338,10 +339,22 @@ curl -s https://prism-hcb.vercel.app/api/v1/health
 ```
 
 must answer `"status": "ok"` with the driver count and `"has_simulation":
-true`, and `curl -sI https://prism-hcb.vercel.app/` must show the security
-headers of `vercel.json` (`content-security-policy: frame-ancestors 'none'`
-among them). Then open the dashboard and check that the Shift Analysis shows the
-expected run. `/api/v1/diagnostics` explains a problem (see Troubleshooting).
+true`, and `curl -sI https://prism-hcb.vercel.app/sign-in` must show the
+security headers of `vercel.json` and the proxy's policy
+(`content-security-policy: default-src 'self'; script-src 'self' 'nonce-`
+and so on, or `content-security-policy-report-only` while
+`PRISM_CSP_REPORT_ONLY=1` is set). Then open the dashboard and check that the
+Shift Analysis shows the expected run. `/api/v1/diagnostics` explains a
+problem (see Troubleshooting).
+
+**The first deployment of a changed policy.** Set `PRISM_CSP_REPORT_ONLY=1`
+in the project's environment variables for that deployment, then open the
+sign-in page, each view of the dashboard, a drill-down, a PNG export, a
+print preview, Settings and a wrong address (the not-found page) with the
+browser console open: a violation is reported there as
+`Content-Security-Policy-Report-Only`. Fix what is
+reported (`lib/csp.ts`), remove the variable, and the policy is enforced
+from the next deployment.
 
 A deploy never needs a restart for data to appear: each API instance checks
 the database on every request that reads the drivers or the run, and reloads
@@ -505,8 +518,13 @@ User management, which lists pending users first. Choosing Viewer or Admin
 for a pending user, and confirming, approves them. Choosing Pending for a
 user, and confirming, takes their role away: from their next page load they
 see the waiting page, and a dashboard they have open loses access within 30
-minutes, when its viewer cookie runs out (an admin write is refused at once,
-as each is checked against `user_roles`). Admins never change their own
+minutes at the latest, when its viewer cookie runs out, and in practice at
+its next request. On PostgreSQL the API re-checks the role in `user_roles`
+on every request and refuses a user without one, on which the dashboard
+leaves for the waiting page; on SQLite, a development machine, there is no
+role table and the API does not re-check. An admin write is refused at once
+either way, as the dashboard's route checks `user_roles` before forwarding
+it and the API checks again. Admins never change their own
 role, and a change is made only while the user's access is still what the
 list shows and the admin is still admin, so two admins working at the same
 moment cannot undo each other's changes unseen or leave PRISM without an
@@ -654,6 +672,7 @@ approximate engine.
 
 On another host, set the security headers of `vercel.json` (listed in
 docs/ARCHITECTURE.md, Deployment) at its proxy or web server: Vercel applies
-them today, and nothing else in PRISM does. The API's interactive
+them today, and nothing else in PRISM does. The Content Security Policy
+needs nothing of the host: `proxy.ts` sets it wherever Next.js runs. The API's interactive
 documentation stays off there as on Vercel, since only `PRISM_API_DOCS=1`
 turns it on.

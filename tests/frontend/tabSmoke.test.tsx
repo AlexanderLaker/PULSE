@@ -6,6 +6,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import { makeStore } from './fixtures/prism';
+import journey from '@/data/content/consumer_journey.json';
+import pools from '@/data/content/profit_pools.json';
 
 const STORE = vi.hoisted(() => ({ store: {} as unknown }));
 
@@ -14,12 +16,16 @@ vi.mock('@/hooks/usePrism', () => ({
   default: () => STORE.store,
   PrismProvider: ({ children }: { children: unknown }) => children,
 }));
+// The Consumer Journey and the Explorer fetch their content: the API's answers, from the authored JSON.
 vi.mock('@/lib/apiClient', () => ({
   getDiagnostics: vi.fn(async () => null),
   getDriverProposals: vi.fn(async () => null),
   saveMyProposal: vi.fn(async () => null),
-  getJourneyContent: vi.fn(async () => ({ version: 0, content: null })),
+  getJourneyContent: vi.fn(async () => ({
+    version: 0, source: 'base', content: journey.tiles, contexts: journey.contexts,
+  })),
   saveJourneyContent: vi.fn(),
+  getExplorerViews: vi.fn(async () => ({ views: pools.views })),
 }));
 
 class ResizeObserverStub {
@@ -56,10 +62,10 @@ describe('every tab mounts on a complete store', () => {
     expect(await findByText('AI stain/fabric recognition apps')).toBeTruthy();
   });
 
-  it('Profit Pool Explorer, whose card says what the view covers rather than repeating the group', () => {
-    const { container, getByText } = render(<ProfitPoolExplorer />);
-    expect(container.textContent).toContain('Laundry Care: Industry Value Chain Profit Pool');
-    expect(getByText('Value Chain · revenue pool ~€277bn')).toBeTruthy();
+  it('Profit Pool Explorer, whose card says what the view covers rather than repeating the group', async () => {
+    const { container, findByText } = render(<ProfitPoolExplorer />);
+    expect(await findByText('Laundry Care: Industry Value Chain Profit Pool')).toBeTruthy();
+    expect(container.textContent).toContain('Value Chain · revenue pool ~€277bn');
   });
 
   it('the entry gate', () => {

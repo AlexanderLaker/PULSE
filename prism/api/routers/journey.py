@@ -1,10 +1,12 @@
-"""Consumer Journey content: the admin-edited tile map ({lhc, hair}).
+"""Consumer Journey content: the tile map ({lhc, hair}) and the stage contexts.
 
-The dashboard ships the content as data/consumerJourney.ts; once an admin
-saves an edit, the newest stored version takes precedence over that bundled
-copy. A save must be a tile map the dashboard can render (prism/journey.py)
-and names the version it was edited from, so an admin never overwrites a save
-made in the meantime without seeing it.
+The base content is prism/journey_content.py (generated from
+data/content/consumer_journey.json; confidential, so it never ships with the
+dashboard's code). Once an admin saves an edit, the newest stored version
+takes the base map's place; the stage contexts come from the module with
+every version and are not edited. A save must be a tile map the dashboard can
+render (prism/journey.py) and names the version it was edited from, so an
+admin never overwrites a save made in the meantime without seeing it.
 """
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
@@ -13,6 +15,7 @@ from prism import database
 from prism.api import state
 from prism.api.auth import identity_from_user, require_admin, require_auth
 from prism.journey import JOURNEYS, SIDES, content_problem
+from prism.journey_content import CONTEXTS, TILES
 
 router = APIRouter()
 
@@ -27,10 +30,14 @@ class JourneySave(BaseModel):
 
 @router.get("/api/v1/journey")
 def get_journey_content(user: dict = Depends(require_auth)):
-    """{"version", "content"}: the newest stored version, or version 0 and
-    content null while the dashboard's bundled content applies."""
+    """{"version", "source", "content", "contexts"}: the newest stored tile map
+    (source "stored") or, while nothing is stored, the base map with version 0
+    (source "base"); the stage contexts in either case."""
     state.ensure_schema()
-    return database.load_journey_content()
+    stored = database.load_journey_content()
+    if stored["content"] is None:
+        return {"version": 0, "source": "base", "content": TILES, "contexts": CONTEXTS}
+    return {"version": stored["version"], "source": "stored", "content": stored["content"], "contexts": CONTEXTS}
 
 
 @router.put("/api/v1/journey")

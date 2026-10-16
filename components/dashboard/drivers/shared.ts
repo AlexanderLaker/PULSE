@@ -3,7 +3,7 @@
  * and value-chain labels, the uncertainty label and the colours of the
  * scoring modes.
  */
-import { DRIVER_CODE_MAP, codeForDriverId } from '@/data/driverCodeMap';
+import { codeForDriverId } from '@/data/driverCodeMap';
 import { EXPANSION } from '@/lib/format';
 import { S } from '@/lib/theme';
 import { UNCERTAINTY_LABELS } from '@/lib/uncertainty';
@@ -11,11 +11,9 @@ import { VC_STAGES, stageIndex } from '@/lib/valueChain';
 import type { DriverProposal } from '@/types';
 
 // ─── Display codes ─────────────────────────────────────────────────
-/** A driver's display code ("C-01") from the generated code map: by its id,
- *  else by its name (a database seeded from an older base may carry an id the
- *  map does not know); undefined when neither matches. */
-export const driverCode = (d: { id: string; name: string }): string | undefined =>
-  codeForDriverId(d.id) ?? Object.entries(DRIVER_CODE_MAP).find(([, v]) => v.name === d.name)?.[0];
+/** A driver's display code ("C-01") from the generated code map, by its id;
+ *  undefined for an id the map does not know. */
+export const driverCode = (d: { id: string }): string | undefined => codeForDriverId(d.id);
 
 // ─── A proposal counts as a rating ─────────────────────────────────
 /** The rule behind the Rated pill and the rating progress: a proposal with a

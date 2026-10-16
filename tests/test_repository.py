@@ -16,6 +16,9 @@
   own spelling; tests/frontend/interfaceCopy.test.tsx holds the dashboard to
   the same list).
 - Scripts are entry points: no script or migration imports another script.
+- The content behind the API (data/content/*.json, the Consumer Journey and
+  the Profit Pool Explorer) is confidential: nothing under app/, components/,
+  hooks/ or lib/ imports it, so none of it reaches the dashboard's bundle.
 - The tracked files pass the handover's scan for secret-shaped strings.
 - README.md's configuration table and .env.example name the same variables,
   and every variable the code reads is one of them.
@@ -180,7 +183,7 @@ def test_the_deployment_leaves_out_exactly_what_it_does_not_run(tmp_path):
                              input="\0".join(paths), capture_output=True, text=True).stdout
         return {p for p in out.split("\0") if p}
 
-    left_out = ("tests/", "docs/", "migrations/", "scripts/", "data/drivers/", "data/parameters/")
+    left_out = ("tests/", "docs/", "migrations/", "scripts/", "data/drivers/", "data/parameters/", "data/content/")
     assert ignored(tracked) == {p for p in tracked if p.startswith(left_out)} | {".env.example"}
     secrets_and_outputs = [".env", ".env.production.local", "data/prism.db", "runs/prism_run_1.xlsx",
                            "prism_20261015.dump", "_NOT_FOR_HANDOVER/notes.md",
@@ -274,6 +277,35 @@ def test_no_script_imports_another():
                 if called in DYNAMIC_LOADERS:
                     hits.append(f"{rel}:{node.lineno}: loads code with {called}()")
     assert {p.name for p in entry_points} >= {"run_production.py", "generate_seed.py"} and hits == []
+
+
+#: An import or require of a module under data/content, wherever it points from (a relative path or the
+#: @/ alias), including a dynamic import.
+CONTENT_IMPORT = re.compile(r"""(?:from\s*|import\s*\(?\s*|require\s*\(\s*)['"][^'"]*data/content/[^'"]*['"]""")
+
+
+def test_the_dashboard_imports_none_of_the_content():
+    """The Journey tiles and contexts and the Explorer views reach the browser through the API only
+    (GET /api/v1/journey, GET /api/v1/explorer): a dashboard module that imported data/content would compile
+    it into a public chunk. Tests may read the files."""
+    hits = []
+    for path in FILES:
+        rel = path.relative_to(REPO).as_posix()
+        if not (rel.startswith(("app/", "components/", "hooks/", "lib/", "data/", "types/")) or rel == "proxy.ts") \
+                or path.suffix not in {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}:
+            continue
+        for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if CONTENT_IMPORT.search(line):
+                hits.append(f"{rel}:{i}: {line.strip()[:100]}")
+    assert hits == []
+    assert (REPO / "data" / "content" / "consumer_journey.json").is_file()
+    assert (REPO / "data" / "content" / "profit_pools.json").is_file()
+    for text in ("import tiles from '@/data/content/consumer_journey.json';",
+                 'import pools from "../data/content/profit_pools.json";',
+                 "const views = await import('@/data/content/profit_pools.json');",
+                 "const v = require('../../data/content/profit_pools.json');"):
+        assert CONTENT_IMPORT.search(text), text   # the rule is live
+    assert not CONTENT_IMPORT.search("import { getJourneyContent } from '@/lib/apiClient';")
 
 
 #: Set by the platform, not by the operator: Vercel marks its deployments,
@@ -402,13 +434,14 @@ def test_the_image_optimiser_stays_off():
 
 def test_every_response_carries_the_security_headers():
     """vercel.json sets them on every path, the API's included: no page may be framed, no response is
-    sniffed, the referrer leaves as the origin only, and search engines are asked not to index."""
+    sniffed, the referrer leaves as the origin only, and search engines are asked not to index. The
+    Content Security Policy is the proxy's alone (lib/csp.ts, with frame-ancestors among its
+    directives): a second header of that name here could replace it on Vercel."""
     config = json.loads((REPO / "vercel.json").read_text(encoding="utf-8"))
     rules = [rule for rule in config.get("headers", []) if rule["source"] == "/(.*)"]
     assert len(rules) == 1
     headers = {h["key"]: h["value"] for h in rules[0]["headers"]}
     assert headers == {
-        "Content-Security-Policy": "frame-ancestors 'none'",
         "X-Frame-Options": "DENY",
         "X-Content-Type-Options": "nosniff",
         "Referrer-Policy": "strict-origin-when-cross-origin",
