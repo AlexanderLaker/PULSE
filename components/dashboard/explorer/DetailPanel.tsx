@@ -1,9 +1,11 @@
 /**
  * The drill-down of one bar, a drawer from the right: the pool trajectory
  * split into the revenue CAGR and the GP1 margin drift, the euro pools today
- * and in 2030, and every source, linked and graded.
+ * and in 2030, and every source, linked and graded. Every figure's derivation
+ * is a title on hover and, with "Show calculations", a definition list under
+ * its row.
  */
-import { useRef, type FC, type ReactNode } from 'react';
+import { useId, useRef, useState, type CSSProperties, type FC, type ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
 import useOverlay from '@/hooks/useOverlay';
@@ -35,8 +37,12 @@ export const DetailPanel: FC<{
   const gp1End = itemGp1PoolEurBnTerminal(view, item);
   const gp1PoolShare = gp1Now / (view.items.reduce((s, it) => s + itemGp1PoolEurBn(view, it), 0) || 1);
   const panelRef = useRef<HTMLElement>(null);
+  // "Show calculations" lists every figure's derivation under its row.
+  const [showCalc, setShowCalc] = useState(false);
+  const calcId = useId();
 
-  // Every figure in the panel explains its calculation and its source on hover.
+  // Every figure in the panel explains its calculation and its source, on
+  // hover and in the calculation lists.
   const revSrc = item.sources.revenue[0];
   const revSrcNames = item.sources.revenue.map((s) => sourceParts(s).name).join(' · ') || NO_VALUE;
   const mgnSrcNames = item.sources.margin.map((s) => sourceParts(s).name).join(' · ') || NO_VALUE;
@@ -73,7 +79,7 @@ export const DetailPanel: FC<{
         aria-hidden
       />
       {/* Drawer */}
-      <motion.aside
+      <motion.section
         ref={panelRef}
         role="dialog"
         aria-modal="true"
@@ -110,6 +116,7 @@ export const DetailPanel: FC<{
             <button type="button"
               onClick={onClose}
               aria-label="Close assessment panel"
+              data-print-hide
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 width: 32, height: 32, borderRadius: 9, flexShrink: 0,
@@ -123,18 +130,35 @@ export const DetailPanel: FC<{
 
           {/* Key figures: where this pool sits in the view */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-            <KeyInfo label="Revenue share" value={fmtShare(item.revenueShare)} sub="of view" tip={tips.revShare} />
-            <KeyInfo label="GP1 pool share" value={fmtShare(gp1PoolShare)} sub="of view pool" tip={tips.gp1Share} />
+            <KeyInfo label="Revenue share" value={fmtShare(item.revenueShare)} sub="of view" tip={tips.revShare} showCalc={showCalc} />
+            <KeyInfo label="GP1 pool share" value={fmtShare(gp1PoolShare)} sub="of view pool" tip={tips.gp1Share} showCalc={showCalc} />
           </div>
 
-          {/* Profit pool trajectory, one row per metric: today → rate → 2030 */}
-          <div style={{ marginBottom: 16 }}>
-            <SectionLabel>Profit pool trajectory · {POOL_HORIZON_LABEL}</SectionLabel>
+          {/* Profit pool trajectory, one row per metric: today → rate → 2030;
+              the toggle controls the lists that open inside these rows. */}
+          <div id={calcId} style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+              <SectionLabel>Profit pool trajectory · {POOL_HORIZON_LABEL}</SectionLabel>
+              <button type="button"
+                onClick={() => setShowCalc((v) => !v)}
+                aria-expanded={showCalc}
+                aria-controls={calcId}
+                data-print-hide
+                style={{
+                  padding: '4px 10px', borderRadius: 999, minHeight: 24,
+                  border: `1px solid ${showCalc ? S.primary : S.cardBorderStrong}`,
+                  background: showCalc ? S.primarySoft : S.surface, color: S.primary,
+                  fontFamily: HEADLINE_FONT, fontWeight: 700, fontSize: 11, cursor: 'pointer',
+                }}
+              >
+                {showCalc ? 'Hide calculations' : 'Show calculations'}
+              </button>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: TRAJ_GRID, gap: 6, padding: '6px 4px 7px' }}>
               <span />
               <span style={{ textAlign: 'right', fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: S.onSurfaceVariant }}>Today</span>
               <span style={{ textAlign: 'right', fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: S.onSurfaceVariant }}>p.a.</span>
-              <span style={{ textAlign: 'right', fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: S.onSurfaceVariant }}>2030</span>
+              <span style={{ textAlign: 'right', fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: S.onSurfaceVariant, lineHeight: 1.25 }}>2030 if rates hold</span>
             </div>
             <TrajRow
               metric="Revenue pool"
@@ -147,6 +171,7 @@ export const DetailPanel: FC<{
               todayTip={tips.revToday}
               changeTip={tips.revPa}
               endTip={tips.revEnd}
+              showCalc={showCalc}
             />
             <TrajRow
               metric="GP1 margin (proxy)"
@@ -159,6 +184,7 @@ export const DetailPanel: FC<{
               todayTip={tips.gp1Today}
               changeTip={tips.gp1Pa}
               endTip={tips.gp1End}
+              showCalc={showCalc}
             />
             <TrajRow
               metric="GP1 profit pool"
@@ -167,12 +193,16 @@ export const DetailPanel: FC<{
               changeTone={poolRating.tone}
               end={fmtEurBn(gp1End)}
               emphasis
+              endGrade="estimate"
               todayTip={tips.poolToday}
               changeTip={tips.poolPa}
               endTip={tips.poolEnd}
+              showCalc={showCalc}
             />
             <div style={{ fontSize: 11, color: S.mutedText, lineHeight: 1.5, margin: '9px 4px 0' }}>
-              Pool = revenue × GP1 margin: the bottom row is the top two combined. Margin drift is a structured estimate; the pool rate inherits it. Hover any figure for its calculation and source.
+              Pool = revenue × GP1 margin: the bottom row is the top two combined. Margin drift is a structured
+              estimate; the pool rate inherits it, so the 2030 column holds what the rates imply, not a figure
+              anyone has published. Show calculations lists every figure&rsquo;s derivation and source.
             </div>
           </div>
 
@@ -186,7 +216,7 @@ export const DetailPanel: FC<{
             </div>
           </div>
         </div>
-      </motion.aside>
+      </motion.section>
     </>
   );
 };
@@ -197,9 +227,33 @@ const SectionLabel: FC<{ children: ReactNode }> = ({ children }) => (
   </div>
 );
 
-// A key figure: the share of the view this pool holds; `tip` explains on
-// hover how the figure is derived and where it comes from.
-const KeyInfo: FC<{ label: string; value: string; sub: string; tip?: string }> = ({ label, value, sub, tip }) => (
+/** A derivation as text: the tip's line breaks kept, in the small muted type of a footnote. */
+const calcStyle: CSSProperties = {
+  fontSize: 11, color: S.onSurfaceVariant, lineHeight: 1.5, whiteSpace: 'pre-line', margin: 0,
+};
+
+/** The derivations of a row's figures as a definition list, shown under the row by "Show calculations". */
+const CalcList: FC<{ entries: { term: string; text?: string }[] }> = ({ entries }) => {
+  const rows = entries.filter((e): e is { term: string; text: string } => !!e.text);
+  if (!rows.length) return null;
+  return (
+    <dl style={{ margin: '6px 4px 0', padding: '8px 10px', borderRadius: 8, background: S.surfaceLow, border: `1px solid ${S.cardBorder}`, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {rows.map((e) => (
+        <div key={e.term}>
+          <dt style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: S.onBg }}>{e.term}</dt>
+          <dd style={calcStyle}>{e.text}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+};
+
+// A key figure: the share of the view this pool holds; `tip` explains how the
+// figure is derived and where it comes from, on hover and, with
+// "Show calculations", as text beneath.
+const KeyInfo: FC<{ label: string; value: string; sub: string; tip?: string; showCalc?: boolean }> = ({
+  label, value, sub, tip, showCalc,
+}) => (
   <div
     title={tip}
     style={{ background: S.surfaceLow, borderRadius: 10, padding: '9px 12px', border: `1px solid ${S.cardBorder}`, cursor: tip ? 'help' : undefined }}
@@ -208,6 +262,12 @@ const KeyInfo: FC<{ label: string; value: string; sub: string; tip?: string }> =
     <div style={{ fontSize: 18, fontWeight: 800, fontFamily: HEADLINE_FONT, color: S.onBg, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>
       {value} <span style={{ fontSize: 11, fontWeight: 600, color: S.mutedText }}>{sub}</span>
     </div>
+    {showCalc && tip && (
+      <dl style={{ margin: '6px 0 0' }}>
+        <dt className="sr-only">{label}, derivation</dt>
+        <dd style={calcStyle}>{tip}</dd>
+      </dl>
+    )}
   </div>
 );
 
@@ -215,12 +275,16 @@ const TRAJ_GRID = '1.4fr 1fr 1fr 1fr';
 
 // One trajectory row: metric · today · change (colour = direction) · 2030,
 // with an optional driver and grade beneath. Each figure carries its own
-// calculation and source on hover (the dotted underline marks it).
+// calculation and source on hover (the dotted underline marks it) and, with
+// "Show calculations", as a definition list under the row. `endGrade` chips
+// the 2030 figure where it is an estimate.
 const TrajRow: FC<{
   metric: string; today: string; change: string; changeTone: CagrRating['tone']; end: string;
-  emphasis?: boolean; driver?: string; grade?: EvidenceGrade;
-  todayTip?: string; changeTip?: string; endTip?: string;
-}> = ({ metric, today, change, changeTone, end, emphasis, driver, grade, todayTip, changeTip, endTip }) => {
+  emphasis?: boolean; driver?: string; grade?: EvidenceGrade; endGrade?: EvidenceGrade;
+  todayTip?: string; changeTip?: string; endTip?: string; showCalc?: boolean;
+}> = ({
+  metric, today, change, changeTone, end, emphasis, driver, grade, endGrade, todayTip, changeTip, endTip, showCalc,
+}) => {
   const num = (color: string, tip?: string) => ({
     textAlign: 'right' as const, fontFamily: HEADLINE_FONT, fontWeight: 800,
     fontSize: emphasis ? 16 : 14, color, fontVariantNumeric: 'tabular-nums' as const,
@@ -243,8 +307,18 @@ const TrajRow: FC<{
         <span style={{ fontSize: emphasis ? 13.5 : 12.5, fontWeight: emphasis ? 800 : 700, fontFamily: emphasis ? HEADLINE_FONT : BODY_FONT, color: S.onBg }}>{metric}</span>
         <span style={num(S.onBg, todayTip)} title={todayTip}>{today}</span>
         <span style={num(arrowColorFor(changeTone), changeTip)} title={changeTip}>{change}</span>
-        <span style={num(emphasis ? arrowColorFor(changeTone) : S.onBg, endTip)} title={endTip}>{end}</span>
+        <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
+          <span style={num(emphasis ? arrowColorFor(changeTone) : S.onBg, endTip)} title={endTip}>{end}</span>
+          {endGrade && <GradeChip grade={endGrade} />}
+        </span>
       </div>
+      {showCalc && (
+        <CalcList entries={[
+          { term: `${metric}: today`, text: todayTip },
+          { term: `${metric}: per year`, text: changeTip },
+          { term: `${metric}: 2030 if rates hold`, text: endTip },
+        ]} />
+      )}
       {driver && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '3px 4px 9px', borderBottom: `1px solid ${S.surfaceHigh}` }}>
           <span style={{ flex: 1, fontSize: 11, color: S.onSurfaceVariant, lineHeight: 1.45 }}>{driver}</span>

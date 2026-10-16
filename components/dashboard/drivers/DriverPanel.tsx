@@ -5,11 +5,12 @@
  * exposure and the value-chain epicentre on the right. Admins get an Edit
  * button that turns every field except the PRISM Analysis into a form; Save
  * sends one DriverUpdate with the fields that changed and the revision it
- * started from.
+ * started from. While the form holds unsaved edits the panel says so to the
+ * page (`onDirtyChange`), which asks before anything would unmount it.
  */
-import { useState, type FC } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type FC } from 'react';
 import {
-  Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper, Plus, Trash2, Lock,
+  Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper, Plus, Trash2, Lock, Check,
 } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import { ApiError } from '@/lib/apiClient';
@@ -21,13 +22,13 @@ import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import Chip from '@/components/dashboard/Chip';
 import type { Confidence, Direction, Driver, DriverSource, DriverUpdate, ExposureMap } from '@/types';
 import SectionCard from '@/components/dashboard/SectionCard';
-import { curveLabel, DIFFUSION_LABELS, uncLabel, vcStageLabel } from './shared';
+import { curveLabel, DIFFUSION_LABELS, REVIEWED_COLOR, uncReading, vcStageLabel } from './shared';
 import {
   CategoryExposureGrid, DiffusionGlyph, DotBar, EditableCategoryGrid, EditableRegionGrid,
   EpicentreRail, EpicentreSlider, RegionExposureGrid, UncertaintyPicker,
 } from './scales';
 import {
-  EditedChip, FIELD_HELP, FieldLabel, MetaChip, SourceItem, TIER_CONFIG, TIER_OPTIONS,
+  EditedChip, FIELD_HELP, FieldLabel, MetaChip, SourceItem, TIER_CONFIG, TIER_LEGEND, TIER_OPTIONS,
 } from './cards';
 import { ANALYSIS_FOOTNOTE, PrismAnalysisReading } from './PrismAnalysis';
 
@@ -36,6 +37,8 @@ interface DriverPanelProps {
   driver: Driver;
   isAdmin: boolean;
   updateDriver: (driverId: string, update: DriverUpdate) => Promise<void>;
+  /** Told when the editor starts or stops holding unsaved edits. */
+  onDirtyChange?: (driverId: string, dirty: boolean) => void;
 }
 
 // ─── The admin editor's working copy: every field an edit can send ──
@@ -78,6 +81,11 @@ const validPeak = (text: string, min: number): boolean =>
 /** Whether a source's link is one the API accepts: none, or an http(s) address. */
 const validLink = (url: string): boolean => url.trim() === '' || SOURCE_URL.test(url.trim());
 
+/** A source that says something (a tier or a date) but names nothing: it would
+ *  be dropped on save, so the form asks for a title or a link first. */
+const sourceNeedsName = (s: DriverSource): boolean =>
+  !s.title.trim() && !s.url.trim() && (s.tier !== '' || s.published.trim() !== '');
+
 /** The DriverUpdate of a save: the revision the draft was taken from, and only
  *  the fields the admin changed (of an exposure map, only the changed cells),
  *  and only sources with a title or a link. The form lets nothing outside the
@@ -104,7 +112,24 @@ function updateFrom(draft: Draft, d: Driver): DriverUpdate {
   return update;
 }
 
-export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDriver }) => {
+/** How long "Saved" stays in the header after a save. */
+const SAVED_FOR_MS = 4000;
+
+const pillButton = (kind: 'primary' | 'secondary' | 'tonal', disabled = false): CSSProperties => ({
+  padding: '8px 20px',
+  borderRadius: 999,
+  fontFamily: HEADLINE_FONT,
+  fontSize: 11, fontWeight: 700,
+  letterSpacing: '0.08em', textTransform: 'uppercase',
+  backgroundColor: kind === 'primary' ? S.primary : kind === 'tonal' ? S.primaryContainer : S.surfaceLow,
+  color: kind === 'primary' ? S.onPrimary : kind === 'tonal' ? S.onPrimaryContainer : S.onSurfaceVariant,
+  border: 'none',
+  cursor: disabled ? 'not-allowed' : 'pointer',
+  opacity: disabled ? 0.5 : 1,
+  minHeight: 32,
+});
+
+export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDriver, onDirtyChange }) => {
   const base = driver.baseline;
   // Set when the drivers could not be reloaded, after a save among others:
   // the panel may then show the driver as it was before that save.
@@ -123,6 +148,32 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
   // The peak year as typed: the draft takes it only while it is a year the
   // peak may take, and Save waits until it is.
   const [peakText, setPeakText] = useState(String(driver.peak_year));
+  // The GP1 share as typed in the number field: it clamps when the field is
+  // left, so a cleared field does not jump to 1 while the admin is typing.
+  const gp1Of = (share: number) => String(Math.round(share * 100));
+  const [gp1Text, setGp1Text] = useState(gp1Of(driver.gp1_pct_affected));
+  const [gp1ShownFor, setGp1ShownFor] = useState(draft.gp1_pct_affected);
+  if (gp1ShownFor !== draft.gp1_pct_affected) {
+    setGp1ShownFor(draft.gp1_pct_affected);
+    setGp1Text(gp1Of(draft.gp1_pct_affected));
+  }
+  // "Saved" shows in the header for a moment after a save.
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
+
+  // Focus: the description when editing starts; the Edit button when the
+  // editor closes, by Cancel or a save.
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const editButtonRef = useRef<HTMLButtonElement>(null);
+  const focusEditWhenClosed = useRef(false);
+  useEffect(() => {
+    if (isEditing) descriptionRef.current?.focus();
+    else if (focusEditWhenClosed.current) {
+      focusEditWhenClosed.current = false;
+      editButtonRef.current?.focus();
+    }
+  }, [isEditing]);
 
   // The driver the draft was taken from. Outside editing it follows every new
   // driver object (after a save the store reloads the drivers); while editing
@@ -140,7 +191,26 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
   const peakMin = firstPeakYear(draftBase.start_year);
   const peakOk = validPeak(peakText, peakMin);
   const linksOk = draft.sources.every((src) => validLink(src.url));
-  const formOk = peakOk && linksOk;
+  const sourcesNamed = draft.sources.every((src) => !sourceNeedsName(src));
+  const formOk = peakOk && linksOk && sourcesNamed;
+  const formProblem = !peakOk ? 'The peak year needs correcting before the driver can be saved.'
+    : !linksOk ? 'A source link needs correcting before the driver can be saved.'
+    : !sourcesNamed ? 'A source needs a title or a link before the driver can be saved.'
+    : null;
+
+  // Unsaved edits: any field, cell or source that differs from the driver the
+  // draft was taken from, or a peak year typed and not yet valid.
+  const dirty = isEditing && (
+    Object.keys(updateFrom(draft, draftBase)).length > 1
+    || !sameSources(draft.sources, draftBase.sources)
+    || peakText !== String(draftBase.peak_year)
+  );
+  const onDirtyRef = useRef(onDirtyChange);
+  useEffect(() => { onDirtyRef.current = onDirtyChange; });
+  useEffect(() => {
+    onDirtyRef.current?.(driver.id, dirty);
+  }, [dirty, driver.id]);
+  useEffect(() => () => { onDirtyRef.current?.(driver.id, false); }, [driver.id]);
 
   const startEditing = () => {
     setDraftBase(driver);
@@ -148,6 +218,7 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
     setPeakText(String(driver.peak_year));
     setSaveError(null);
     setUncertain(false);
+    setSavedAt(null);
     setIsEditing(true);
   };
 
@@ -157,6 +228,7 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
     setPeakText(String(driver.peak_year));
     setSaveError(null);
     setUncertain(false);
+    focusEditWhenClosed.current = true;
     setIsEditing(false);
   };
 
@@ -171,7 +243,11 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
     setSaveError(null);
     try {
       await updateDriver(driver.id, update);
+      focusEditWhenClosed.current = true;
       setIsEditing(false);
+      setSavedAt(Date.now());
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+      savedTimer.current = setTimeout(() => setSavedAt(null), SAVED_FOR_MS);
     } catch (e) {
       if (e instanceof ApiError && e.outcomeUnknown) setUncertain(true);
       setSaveError(e instanceof ApiError && e.outcomeUnknown
@@ -193,20 +269,40 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
   const patchSource = (idx: number, patch: Partial<DriverSource>) =>
     edit({ sources: draft.sources.map((s, i) => (i === idx ? { ...s, ...patch } : s)) });
 
+  // The GP1 number field: the draft takes a whole percent from 1 to 100 as it
+  // is typed; anything else waits for the field to be left, then clamps.
+  const typeGp1 = (text: string) => {
+    if (saving) return;
+    setGp1Text(text);
+    const n = parseInt(text, 10);
+    if (/^\d+$/.test(text.trim()) && n >= 1 && n <= 100) {
+      setGp1ShownFor(n / 100);
+      edit({ gp1_pct_affected: n / 100 });
+    }
+  };
+  const settleGp1 = () => {
+    const n = parseInt(gp1Text, 10);
+    const share = Number.isNaN(n) ? draft.gp1_pct_affected : Math.max(1, Math.min(100, n)) / 100;
+    setGp1ShownFor(share);
+    setGp1Text(gp1Of(share));
+    if (share !== draft.gp1_pct_affected) edit({ gp1_pct_affected: share });
+  };
+
   const curve = isEditing ? draft.diffusion_curve : driver.diffusion_curve;
   const vcStage = isEditing ? draft.vc_epicentre : driver.vc_epicentre;
+  const saveBlocked = saving || !formOk || uncertain || changedMeanwhile;
 
   return (
     <div
       onClick={(e) => e.stopPropagation()}
       aria-busy={saving || undefined}
+      className="px-4 pt-6 pb-4 md:px-8 md:pt-7"
       style={{
-        padding: '28px 32px 36px',
         backgroundColor: S.surface,
         borderTop: `1px solid ${S.cardBorder}`,
       }}
     >
-      {/* Meta row: direction, confidence, the Edited chip, the evidence summary */}
+      {/* Meta row: direction, confidence, the Edited chip, the evidence summary, the save status */}
       <div style={{
         display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center',
         marginBottom: 24,
@@ -228,10 +324,11 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
                 {DIRECTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
             </label>
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <label title={FIELD_HELP.confidence} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <FieldLabel>Confidence</FieldLabel>
               <select
                 value={draft.confidence}
+                aria-describedby={`confidence-help-${driver.id}`}
                 onChange={(e) => edit({ confidence: e.target.value as Confidence })}
                 style={{
                   padding: '4px 10px', borderRadius: 999, fontSize: 11,
@@ -242,29 +339,33 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
               >
                 {CONFIDENCE_LEVELS.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
+              <span id={`confidence-help-${driver.id}`} className="sr-only">{FIELD_HELP.confidence}</span>
             </label>
           </>
         ) : (
           <>
             <Chip kind={driver.direction === 'Expansion' ? 'expansion' : 'contraction'} />
-            <MetaChip label={`Confidence · ${driver.confidence}`} />
+            <MetaChip label={`Confidence ${driver.confidence}`} help={FIELD_HELP.confidence} />
           </>
         )}
         <EditedChip driver={driver} />
-        {!isEditing && driver.sources.length > 0 && <MetaChip label={evidenceLine(driver.sources)} />}
+        {!isEditing && driver.sources.length > 0 && <MetaChip label={evidenceLine(driver.sources)} plain />}
+        {savedAt != null && !isEditing && (
+          <span role="status" className="inline-flex items-center gap-1.5"
+            style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: REVIEWED_COLOR }}>
+            <Check size={13} strokeWidth={2.6} aria-hidden /> Saved
+          </span>
+        )}
       </div>
 
-      {/* Two columns: the editorial detail on the left; on the right the
+      {/* Two columns from lg: the editorial detail on the left; on the right the
           category and regional exposure grids and the value-chain epicentre. */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 1fr)',
-        gap: 20,
-      }}>
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-5">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <SectionCard title="Description" icon={FileText}>
             {isEditing ? (
               <textarea
+                ref={descriptionRef}
                 aria-label="Description"
                 value={draft.description}
                 onChange={(e) => edit({ description: e.target.value })}
@@ -301,10 +402,7 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
               <PrismAnalysisReading text={driver.analysis} />
             </div>
             {isEditing && (
-              <div style={{
-                marginTop: 8, fontSize: 11, letterSpacing: '0.06em',
-                textTransform: 'uppercase', color: S.mutedText, fontWeight: 700,
-              }}>
+              <div style={{ marginTop: 8, fontSize: 11.5, lineHeight: 1.5, color: S.mutedText, fontWeight: 500 }}>
                 The figures of the PRISM Analysis come from the model and the reading is authored on them; it cannot be edited here.
               </div>
             )}
@@ -313,6 +411,7 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
           <SectionCard
             title="GP1 % affected"
             icon={BarChart3}
+            info={FIELD_HELP.gp1}
             footnote={
               <>
                 What fraction of a category&apos;s GP1 can this driver realistically affect at full
@@ -321,21 +420,24 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
             }
           >
             {isEditing ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <input
                   type="range"
                   aria-label="GP1 % affected"
+                  aria-valuetext={fmtPct(draft.gp1_pct_affected, 0)}
                   min={1} max={100} step={1}
                   value={Math.round(draft.gp1_pct_affected * 100)}
                   onChange={(e) => edit({ gp1_pct_affected: parseInt(e.target.value, 10) / 100 })}
-                  style={{ flex: 1 }}
+                  style={{ flex: '1 1 160px', minWidth: 120, cursor: 'pointer' }}
                 />
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   aria-label="GP1 % affected, in percent"
-                  min={1} max={100} step={1}
-                  value={Math.round(draft.gp1_pct_affected * 100)}
-                  onChange={(e) => edit({ gp1_pct_affected: Math.max(1, Math.min(100, parseInt(e.target.value || '1', 10))) / 100 })}
+                  value={gp1Text}
+                  readOnly={saving}
+                  onChange={(e) => typeGp1(e.target.value)}
+                  onBlur={settleGp1}
                   style={{
                     width: 72, padding: '6px 8px', borderRadius: 8,
                     border: `1px solid ${S.cardBorder}`, backgroundColor: S.surfaceLow,
@@ -343,7 +445,7 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
                     fontSize: 15, textAlign: 'right',
                   }}
                 />
-                <span style={{ color: S.mutedText, fontSize: 12 }}>%</span>
+                <span style={{ color: S.mutedText, fontSize: 12 }}>% (1 to 100)</span>
               </div>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -376,15 +478,17 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
           <SectionCard
             title="Probability"
             icon={Zap}
+            info={FIELD_HELP.probability}
             footnote={
               <>Likelihood that this driver materialises as described.
-              Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain.</>
+              Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain.{isEditing ? ' The ring marks the baseline.' : ''}</>
             }
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20 }}>
               <DotBar
                 value={isEditing ? draft.probability : driver.probability}
                 editable={isEditing}
+                baseline={isEditing ? base.probability : undefined}
                 onChange={isEditing ? (v) => edit({ probability: v }) : undefined}
               />
               <div style={{
@@ -402,9 +506,10 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
           <SectionCard
             title="Materialisation timing"
             icon={Clock}
+            info={FIELD_HELP.timing}
             footnote="When does this driver reach full impact, and how does it build over time?"
           >
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
                 <FieldLabel>Peak year</FieldLabel>
                 {isEditing ? (
@@ -483,53 +588,50 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
           </SectionCard>
 
           {/* One uncertainty score per driver: it sets the Beta concentration
-              (the band width) and the peak-year jitter. */}
+              (the band width) and the peak-year jitter. The statistics behind
+              the score are in the card's help; the card itself reads plain. */}
           <SectionCard
             title="Uncertainty"
             icon={Zap}
-            info={FIELD_HELP.uncertainty}
-            footnote="0 = fixed by law or contract · 3 = size could be half or double · 5 = the sign could differ. Band width and timing jitter follow this score; the mean stays where probability puts it."
+            info={`${FIELD_HELP.uncertainty} For this driver's score of ${driver.uncertainty}: Beta concentration ${UNCERTAINTY_KAPPA[driver.uncertainty]}, peak-year jitter plus or minus ${UNCERTAINTY_PEAK_JITTER[driver.uncertainty]} years.`}
+            footnote="0 = fixed by law or contract, 3 = size could be half or double, 5 = the sign could differ. Band width and timing jitter follow this score; the mean stays where probability puts it."
           >
             {isEditing ? (
               <UncertaintyPicker value={draft.uncertainty} baseline={base.uncertainty} onChange={(v) => edit({ uncertainty: v })} />
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <div style={{
-                  padding: '8px 10px', borderRadius: 8, minWidth: 160,
-                  fontSize: 13, fontWeight: 700, color: S.onSurface,
-                  backgroundColor: S.surfaceLow, border: `1px solid ${S.cardBorder}`,
-                }}>
-                  {uncLabel(driver.uncertainty)}
-                </div>
-                <span style={{ fontSize: 11, color: S.mutedText }}>
-                  Beta concentration {UNCERTAINTY_KAPPA[driver.uncertainty]} · peak-year jitter ±{UNCERTAINTY_PEAK_JITTER[driver.uncertainty]} y
-                </span>
+              <div style={{
+                padding: '8px 10px', borderRadius: 8,
+                fontSize: 13, fontWeight: 700, color: S.onSurface, lineHeight: 1.45,
+                backgroundColor: S.surfaceLow, border: `1px solid ${S.cardBorder}`,
+              }}>
+                {uncReading(driver.uncertainty)}
               </div>
             )}
           </SectionCard>
 
           {/* Sources; edit mode gives each a title, link, publication date and tier */}
           {(isEditing || driver.sources.length > 0) && (
-            <SectionCard title={`Sources · ${isEditing ? draft.sources.length : driver.sources.length}`} icon={Newspaper}>
+            <SectionCard title={`Sources · ${isEditing ? draft.sources.length : driver.sources.length}`} icon={Newspaper} info={TIER_LEGEND}>
               {isEditing ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {draft.sources.map((s, i) => (
                     <div key={i} style={{
                       padding: 10, borderRadius: 10,
                       backgroundColor: S.surfaceLow,
-                      border: `1px solid ${S.cardBorder}`,
+                      border: `1px solid ${sourceNeedsName(s) ? S.error : S.cardBorder}`,
                       display: 'flex', flexDirection: 'column', gap: 8,
                     }}>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                         <input
                           type="text"
                           placeholder="Source title"
                           aria-label="Source title"
+                          aria-invalid={sourceNeedsName(s) || undefined}
                           value={s.title}
                           maxLength={SOURCE_FIELD_LIMITS.title}
                           onChange={(e) => patchSource(i, { title: e.target.value })}
                           style={{
-                            flex: 2, padding: '6px 10px', borderRadius: 6,
+                            flex: '2 1 200px', minWidth: 0, padding: '6px 10px', borderRadius: 6,
                             border: `1px solid ${S.cardBorder}`,
                             backgroundColor: S.surface, color: S.onSurface,
                             fontSize: 13, fontWeight: 600,
@@ -538,18 +640,18 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
                         <select
                           value={s.tier}
                           onChange={(e) => patchSource(i, { tier: e.target.value as DriverSource['tier'] })}
-                          title="Source rating"
-                          aria-label="Source rating"
+                          title="Source tier"
+                          aria-label="Source tier"
                           style={{
-                            padding: '6px 10px', borderRadius: 6,
+                            width: 88, flexShrink: 0, padding: '6px 10px', borderRadius: 6,
                             border: `1px solid ${S.cardBorder}`,
                             backgroundColor: S.surface, color: S.onSurface,
                             fontSize: 12, fontWeight: 700,
                           }}
                         >
-                          <option value="">Rating…</option>
+                          <option value="">Tier</option>
                           {TIER_OPTIONS.map((t) => (
-                            <option key={t} value={t}>{t} · {TIER_CONFIG[t].description}</option>
+                            <option key={t} value={t}>{t}</option>
                           ))}
                         </select>
                         <button
@@ -559,7 +661,7 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
                           aria-label="Remove source"
                           style={{
                             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                            width: 30, height: 30, borderRadius: 6,
+                            width: 30, height: 30, borderRadius: 6, flexShrink: 0,
                             border: `1px solid ${S.cardBorder}`,
                             backgroundColor: S.surface, color: S.error,
                             cursor: 'pointer',
@@ -568,7 +670,12 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
                           <Trash2 size={13} />
                         </button>
                       </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
+                      {s.tier && (
+                        <div style={{ fontSize: 11, color: S.mutedText, lineHeight: 1.4 }}>
+                          {s.tier}: {TIER_CONFIG[s.tier].description}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <input
                           type="url"
                           placeholder="https://…"
@@ -578,7 +685,7 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
                           maxLength={SOURCE_FIELD_LIMITS.url}
                           onChange={(e) => patchSource(i, { url: e.target.value })}
                           style={{
-                            flex: 2, padding: '6px 10px', borderRadius: 6,
+                            flex: '2 1 200px', minWidth: 0, padding: '6px 10px', borderRadius: 6,
                             border: `1px solid ${validLink(s.url) ? S.cardBorder : S.error}`,
                             backgroundColor: S.surface, color: S.onSurface,
                             fontSize: 12,
@@ -592,7 +699,7 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
                           maxLength={SOURCE_FIELD_LIMITS.published}
                           onChange={(e) => patchSource(i, { published: e.target.value })}
                           style={{
-                            flex: 3, padding: '6px 10px', borderRadius: 6,
+                            flex: '3 1 160px', minWidth: 0, padding: '6px 10px', borderRadius: 6,
                             border: `1px solid ${S.cardBorder}`,
                             backgroundColor: S.surface, color: S.onSurface,
                             fontSize: 12,
@@ -602,6 +709,11 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
                       {!validLink(s.url) && (
                         <div style={{ fontSize: 11, color: S.error }}>
                           A link starts with http:// or https:// and has no spaces; leave it empty for a source without one.
+                        </div>
+                      )}
+                      {sourceNeedsName(s) && (
+                        <div style={{ fontSize: 11, color: S.error }}>
+                          Needs a title or a link
                         </div>
                       )}
                     </div>
@@ -635,16 +747,20 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
 
         {/* Right column: the category and regional exposure grids, then the value-chain epicentre */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <SectionCard title="Category exposure" icon={Layers}>
+          <SectionCard title="Category exposure" icon={Layers} info={FIELD_HELP.category}
+            footnote={isEditing ? 'The ring marks the baseline score.' : undefined}>
             {isEditing ? (
-              <EditableCategoryGrid exposures={draft.category_exposure} onChange={(m) => edit({ category_exposure: m })} />
+              <EditableCategoryGrid exposures={draft.category_exposure} baseline={base.category_exposure}
+                onChange={(m) => edit({ category_exposure: m })} />
             ) : (
               <CategoryExposureGrid exposures={driver.category_exposure} />
             )}
           </SectionCard>
-          <SectionCard title="Regional exposure" icon={MapPin} accent={S.onSecondaryContainer}>
+          <SectionCard title="Regional exposure" icon={MapPin} accent={S.onSecondaryContainer} info={FIELD_HELP.regional}
+            footnote={isEditing ? 'The ring marks the baseline score.' : undefined}>
             {isEditing ? (
-              <EditableRegionGrid exposures={draft.regional_exposure} onChange={(m) => edit({ regional_exposure: m })} />
+              <EditableRegionGrid exposures={draft.regional_exposure} baseline={base.regional_exposure}
+                onChange={(m) => edit({ regional_exposure: m })} />
             ) : (
               <RegionExposureGrid exposures={driver.regional_exposure} />
             )}
@@ -679,89 +795,60 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
         </div>
       )}
 
-      {/* Admin toolbar: pill buttons at the lower right, without icons */}
-      {isAdmin && (
+      {/* Admin toolbar: the Edit button at the lower right; while editing, a
+          bar that stays at the bottom of the viewport with Save, Cancel and
+          whether there is anything to save. */}
+      {isAdmin && !isEditing && (
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-          gap: 10, marginTop: 24,
+          gap: 10, marginTop: 24, flexWrap: 'wrap',
         }}>
-          {isEditing && (saveError || changedMeanwhile) && (
+          {driversError && (
+            <span role="status" style={{ color: S.onSurfaceVariant, fontSize: 12, marginRight: 4, maxWidth: 520 }}>
+              The drivers could not be reloaded, so this may not show the latest save.
+            </span>
+          )}
+          <button ref={editButtonRef} type="button" onClick={startEditing} style={pillButton('tonal')}>
+            Edit
+          </button>
+        </div>
+      )}
+      {isAdmin && isEditing && (
+        <div
+          data-print-hide
+          style={{
+            position: 'sticky', bottom: 0, zIndex: 5,
+            display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+            gap: 10, marginTop: 24, padding: '12px 0', flexWrap: 'wrap',
+            backgroundColor: S.surface, borderTop: `1px solid ${S.cardBorder}`,
+          }}
+        >
+          {(saveError || changedMeanwhile) && (
             <span role="alert" style={{ color: S.error, fontSize: 12, marginRight: 4, maxWidth: 520 }}>
               {saveError ?? 'This driver has changed since you started editing; saving would be refused. '
                 + 'Discard your edits to see the current version.'}
             </span>
           )}
-          {!isEditing && driversError && (
-            <span role="status" style={{ color: S.onSurfaceVariant, fontSize: 12, marginRight: 4, maxWidth: 520 }}>
-              The drivers could not be reloaded, so this may not show the latest save.
+          {!saveError && !changedMeanwhile && formProblem && (
+            <span id={`save-problem-${driver.id}`} style={{ color: S.error, fontSize: 12, marginRight: 4, maxWidth: 520 }}>
+              {formProblem}
             </span>
           )}
-          {isEditing && !saveError && !changedMeanwhile && !formOk && (
-            <span style={{ color: S.error, fontSize: 12, marginRight: 4, maxWidth: 520 }}>
-              {!peakOk ? 'The peak year needs correcting before the driver can be saved.'
-                : 'A source link needs correcting before the driver can be saved.'}
-            </span>
-          )}
-          {!isEditing && (
-            <button
-              type="button"
-              onClick={startEditing}
-              style={{
-                padding: '8px 20px',
-                borderRadius: 999,
-                fontFamily: HEADLINE_FONT,
-                fontSize: 11, fontWeight: 700,
-                letterSpacing: '0.08em', textTransform: 'uppercase',
-                backgroundColor: S.primaryContainer,
-                color: S.onPrimaryContainer,
-                border: 'none', cursor: 'pointer',
-              }}
-            >
-              Edit
-            </button>
-          )}
-          {isEditing && (
-            <>
-              <button
-                type="button"
-                onClick={handleCancel}
-                disabled={saving}
-                style={{
-                  padding: '8px 20px',
-                  borderRadius: 999,
-                  fontFamily: HEADLINE_FONT,
-                  fontSize: 11, fontWeight: 700,
-                  letterSpacing: '0.08em', textTransform: 'uppercase',
-                  backgroundColor: S.surfaceLow,
-                  color: S.onSurfaceVariant,
-                  border: 'none',
-                  cursor: saving ? 'not-allowed' : 'pointer',
-                  opacity: saving ? 0.5 : 1,
-                }}
-              >
-                {changedMeanwhile || uncertain ? 'Discard edits' : 'Cancel'}
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving || !formOk || uncertain || changedMeanwhile}
-                style={{
-                  padding: '8px 20px',
-                  borderRadius: 999,
-                  fontFamily: HEADLINE_FONT,
-                  fontSize: 11, fontWeight: 700,
-                  letterSpacing: '0.08em', textTransform: 'uppercase',
-                  backgroundColor: S.primary,
-                  color: S.onPrimary,
-                  border: 'none',
-                  cursor: saving || !formOk || uncertain || changedMeanwhile ? 'not-allowed' : 'pointer',
-                  opacity: saving || !formOk || uncertain || changedMeanwhile ? 0.5 : 1,
-                }}
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-            </>
-          )}
+          <span style={{ fontSize: 12, fontWeight: 700, color: dirty ? S.onAmberContainer : S.mutedText, marginRight: 'auto' }}>
+            {saving ? 'Saving' : dirty ? 'Unsaved changes' : 'No changes yet'}
+          </span>
+          <button type="button" onClick={handleCancel} disabled={saving} style={pillButton('secondary', saving)}>
+            {changedMeanwhile || uncertain ? 'Discard edits' : 'Cancel'}
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saveBlocked}
+            aria-describedby={!saveError && !changedMeanwhile && formProblem ? `save-problem-${driver.id}` : undefined}
+            style={pillButton('primary', saveBlocked)}
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
         </div>
       )}
     </div>

@@ -153,6 +153,7 @@ effect with the next deployment.
 | `PRISM_ALLOWED_EMAIL_DOMAINS` | dashboard (optional) | Comma-separated email domains (such as `henkel.com`), matched exactly: an admin can approve only a pending user whose address is at one of them. Unset, any address can be approved; a user who has a role keeps it either way |
 | `ADMIN_BOOTSTRAP_SECRET` | dashboard (only while setting up the first admin) | Enables `/api/admin/bootstrap` while set (at least 32 characters); remove it, and `ADMIN_BOOTSTRAP_EMAIL`, once an admin exists |
 | `ADMIN_BOOTSTRAP_EMAIL` | dashboard (only while setting up the first admin) | The one address `/api/admin/bootstrap` can make the first admin |
+| `NEXT_PUBLIC_PRISM_FEEDBACK_URL` | dashboard (optional, also at build time) | Where the Welcome dialog, the error states and the Help menu send feedback: a `mailto:` address or a link (a Teams channel, a form). Unset, they name the PRISM team without a link |
 | `PRISM_API_ORIGIN` | dashboard (optional) | The origin the admin routes call the API on; without it, the host the request came in on. On Vercel set it for Production only, so a preview deployment never writes to the production API |
 | `PRISM_LOCAL_API_URL` | local dashboard | Where the dev server sends `/api/v1` (default `http://127.0.0.1:8000`) |
 | `PRISM_DB_PATH` | API, scripts | The SQLite file used when neither database URL is set (default `data/prism.db`); the production run uses it only with `--allow-sqlite` |

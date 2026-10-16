@@ -1,18 +1,17 @@
 import type { Metadata, Viewport } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
-import { Inter, Manrope, JetBrains_Mono } from 'next/font/google';
+import { Inter, Manrope } from 'next/font/google';
 import { S, BODY_FONT, HEADLINE_FONT } from '@/lib/theme';
 import './globals.css';
 
 /**
- * Manrope, Inter and JetBrains Mono are self-hosted at build time with
- * next/font (no request to Google at runtime) and exposed as the CSS
- * variables lib/theme.ts reads. next/font's default size-adjusted fallbacks
+ * Manrope and Inter are self-hosted at build time with next/font (no
+ * request to Google at runtime) and exposed as the CSS variables
+ * lib/theme.ts reads. next/font's default size-adjusted fallbacks
  * keep dense layouts from jumping when the fonts arrive.
  */
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope', display: 'swap' });
-const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains-mono', display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'PRISM',
@@ -119,7 +118,7 @@ export default function RootLayout({
         },
       }}
     >
-      <html lang="en-GB" className={`${inter.variable} ${manrope.variable} ${jetbrainsMono.variable}`}>
+      <html lang="en-GB" className={`${inter.variable} ${manrope.variable}`}>
         {/* The body's font, background and text colour are set in globals.css. */}
         <body>{children}</body>
       </html>

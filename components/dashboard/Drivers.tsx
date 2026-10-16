@@ -8,6 +8,10 @@
  * baseline. Admins edit a driver in its expanded Driver List panel. The PRISM
  * Analysis card is read-only for every role.
  *
+ * The address bar carries the page's state (hooks/useViewUrl.tsx): the mode,
+ * the expanded driver, the search and the force and category filters, so a
+ * driver can be linked and Back returns to the list as it was.
+ *
  * Visual language: tonal layering rather than borders, Manrope
  * headlines over Inter body text, pill filter chips, a force icon tile on
  * every row, dot scales for probability and exposure.
@@ -15,16 +19,21 @@
 
 'use client';
 
-import React, { useMemo, useState, useCallback, type FC } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback, type FC } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Layers, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Info } from 'lucide-react';
+import { Search, Layers, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Info, Download } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
-import { CATEGORIES, HORIZON } from '@/lib/format';
+import useOverlay from '@/hooks/useOverlay';
+import { useViewParams } from '@/hooks/useViewUrl';
+import { sessionEnding } from '@/lib/session';
+import { CATEGORIES, FORCES, FORCE_COLORS, HORIZON } from '@/lib/format';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
-import type { Driver, DriverProposal } from '@/types';
-import { EXPERT_COLOR, REVIEWED_COLOR, type ScoringMode } from './drivers/shared';
+import type { Driver, DriverProposal, ForceName } from '@/types';
+import { EXPERT_COLOR, REVIEWED_COLOR, driverCode, isRated, type ScoringMode } from './drivers/shared';
 import { FIELD_HELP } from './drivers/cards';
-import { DriverRow, ROW_GRID } from './drivers/DriverRow';
+import { DriverRow, LAST_COLUMN_LABEL, ROW_GRID } from './drivers/DriverRow';
+import { downloadText, safeFilename } from '@/lib/exportCsv';
+import { categoryChipLabel, driversCsvText } from './drivers/driversCsv';
 
 // ─── Sort helpers ──────────────────────────────────────────────────
 type SortKey = 'name' | 'direction' | 'probability' | 'gp1' | 'effect';
@@ -40,6 +49,26 @@ const SORT_DEFAULT_DIR: Record<SortKey, SortDir> = {
   effect:      'desc',
 };
 
+const SORT_LABELS: Record<SortKey, string> = {
+  name: 'Driver', direction: 'Direction', probability: 'Probability', gp1: 'GP1 % affected', effect: 'Expected effect',
+};
+
+/** The options of the compact "Sort by" select (below xl): the base order,
+ *  then each column in both directions. */
+const SORT_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: '', label: 'Base order' },
+  { value: 'name:asc', label: 'Driver, A to Z' },
+  { value: 'name:desc', label: 'Driver, Z to A' },
+  { value: 'direction:asc', label: 'Direction, contraction first' },
+  { value: 'direction:desc', label: 'Direction, expansion first' },
+  { value: 'probability:desc', label: 'Probability, high to low' },
+  { value: 'probability:asc', label: 'Probability, low to high' },
+  { value: 'gp1:desc', label: 'GP1 % affected, high to low' },
+  { value: 'gp1:asc', label: 'GP1 % affected, low to high' },
+  { value: 'effect:desc', label: 'Expected effect, high to low' },
+  { value: 'effect:asc', label: 'Expected effect, low to high' },
+];
+
 function sortValue(d: Driver, key: SortKey): string | number {
   switch (key) {
     case 'name':        return d.name;
@@ -50,6 +79,9 @@ function sortValue(d: Driver, key: SortKey): string | number {
   }
 }
 
+const isForce = (v: string | undefined): v is ForceName => v != null && (FORCES as string[]).includes(v);
+const isMode = (v: string | undefined): v is ScoringMode => v === 'list' || v === 'rating' || v === 'review';
+
 // ═══════════════════════════════════════════════════════════════════
 // Scoring modes
 //
@@ -59,7 +91,7 @@ function sortValue(d: Driver, key: SortKey): string | number {
 //           changed from the driver's baseline shows in green; hover a score
 //           for its baseline.
 //   rating  any expert, viewer or admin, scores a driver from a blank slate
-//           in the expanded panel, with the baseline on hover; changes save
+//           in the expanded panel, with the baseline marked; changes save
 //           as they are made.
 //   review  admins only: the expert aggregate against the baseline, with the
 //           delta and who scored what. The admin endorses one driver at a
@@ -77,8 +109,8 @@ const ModeToggle: FC<{ mode: ScoringMode; onChange: (m: ScoringMode) => void; is
     ...(isAdmin ? [{ id: 'review' as ScoringMode, label: 'Review & Endorse', dot: EXPERT_COLOR }] : []),
   ];
   return (
-    <div role="tablist" aria-label="Scoring mode" style={{
-      display: 'inline-flex', gap: 4, padding: 5, borderRadius: 999, backgroundColor: S.surface, border: `1px solid ${S.cardBorder}`,
+    <div role="tablist" aria-label="Scoring mode" data-print-hide className="inline-flex flex-wrap" style={{
+      gap: 4, padding: 5, borderRadius: 999, backgroundColor: S.surface, border: `1px solid ${S.cardBorder}`,
     }}>
       {opts.map((o) => {
         const active = mode === o.id;
@@ -86,7 +118,7 @@ const ModeToggle: FC<{ mode: ScoringMode; onChange: (m: ScoringMode) => void; is
           <button type="button" key={o.id} role="tab" aria-selected={active} onClick={() => onChange(o.id)}
             className="inline-flex items-center gap-2 transition-colors"
             style={{
-              padding: '9px 18px', borderRadius: 999, border: 'none', cursor: 'pointer',
+              padding: '9px 16px', borderRadius: 999, border: 'none', cursor: 'pointer',
               fontFamily: HEADLINE_FONT, fontSize: 13, fontWeight: 700,
               backgroundColor: active ? S.primary : 'transparent', color: active ? S.onPrimary : S.onSurfaceVariant,
             }}>
@@ -115,31 +147,119 @@ interface DriversProps {
   isAdmin?: boolean;
 }
 
+/** What the page would unmount while an editor holds unsaved edits. */
+type PendingAction =
+  | { kind: 'toggle'; id: string | null }
+  | { kind: 'mode'; mode: ScoringMode }
+  /** Back, Forward or a drill-through moved the address away from the dirty editor. */
+  | { kind: 'address'; driver: string | null; mode: ScoringMode };
+
+/** How long the search waits before it reaches the address bar. */
+const SEARCH_URL_DELAY_MS = 300;
+
 const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
   const { drivers, driversError, databaseFailure, loading, apiAvailable, updateDriver, reload } = usePrism();
+  const [params, setParams] = useViewParams('drivers');
+  const allowedMode = useCallback(
+    (m: string | undefined): ScoringMode => (isMode(m) && (m !== 'review' || isAdmin) ? m : 'list'),
+    [isAdmin]);
+  // The address as it stands: the state the page adopts on mount and again
+  // whenever the address changes under it (Back, Forward, a pasted link).
+  const urlDriver = params.driver ?? null;
+  const urlMode = allowedMode(params.mode);
+  const urlQ = params.q ?? '';
+  const urlForce: ForceName | null = isForce(params.force) ? params.force : null;
+  const urlCategory = params.category ?? null;
+
   // The category a driver must be exposed to, by its API name; null shows all.
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const [search, setSearch] = useState(opened?.query ?? '');
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(opened ? null : urlCategory);
+  const [forceFilter, setForceFilter] = useState<ForceName | null>(opened ? null : urlForce);
+  const [search, setSearch] = useState(opened?.query ?? urlQ);
+  // In Expert Rating: show only the drivers not yet rated.
+  const [notRatedOnly, setNotRatedOnly] = useState(false);
+  // The driver whose row is expanded.
+  const [expandedId, setExpandedId] = useState<string | null>(urlDriver);
+  const [mode, setMode] = useState<ScoringMode>(urlMode);
+  // Review & Endorse is for admins. The rule is applied during render rather
+  // than corrected after the commit, so the toggle never paints a mode the
+  // user may not use.
+  if (!isAdmin && mode === 'review') setMode('list');
 
   // Adopt a drill-through whenever a new one arrives: its query replaces the
-  // search and the category filter is cleared, so the driver is never hidden
-  // by a filter left from an earlier visit. Adjusted during render against
-  // the last one adopted, so the list is already filtered in the pass that
+  // search and the filters are cleared, so the driver is never hidden by a
+  // filter left from an earlier visit. Adjusted during render against the
+  // last one adopted, so the list is already filtered in the pass that
   // follows the navigation.
   const [adoptedSeq, setAdoptedSeq] = useState(opened?.seq ?? 0);
   if (opened && opened.seq !== adoptedSeq) {
     setAdoptedSeq(opened.seq);
     setSearch(opened.query);
     setCategoryFilter(null);
+    setForceFilter(null);
   }
-  // The driver whose row is expanded.
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  // The setter as of the latest render, for the effects below: its identity
+  // follows the address, and neither effect should run again for that.
+  const setParamsRef = useRef(setParams);
+  useEffect(() => { setParamsRef.current = setParams; });
+  // The address follows the drill-through: the filters it cleared leave it too.
+  const openedSeq = opened?.seq;
+  useEffect(() => {
+    if (openedSeq != null) setParamsRef.current({ category: null, force: null });
+  }, [openedSeq]);
 
-  const [mode, setMode] = useState<ScoringMode>('list');
-  // Review & Endorse is for admins. The rule is applied during render rather
-  // than corrected after the commit, so the toggle never paints a mode the
-  // user may not use.
-  if (!isAdmin && mode === 'review') setMode('list');
+  // ── Unsaved edits: the editors that hold some, and the action waiting on
+  //    the admin's answer before it unmounts one. The editor is in the Driver
+  //    List panel, so only that mode can hold one. ──
+  const [dirtyIds, setDirtyIds] = useState<ReadonlySet<string>>(() => new Set());
+  const onDirtyChange = useCallback((driverId: string, dirty: boolean) => {
+    setDirtyIds((prev) => {
+      if (prev.has(driverId) === dirty) return prev;
+      const next = new Set(prev);
+      if (dirty) next.add(driverId); else next.delete(driverId);
+      return next;
+    });
+  }, []);
+  const [pending, setPending] = useState<PendingAction | null>(null);
+  const editorDirty = expandedId != null && mode === 'list' && dirtyIds.has(expandedId);
+
+  // The address changed under the page: adopt what differs from what it last
+  // saw. The page's own writes arrive here too and change nothing: the search
+  // is written only after typing has paused, with the value the field holds.
+  // A change that would unmount a dirty editor (another driver, no driver,
+  // another mode) waits for the admin's answer instead; meanwhile the
+  // address is written back to the editor (the effect below).
+  const [seen, setSeen] = useState({ driver: urlDriver, mode: urlMode, q: urlQ, force: urlForce, category: urlCategory });
+  if (seen.driver !== urlDriver || seen.mode !== urlMode) {
+    setSeen((prev) => ({ ...prev, driver: urlDriver, mode: urlMode }));
+    if (editorDirty && (urlDriver !== expandedId || urlMode !== 'list')) {
+      setPending({ kind: 'address', driver: urlDriver, mode: urlMode });
+    } else {
+      if (urlDriver !== expandedId) setExpandedId(urlDriver);
+      if (urlMode !== mode) setMode(urlMode);
+    }
+  }
+  if (seen.q !== urlQ) {
+    setSeen((prev) => ({ ...prev, q: urlQ }));
+    setSearch(urlQ);
+  }
+  if (seen.force !== urlForce) {
+    setSeen((prev) => ({ ...prev, force: urlForce }));
+    setForceFilter(urlForce);
+  }
+  if (seen.category !== urlCategory) {
+    setSeen((prev) => ({ ...prev, category: urlCategory }));
+    setCategoryFilter(urlCategory);
+  }
+  // The search reaches the address after a pause in typing.
+  useEffect(() => {
+    const t = setTimeout(() => { setParamsRef.current({ q: search || null }); }, SEARCH_URL_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [search]);
+  // While the admin decides, the address names the editor they are still in
+  // (again after every further change of address, hence keyed on `pending`).
+  useEffect(() => {
+    if (pending?.kind === 'address') setParamsRef.current({ driver: expandedId, mode: null });
+  }, [pending, expandedId]);
 
   // Each driver's "my proposal", kept live so a collapsed row shows what the
   // expert just entered in the Expert Rating panel (the driver list carries
@@ -164,6 +284,9 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
   const setMyProposal = useCallback((driverId: string, my: DriverProposal) => {
     setMyMap((prev) => ({ ...prev, [driverId]: my }));
   }, []);
+  const myProposalOf = useCallback(
+    (d: Driver): DriverProposal | null | undefined => myMap[d.id] ?? d.proposal_summary.my,
+    [myMap]);
 
   // Sort state: no key keeps the API's order. Clicking a header sorts by that
   // column, clicking it again flips the direction, and a different column
@@ -180,18 +303,29 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
     }
   };
 
-  const filtered = useMemo<Driver[]>(() => {
+  // Whether a driver passes the search and the filters.
+  const matches = useCallback((d: Driver): boolean => {
     const q = search.trim().toLowerCase();
-    return drivers.filter((d) => {
-      if (categoryFilter != null && d.category_exposure[categoryFilter] === 0) return false;
-      if (!q) return true;
-      return (
-        d.name.toLowerCase().includes(q) ||
-        d.description.toLowerCase().includes(q) ||
-        d.force.toLowerCase().includes(q)
-      );
-    });
-  }, [drivers, categoryFilter, search]);
+    if (forceFilter != null && d.force !== forceFilter) return false;
+    if (categoryFilter != null && d.category_exposure[categoryFilter] === 0) return false;
+    if (mode === 'rating' && notRatedOnly && isRated(myProposalOf(d))) return false;
+    if (!q) return true;
+    return (
+      d.name.toLowerCase().includes(q) ||
+      d.description.toLowerCase().includes(q) ||
+      d.force.toLowerCase().includes(q) ||
+      (driverCode(d)?.toLowerCase().includes(q) ?? false)
+    );
+  }, [search, forceFilter, categoryFilter, mode, notRatedOnly, myProposalOf]);
+
+  // The open row stays in the list while it is in use, whatever the filter
+  // says: the driver being scored under "Not rated" would otherwise vanish
+  // the moment its first scores make it rated, and an editor with unsaved
+  // edits would be unmounted by a search without the question below.
+  const pinnedId = expandedId != null && ((mode === 'rating' && notRatedOnly) || editorDirty) ? expandedId : null;
+  const filtered = useMemo<Driver[]>(
+    () => drivers.filter((d) => d.id === pinnedId || matches(d)),
+    [drivers, pinnedId, matches]);
 
   // The sort applies on top of the filter; without a sort key the API's order
   // (by driver id, which groups the forces) stays.
@@ -208,14 +342,153 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
     return [...filtered].sort(cmp);
   }, [filtered, sortKey, sortDir]);
 
+  // The rating progress, over every driver.
+  const ratedCount = useMemo(() => drivers.filter((d) => isRated(myProposalOf(d))).length, [drivers, myProposalOf]);
+
+  // Where "Next unrated" scrolls once the rows have settled (see openNextUnrated).
+  const scrollAfterExit = useRef<string | null>(null);
+  const scrollAfterCommit = useRef<string | null>(null);
+
+  // ── The question before an action drops unsaved edits ──
+  const dirtyDriver = editorDirty ? drivers.find((d) => d.id === expandedId) ?? null : null;
+  // A save that lands while the question is open takes its reason away: the
+  // question goes, and the admin's next action is their own.
+  if (pending != null && dirtyDriver == null) setPending(null);
+  const asking = pending != null && dirtyDriver != null;
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const keepEditing = useCallback(() => setPending(null), []);
+  useOverlay(asking, keepEditing, dialogRef);
+  // Leaving the page with unsaved edits asks first; not while the session is
+  // ending (sign out, or a session that expired), when staying would protect
+  // nothing.
+  const hasDirty = dirtyIds.size > 0;
+  useEffect(() => {
+    if (!hasDirty) return undefined;
+    const warn = (e: BeforeUnloadEvent) => { if (!sessionEnding()) e.preventDefault(); };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [hasDirty]);
+
+  const applyToggle = (id: string | null) => {
+    setExpandedId(id);
+    setParams({ driver: id });
+  };
+  const applyMode = (m: ScoringMode) => {
+    setMode(m);
+    setParams({ mode: m === 'list' ? null : m });
+  };
+  // A toggle or a mode change that would unmount a dirty editor waits for the
+  // admin's answer.
+  const requestToggle = (id: string | null) => {
+    // The admin's own click outranks a scroll still waiting on a collapse.
+    scrollAfterExit.current = null;
+    if (dirtyDriver) { setPending({ kind: 'toggle', id }); return; }
+    applyToggle(id);
+  };
+  const requestMode = (m: ScoringMode) => {
+    if (m === mode) return;
+    if (dirtyDriver) { setPending({ kind: 'mode', mode: m }); return; }
+    applyMode(m);
+  };
+  const discardAndContinue = () => {
+    const action = pending;
+    setPending(null);
+    if (!action) return;
+    if (action.kind === 'toggle') applyToggle(action.id);
+    else if (action.kind === 'mode') applyMode(action.mode);
+    else {
+      setExpandedId(action.driver);
+      setMode(action.mode);
+      setParams({ driver: action.driver, mode: action.mode === 'list' ? null : action.mode });
+    }
+  };
+
+  // Expert Rating: the next unrated driver after the open one, in the list's
+  // order, wrapping round to the top; opening it brings its row into view.
+  const nextUnratedId = useMemo<string | null>(() => {
+    if (mode !== 'rating' || expandedId == null) return null;
+    const i = sorted.findIndex((d) => d.id === expandedId);
+    const after = i < 0 ? sorted : [...sorted.slice(i + 1), ...sorted.slice(0, i)];
+    return after.find((d) => d.id !== expandedId && !isRated(myProposalOf(d)))?.id ?? null;
+  }, [mode, expandedId, sorted, myProposalOf]);
+  // The row comes to the top of the viewport, under the sticky top bar.
+  const scrollToRow = (id: string) => {
+    const row = document.getElementById(`driver-row-${id}`);
+    if (!row) return;
+    const top = row.getBoundingClientRect().top + window.scrollY - 88;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    window.scrollTo({ top: Math.max(0, top), behavior: reduced ? 'auto' : 'smooth' });
+  };
+  // The next row is scrolled to once the rows have settled: after the open
+  // panel has collapsed when its row stays in the list (onPanelExit), or
+  // after the commit when the row leaves the list (it is rated and "Not
+  // rated" is on), as nothing then animates.
+  useEffect(() => {
+    const id = scrollAfterCommit.current;
+    if (id == null) return;
+    scrollAfterCommit.current = null;
+    scrollToRow(id);
+  }, [expandedId]);
+  const onPanelExit = useCallback(() => {
+    const id = scrollAfterExit.current;
+    if (id == null) return;
+    scrollAfterExit.current = null;
+    scrollToRow(id);
+  }, []);
+  const openNextUnrated = () => {
+    if (!nextUnratedId || expandedId == null) return;
+    const current = drivers.find((d) => d.id === expandedId);
+    const currentStays = current != null && matches(current);
+    if (currentStays) scrollAfterExit.current = nextUnratedId;
+    else scrollAfterCommit.current = nextUnratedId;
+    applyToggle(nextUnratedId);
+  };
+
+  const clearAll = () => {
+    setSearch('');
+    setCategoryFilter(null);
+    setForceFilter(null);
+    setNotRatedOnly(false);
+    setParams({ q: null, category: null, force: null });
+  };
+  const filterActive = search.trim() !== '' || categoryFilter != null || forceFilter != null || (mode === 'rating' && notRatedOnly);
+  const countText = filterActive
+    ? `${sorted.length} of ${drivers.length} ${drivers.length === 1 ? 'driver' : 'drivers'}`
+    : `${drivers.length} ${drivers.length === 1 ? 'driver' : 'drivers'}`;
+
+  const exportCsv = () => {
+    const parts: string[] = [];
+    if (search.trim()) parts.push(`search "${search.trim()}"`);
+    if (forceFilter) parts.push(`force ${forceFilter}`);
+    if (categoryFilter) {
+      const c = CATEGORIES.find((x) => x.name === categoryFilter);
+      parts.push(`category ${c ? categoryChipLabel(c) : categoryFilter}`);
+    }
+    if (mode === 'rating' && notRatedOnly) parts.push('not rated only');
+    const order = sortKey
+      ? `sorted by ${SORT_LABELS[sortKey].toLowerCase()}, ${sortDir === 'asc' ? 'ascending' : 'descending'}`
+      : 'in the base order';
+    const filterText = `Filter: ${parts.length ? parts.join('; ') : 'none'}; ${order}`;
+    const now = new Date();
+    downloadText(safeFilename(`prism-drivers-${now.toISOString().slice(0, 10)}`, 'csv'), driversCsvText(sorted, filterText, now));
+  };
+
+  const sortSelectValue = sortKey ? `${sortKey}:${sortDir}` : '';
+  const onSortSelect = (value: string) => {
+    if (!value) { setSortKey(null); return; }
+    const [key, dir] = value.split(':') as [SortKey, SortDir];
+    setSortKey(key);
+    setSortDir(dir);
+  };
+
   return (
     <div
       className="min-h-screen"
       style={{ backgroundColor: S.bg, color: S.onBg, fontFamily: BODY_FONT }}
     >
-      <main className="max-w-[1440px] mx-auto px-8 py-10">
+      <main className="max-w-[1440px] mx-auto px-4 md:px-8 py-6 md:py-10">
         {/* Editorial header with the insight-rail accent */}
-        <header className="mb-8 flex items-start justify-between gap-8">
+        <header className="mb-8 flex flex-col md:flex-row md:items-start md:justify-between gap-6 md:gap-8">
           <div
             className="pl-5"
             style={{ borderLeft: `4px solid ${S.primary}` }}
@@ -227,11 +500,10 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
               Drivers
             </div>
             <h1
-              className="font-extrabold tracking-tight"
+              className="font-extrabold tracking-tight text-[1.75rem] md:text-[2.5rem]"
               style={{
                 fontFamily: HEADLINE_FONT,
                 color: S.onBg,
-                fontSize: '2.5rem',
                 lineHeight: 1.1,
               }}
             >
@@ -246,55 +518,98 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
             </p>
           </div>
 
-          {/* Search */}
-          <div className="relative w-full max-w-xs">
-            <Search
-              size={16}
-              className="absolute left-4 top-1/2 -translate-y-1/2"
-              style={{ color: S.onSurfaceVariant }}
-            />
-            <input
-              type="search"
-              aria-label="Search drivers"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search drivers…"
-              className="w-full pl-11 pr-4 py-2.5 rounded-full text-sm focus:outline-none focus:ring-2"
-              style={{
-                backgroundColor: S.surfaceLow,
-                color: S.onSurface,
-                border: 'none',
-              }}
-            />
+          {/* Search, the result count, Clear and the export */}
+          <div className="w-full md:max-w-xs flex flex-col gap-2 md:items-end">
+            <div className="relative w-full" data-print-hide>
+              <Search
+                size={16}
+                className="absolute left-4 top-1/2 -translate-y-1/2"
+                style={{ color: S.onSurfaceVariant }}
+              />
+              <input
+                type="search"
+                aria-label="Search drivers"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search drivers…"
+                className="w-full pl-11 pr-4 py-2.5 rounded-full text-sm focus:outline-none focus:ring-2"
+                style={{
+                  backgroundColor: S.surfaceLow,
+                  color: S.onSurface,
+                  border: 'none',
+                }}
+              />
+            </div>
+            <div className="flex items-center gap-3 flex-wrap px-1" style={{ fontSize: 12, color: S.onSurfaceVariant }}>
+              <span style={{ fontWeight: 700 }}>{countText}</span>
+              {filterActive && (
+                <button type="button" onClick={clearAll} data-print-hide style={{
+                  background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
+                  color: S.primary, fontWeight: 700, fontSize: 12, textDecoration: 'underline', minHeight: 24,
+                }}>
+                  Clear
+                </button>
+              )}
+              <button type="button" onClick={exportCsv} data-print-hide disabled={sorted.length === 0}
+                className="inline-flex items-center gap-1.5"
+                style={{
+                  padding: '4px 12px', borderRadius: 999, border: `1px solid ${S.cardBorder}`,
+                  background: S.surface, color: S.primary, fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 700,
+                  cursor: sorted.length === 0 ? 'not-allowed' : 'pointer', opacity: sorted.length === 0 ? 0.5 : 1, minHeight: 24,
+                }}>
+                <Download size={12} strokeWidth={2.4} aria-hidden />
+                Export CSV
+              </button>
+            </div>
           </div>
         </header>
 
-        {/* Scoring mode toggle and what the mode shows */}
+        {/* Scoring mode toggle and what the mode shows; in Expert Rating, the progress */}
         <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
-          <ModeToggle mode={mode} onChange={setMode} isAdmin={isAdmin} />
-          <p style={{ fontSize: 13, color: S.onSurfaceVariant, maxWidth: '42rem', lineHeight: 1.5 }}>
-            {mode === 'list'
-              ? 'The scores that feed the model. Scores an admin has changed from the baseline show in green; hover a score for its baseline.'
-              : mode === 'rating'
-              ? 'Score any driver from a blank slate: open a row and your changes auto-save. Hover a grey dot or blank field to see the baseline.'
-              : 'Compare the expert average with the baseline and endorse one driver at a time. Hover an expert score to see who scored what.'}
-          </p>
+          <ModeToggle mode={mode} onChange={requestMode} isAdmin={isAdmin} />
+          {mode === 'rating' ? (
+            <div className="flex items-center gap-3 flex-wrap" style={{ fontSize: 13, color: S.onSurfaceVariant }}>
+              <span role="status" style={{ fontWeight: 700 }}>
+                {ratedCount} of {drivers.length} rated
+              </span>
+              <FilterChip label="Not rated" active={notRatedOnly} onClick={() => setNotRatedOnly((v) => !v)} />
+              <span className="hidden sm:inline">Open a row to score it; changes save as you make them.</span>
+            </div>
+          ) : (
+            <p style={{ fontSize: 13, color: S.onSurfaceVariant, maxWidth: '42rem', lineHeight: 1.5 }}>
+              {mode === 'list'
+                ? 'The scores that feed the model. Scores an admin has changed from the baseline show in green; hover a score for its baseline.'
+                : 'Compare the expert mean with the baseline and endorse one driver at a time. Who scored what is listed under each driver.'}
+            </p>
+          )}
         </div>
 
-        {/* Category filter chips */}
-        <section className="mb-8">
-          <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+        {/* Filter chips: the force, then the category */}
+        <section className="mb-8 flex flex-col gap-2" data-print-hide>
+          <div role="group" aria-label="Filter by force" className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            <FilterChip label="All" active={forceFilter == null} onClick={() => { setForceFilter(null); setParams({ force: null }); }} />
+            {FORCES.map((f) => (
+              <FilterChip
+                key={f}
+                label={f}
+                dot={FORCE_COLORS[f]}
+                active={forceFilter === f}
+                onClick={() => { setForceFilter(f); setParams({ force: f }); }}
+              />
+            ))}
+          </div>
+          <div role="group" aria-label="Filter by category" className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
             <FilterChip
               label="All"
               active={categoryFilter == null}
-              onClick={() => setCategoryFilter(null)}
+              onClick={() => { setCategoryFilter(null); setParams({ category: null }); }}
             />
             {CATEGORIES.map((c) => (
               <FilterChip
                 key={c.name}
-                label={c.short}
+                label={categoryChipLabel(c)}
                 active={categoryFilter === c.name}
-                onClick={() => setCategoryFilter(c.name)}
+                onClick={() => { setCategoryFilter(c.name); setParams({ category: c.name }); }}
               />
             ))}
           </div>
@@ -320,43 +635,60 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
           </div>
         )}
 
-        {/* Editorial "paper" card holding the driver list */}
+        {/* Below xl the column header is gone: a compact sort control instead */}
+        <div className="xl:hidden mb-3 flex items-center justify-end gap-2" data-print-hide>
+          <label className="inline-flex items-center gap-2" style={{ fontSize: 12, fontWeight: 700, color: S.onSurfaceVariant }}>
+            Sort by
+            <select value={sortSelectValue} onChange={(e) => onSortSelect(e.target.value)} style={{
+              padding: '6px 10px', borderRadius: 8, border: `1px solid ${S.cardBorder}`,
+              backgroundColor: S.surface, color: S.onSurface, fontSize: 12, fontWeight: 600,
+            }}>
+              {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </label>
+        </div>
+
+        {/* Editorial "paper" card holding the driver list. Clipped, not
+            hidden, so the editor's sticky bar can stick to the viewport. */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
-          className="rounded-2xl overflow-hidden"
+          role="table"
+          aria-label="Profit Pool Drivers"
+          className="rounded-2xl overflow-clip"
           style={{
             backgroundColor: S.surface,
             boxShadow: SHADOW.card,
           }}
         >
-          {/* Column header: every column sorts */}
-          <div
-            className="grid items-center px-8 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em]"
-            style={{
-              gridTemplateColumns: ROW_GRID[mode],
-              backgroundColor: S.surfaceLow,
-              color: S.onSurfaceVariant,
-            }}
-          >
-            <SortHeader label="Driver"          sortKey="name"        currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
-            <SortHeader label="Direction"      sortKey="direction"   currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
-            <SortHeader label="Probability"    sortKey="probability" currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
-            <span className="inline-flex items-center justify-end w-full">
-              <SortHeader label="GP1 % affected" sortKey="gp1"         currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
-              <Gp1InfoTip />
-            </span>
-            <SortHeader label="Expected effect" sortKey="effect"     currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
-            <span className="inline-flex items-center justify-end w-full text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: S.onSurfaceVariant }}>
-              {mode === 'rating' ? 'Your rating' : mode === 'review' ? 'Proposals' : 'Edited'}
-            </span>
+          {/* Column header, from xl: every column but the last sorts */}
+          <div role="rowgroup" className="hidden xl:block">
+            <div
+              role="row"
+              className="grid items-center gap-x-3 px-8 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em]"
+              style={{
+                gridTemplateColumns: ROW_GRID[mode],
+                backgroundColor: S.surfaceLow,
+                color: S.onSurfaceVariant,
+              }}
+            >
+              <SortHeader label="Driver"          sortKey="name"        currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
+              <SortHeader label="Direction"      sortKey="direction"   currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
+              <SortHeader label="Probability"    sortKey="probability" currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
+              <SortHeader label="GP1 % affected" sortKey="gp1"         currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right"
+                extra={<Gp1InfoTip />} />
+              <SortHeader label="Expected effect" sortKey="effect"     currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
+              <div role="columnheader" className="inline-flex items-center justify-end w-full text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: S.onSurfaceVariant }}>
+                {LAST_COLUMN_LABEL[mode]}
+              </div>
+            </div>
           </div>
 
           {/* Rows */}
-          <div>
+          <div role="rowgroup">
             {loading && drivers.length === 0 && (
-              <EmptyRow text="Loading drivers…" icon={<Layers size={20} />} />
+              <EmptyRow text="Loading drivers…" icon={<Layers size={20} />} status />
             )}
             {!loading && !apiAvailable && drivers.length === 0 && (
               <EmptyRow text="The PRISM service cannot be reached; the drivers show once it answers." icon={<AlertTriangle size={20} />} />
@@ -367,7 +699,7 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
             )}
             {!loading && drivers.length > 0 && sorted.length === 0 && (
               <EmptyRow text="No drivers match the current search and filter." icon={<Search size={20} />}
-                action={{ label: 'Clear search and filter', onClick: () => { setSearch(''); setCategoryFilter(null); } }} />
+                action={{ label: 'Clear search and filter', onClick: clearAll }} />
             )}
             {sorted.map((d, idx) => {
               const expanded = expandedId === d.id;
@@ -377,39 +709,83 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
                   driver={d}
                   isLast={idx === sorted.length - 1}
                   expanded={expanded}
-                  onToggle={() => setExpandedId(expanded ? null : d.id)}
+                  onToggle={() => requestToggle(expanded ? null : d.id)}
                   mode={mode}
                   myProposal={myMap[d.id]}
                   onMyChange={setMyProposal}
                   isAdmin={isAdmin}
                   updateDriver={updateDriver}
+                  onDirtyChange={onDirtyChange}
+                  onPanelExit={onPanelExit}
+                  nextUnrated={expanded && mode === 'rating' ? {
+                    id: nextUnratedId,
+                    reason: nextUnratedId ? null : 'Every other driver in this list is rated',
+                    go: openNextUnrated,
+                  } : undefined}
                 />
               );
             })}
           </div>
         </motion.div>
       </main>
+
+      {/* The question before an action would drop unsaved edits */}
+      {asking && dirtyDriver && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ backgroundColor: S.scrim }}>
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="discard-edits-title"
+            tabIndex={-1}
+            className="w-full max-w-md rounded-2xl p-6"
+            style={{ backgroundColor: S.surface, boxShadow: SHADOW.dialog, color: S.onSurface }}
+          >
+            <h2 id="discard-edits-title" style={{ margin: 0, fontFamily: HEADLINE_FONT, fontSize: 17, fontWeight: 800, lineHeight: 1.3 }}>
+              Discard the edits to {dirtyDriver.name}?
+            </h2>
+            <p style={{ margin: '10px 0 0', fontSize: 13.5, lineHeight: 1.55, color: S.onSurfaceVariant }}>
+              The editor holds changes that have not been saved. Keep editing to save them first, or discard them.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-2.5 flex-wrap">
+              <button type="button" onClick={keepEditing} style={{
+                padding: '9px 18px', borderRadius: 999, border: `1px solid ${S.cardBorder}`, background: S.surface,
+                color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              }}>
+                Keep editing
+              </button>
+              <button type="button" onClick={discardAndContinue} style={{
+                padding: '9px 18px', borderRadius: 999, border: 'none', background: S.error,
+                color: S.onPrimary, fontFamily: HEADLINE_FONT, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              }}>
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 // ─── Filter chip ───────────────────────────────────────────────────
-const FilterChip: FC<{ label: string; active: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
+const FilterChip: FC<{ label: string; active: boolean; onClick: () => void; dot?: string }> = ({ label, active, onClick, dot }) => (
   <button
     type="button"
     onClick={onClick}
     aria-pressed={active}
-    className="flex-shrink-0 px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 hover:scale-[0.97]"
+    className="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 hover:scale-[0.97]"
     style={{
       backgroundColor: active ? S.primaryContainer : S.surfaceLow,
       color:           active ? S.onPrimaryContainer : S.onSurfaceVariant,
     }}
   >
+    {dot && <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: dot, flexShrink: 0 }} />}
     {label}
   </button>
 );
 
-// ─── Sort header: a clickable column header with its sort direction ──
+// ─── Sort header: a column header with a button that sorts by it ──
 const SortHeader: FC<{
   label: string;
   sortKey: SortKey;
@@ -417,31 +793,39 @@ const SortHeader: FC<{
   currentDir: SortDir;
   onToggle: (key: SortKey) => void;
   align?: 'left' | 'right';
-}> = ({ label, sortKey, currentKey, currentDir, onToggle, align = 'left' }) => {
+  /** Something beside the button, such as the GP1 help. */
+  extra?: React.ReactNode;
+}> = ({ label, sortKey, currentKey, currentDir, onToggle, align = 'left', extra }) => {
   const isActive = currentKey === sortKey;
   const Icon = !isActive ? ArrowUpDown : currentDir === 'asc' ? ArrowUp : ArrowDown;
   return (
-    <button
-      type="button"
-      onClick={() => onToggle(sortKey)}
-      // aria-sort is valid only on a column header, and this header row is a
-      // CSS grid rather than a table, so the sort state is in the name.
-      aria-label={`Sort by ${label}${isActive ? `, currently ${currentDir === 'asc' ? 'ascending' : 'descending'}` : ''}`}
-      className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.15em] transition-colors"
-      style={{
-        justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
-        color: isActive ? S.onSurface : S.onSurfaceVariant,
-        background: 'transparent',
-        border: 'none',
-        padding: 0,
-        cursor: 'pointer',
-        width: '100%',
-        textAlign: align,
-      }}
+    <div
+      role="columnheader"
+      aria-sort={isActive ? (currentDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+      className="inline-flex items-center w-full"
+      style={{ justifyContent: align === 'right' ? 'flex-end' : 'flex-start' }}
     >
-      <span>{label}</span>
-      <Icon size={12} style={{ opacity: isActive ? 1 : 0.45 }} />
-    </button>
+      <button
+        type="button"
+        onClick={() => onToggle(sortKey)}
+        aria-label={`Sort by ${label}`}
+        className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.15em] transition-colors"
+        style={{
+          justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
+          color: isActive ? S.onSurface : S.onSurfaceVariant,
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
+          cursor: 'pointer',
+          textAlign: align,
+          minHeight: 24,
+        }}
+      >
+        <span>{label}</span>
+        <Icon size={12} style={{ opacity: isActive ? 1 : 0.45 }} aria-hidden />
+      </button>
+      {extra}
+    </div>
   );
 };
 
@@ -450,11 +834,11 @@ const Gp1InfoTip: FC = () => {
   const [open, setOpen] = useState(false);
   return (
     <span className="relative inline-flex items-center">
-      <button type="button" aria-label="What does GP1 % affected mean?"
+      <button type="button" aria-label="What does GP1 % affected mean?" aria-expanded={open}
         onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}
         onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
         style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          background: 'transparent', border: 'none', padding: 0, marginLeft: 6,
+          width: 24, height: 24, background: 'transparent', border: 'none', padding: 0, marginLeft: 2,
           color: S.onSurfaceVariant, cursor: 'help' }}>
         <Info size={11} strokeWidth={2.4} />
       </button>
@@ -472,23 +856,29 @@ const Gp1InfoTip: FC = () => {
 };
 
 // ─── Empty and loading row ─────────────────────────────────────────
-const EmptyRow: FC<{ text: string; icon: React.ReactNode; action?: { label: string; onClick: () => void } }> = ({
-  text, icon, action,
+const EmptyRow: FC<{ text: string; icon: React.ReactNode; action?: { label: string; onClick: () => void }; status?: boolean }> = ({
+  text, icon, action, status,
 }) => (
   <div
-    className="px-8 py-16 flex flex-col items-center justify-center gap-3"
-    style={{ color: S.onSurfaceVariant }}
+    role="row"
   >
-    <div style={{ color: S.primary }}>{icon}</div>
-    <div className="text-sm">{text}</div>
-    {action && (
-      <button type="button" onClick={action.onClick} style={{
-        padding: '7px 16px', borderRadius: 999, border: `1px solid ${S.cardBorder}`, background: S.surface,
-        color: S.primary, fontFamily: HEADLINE_FONT, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-      }}>
-        {action.label}
-      </button>
-    )}
+    <div
+      role="cell"
+      aria-colspan={6}
+      className="px-8 py-16 flex flex-col items-center justify-center gap-3"
+      style={{ color: S.onSurfaceVariant }}
+    >
+      <div style={{ color: S.primary }}>{icon}</div>
+      <div className="text-sm" role={status ? 'status' : undefined}>{text}</div>
+      {action && (
+        <button type="button" onClick={action.onClick} style={{
+          padding: '7px 16px', borderRadius: 999, border: `1px solid ${S.cardBorder}`, background: S.surface,
+          color: S.primary, fontFamily: HEADLINE_FONT, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+        }}>
+          {action.label}
+        </button>
+      )}
+    </div>
   </div>
 );
 

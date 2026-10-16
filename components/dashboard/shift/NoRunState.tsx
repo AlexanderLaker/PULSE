@@ -5,8 +5,9 @@
  */
 import React, { type FC } from 'react';
 import { AlertTriangle, Info } from 'lucide-react';
+import FeedbackLink from '@/components/dashboard/FeedbackLink';
 import { NO_VALUE } from '@/lib/format';
-import { S, SHADOW, HEADLINE_FONT, MONO_FONT } from '@/lib/theme';
+import { S, SHADOW, HEADLINE_FONT, FIGURES } from '@/lib/theme';
 import type { DiagnosticsResult } from '@/types';
 
 /** Why the page has no run to show. */
@@ -40,7 +41,7 @@ const NO_RUN_TITLE: Record<NoRunReason, { viewer: string; admin: string }> = {
   no_run:         { viewer: 'No simulation available yet', admin: 'No run stored yet' },
 };
 
-const CODE: React.CSSProperties = { fontFamily: MONO_FONT, fontSize: '0.92em' };
+const CODE: React.CSSProperties = { ...FIGURES, fontSize: '0.92em' };
 
 export const NoRunState: FC<{
   reason: NoRunReason;
@@ -83,7 +84,7 @@ export const NoRunState: FC<{
               ? 'No simulation run has been published yet. Results appear here automatically as soon as the PRISM team publishes the first run.'
               : reason === 'migrating'
                 ? 'PRISM’s database is moving to the current schema. The results return here as soon as the update has finished.'
-                : 'The results cannot be loaded right now. Please check back shortly; if this persists, contact the PRISM team.'}
+                : <>The results cannot be loaded right now. Check back shortly; if this persists, contact <FeedbackLink />.</>}
           </p>
         ) : reason === 'migrating' ? (
           <>
@@ -92,7 +93,7 @@ export const NoRunState: FC<{
               here once it has committed.
             </p>
             {diagnostics?.error && (
-              <p style={{ fontFamily: MONO_FONT, fontSize: '12px', color: S.error }}>
+              <p style={{ ...FIGURES, fontSize: '12px', color: S.error }}>
                 {diagnostics.error}
               </p>
             )}
@@ -111,7 +112,7 @@ export const NoRunState: FC<{
               driver base.
             </p>
             {diagnostics?.error && (
-              <p style={{ fontFamily: MONO_FONT, fontSize: '12px', color: S.error }}>
+              <p style={{ ...FIGURES, fontSize: '12px', color: S.error }}>
                 {diagnostics.error}
               </p>
             )}
@@ -124,7 +125,7 @@ export const NoRunState: FC<{
               and answering, then reload the page.
             </p>
             {requestError && (
-              <p style={{ fontFamily: MONO_FONT, fontSize: '12px', color: S.error }}>
+              <p style={{ ...FIGURES, fontSize: '12px', color: S.error }}>
                 {requestError}
               </p>
             )}
@@ -137,7 +138,7 @@ export const NoRunState: FC<{
               Vercel project settings points to the Neon database the production runs write to.
             </p>
             {diagnostics?.error && (
-              <p style={{ fontFamily: MONO_FONT, fontSize: '12px', color: S.error }}>
+              <p style={{ ...FIGURES, fontSize: '12px', color: S.error }}>
                 {diagnostics.error}
               </p>
             )}
@@ -156,7 +157,7 @@ export const NoRunState: FC<{
               exists in the database but lacks part of what the dashboard reads.
             </p>
             {diagnostics?.error && (
-              <p style={{ fontFamily: MONO_FONT, fontSize: '12px', color: S.error }}>
+              <p style={{ ...FIGURES, fontSize: '12px', color: S.error }}>
                 {diagnostics.error}
               </p>
             )}
@@ -168,8 +169,8 @@ export const NoRunState: FC<{
         ) : (
           <p>
             Runs are made offline by <code style={CODE}>python3 scripts/run_production.py</code>,
-            which stores them in the database. Once one is stored, all four lenses (Time Path,
-            Force, Value Chain and Region) fill in here.
+            which stores them in the database. Once one is stored, all four lenses (Time path,
+            Force attribution, Value-chain attribution and Region attribution) fill in here.
           </p>
         )}
       </div>

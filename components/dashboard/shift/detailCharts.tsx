@@ -3,14 +3,14 @@
  * with its P10 to P90 band, the force attribution and the regional shifts in
  * the year the panel names.
  */
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { LucideIcon } from 'lucide-react';
 import {
-  Area, Line, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  Area, Line, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 import { FLAT_EPS, FORCE_COLORS, YEARS, fmtShift, fmtPct, heatText, shiftColor } from '@/lib/format';
-import { S, SHADOW, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
+import { S, SHADOW, HEADLINE_FONT, BODY_FONT, FIGURES } from '@/lib/theme';
 import type { ForceName, ShiftPath } from '@/types';
 
 // ─── Section: card with an uppercase header ────────────────────────────────
@@ -63,17 +63,38 @@ interface ChartDataPoint {
   p90: number;
 }
 
+/**
+ * The Y axis of the fan chart, from the data: the domain runs from the
+ * lowest P10 (or zero) to the highest P90 (or zero), padded by a tenth of
+ * that range at each end, so zero is always on the chart; the ticks are the
+ * round values inside it at a step of 0.5, 1, 2 or 5 percent, whichever
+ * keeps them to a handful.
+ */
+export function pathAxis(points: ReadonlyArray<{ p10: number; p90: number }>): { domain: [number, number]; ticks: number[] } {
+  const lo = Math.min(0, ...points.map((d) => d.p10));
+  const hi = Math.max(0, ...points.map((d) => d.p90));
+  const range = hi - lo;
+  const pad = (range > 0 ? range : 0.01) * 0.1;
+  const domain: [number, number] = [lo - pad, hi + pad];
+  const rangePct = range * 100;
+  const stepPct = rangePct <= 3 ? 0.5 : rangePct <= 6 ? 1 : rangePct <= 12 ? 2 : 5;
+  const ticks: number[] = [];
+  const first = Math.ceil((domain[0] * 100) / stepPct - 1e-9);
+  const last = Math.floor((domain[1] * 100) / stepPct + 1e-9);
+  for (let k = first; k <= last; k += 1) ticks.push(Math.round(k * stepPct * 10) / 1000);
+  return { domain, ticks };
+}
+
+/** Below this container width the X axis labels only its first and last year. */
+const NARROW_CHART = 600;
+
 export const MiniPathChart: React.FC<{ path: ShiftPath }> = ({ path }) => {
   const chartData: ChartDataPoint[] = YEARS.map((year) => {
     const d = path[String(year)];
     return { year, median: d.median, p10: d.p10, p90: d.p90 };
   });
 
-  const maxAbs = Math.max(
-    ...chartData.map((d) => Math.max(Math.abs(d.p10), Math.abs(d.p90), Math.abs(d.median))),
-    0.01,
-  );
-  const yAxisDomain: [number, number] = [-maxAbs * 1.15, maxAbs * 1.15];
+  const { domain, ticks } = pathAxis(chartData);
 
   // The band and the median line take the terminal direction's colour, so a
   // contracting category reads red and an expanding one green, like the
@@ -81,10 +102,25 @@ export const MiniPathChart: React.FC<{ path: ShiftPath }> = ({ path }) => {
   const termMedian = chartData[chartData.length - 1].median;
   const fanTint = Math.abs(termMedian) < FLAT_EPS ? S.primary : shiftColor(termMedian);
 
+  // On a narrow container ten year labels would collide, so only the ends
+  // are labelled; the width comes from a ResizeObserver on the wrapper.
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? el.clientWidth;
+      setNarrow(width > 0 && width < NARROW_CHART);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div style={{ height: 280 }}>
+    <div ref={wrapRef} style={{ height: 280 }}>
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={chartData} margin={{ left: 0, right: 8, top: 6, bottom: 0 }}>
+        <ComposedChart data={chartData} margin={{ left: 0, right: 24, top: 6, bottom: 0 }} accessibilityLayer>
           <defs>
             <linearGradient id="confidenceBand" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={fanTint} stopOpacity={0.26} />
@@ -102,16 +138,18 @@ export const MiniPathChart: React.FC<{ path: ShiftPath }> = ({ path }) => {
             tick={{ fontSize: 11, fill: S.onSurfaceVariant, fontFamily: BODY_FONT }}
             axisLine={{ stroke: S.cardBorder }}
             tickLine={false}
-            interval={0}
+            interval={narrow ? 'preserveStartEnd' : 0}
           />
           <YAxis
-            domain={yAxisDomain}
-            tick={{ fontSize: 11, fill: S.onSurfaceVariant, fontFamily: MONO_FONT }}
+            domain={domain}
+            ticks={ticks}
+            tick={{ fontSize: 11, fill: S.onSurfaceVariant, ...FIGURES }}
             axisLine={{ stroke: S.cardBorder }}
             tickLine={false}
             tickFormatter={(v: number) => fmtShift(v, 1)}
-            width={48}
+            width={52}
           />
+          <ReferenceLine y={0} stroke={S.onSurfaceVariant} strokeOpacity={0.6} strokeWidth={1} />
           <Tooltip
             cursor={{ stroke: S.primary, strokeDasharray: '2 3', strokeOpacity: 0.5 }}
             content={({ active, payload }) => {
@@ -157,7 +195,7 @@ export const MiniPathChart: React.FC<{ path: ShiftPath }> = ({ path }) => {
                     <span style={{ opacity: 0.72 }}>Median</span>
                     <span
                       style={{
-                        fontFamily: MONO_FONT,
+                        ...FIGURES,
                         fontWeight: 700,
                         textAlign: 'right',
                         color: medColor,
@@ -166,11 +204,11 @@ export const MiniPathChart: React.FC<{ path: ShiftPath }> = ({ path }) => {
                       {fmtShift(d.median, 1)}
                     </span>
                     <span style={{ opacity: 0.72 }}>P10</span>
-                    <span style={{ fontFamily: MONO_FONT, textAlign: 'right' }}>
+                    <span style={{ ...FIGURES, textAlign: 'right' }}>
                       {fmtShift(d.p10, 1)}
                     </span>
                     <span style={{ opacity: 0.72 }}>P90</span>
-                    <span style={{ fontFamily: MONO_FONT, textAlign: 'right' }}>
+                    <span style={{ ...FIGURES, textAlign: 'right' }}>
                       {fmtShift(d.p90, 1)}
                     </span>
                   </div>
@@ -295,7 +333,7 @@ export const ForceDecomposition: React.FC<{ decomposition: Record<string, number
               style={{
                 fontSize: 12,
                 fontWeight: 700,
-                fontFamily: MONO_FONT,
+                ...FIGURES,
                 color: valueInk,
                 textAlign: 'right',
               }}
@@ -322,7 +360,11 @@ export interface RegionalRow {
   share: number | undefined;
 }
 
-export const RegionalDecomposition: React.FC<{ rows: RegionalRow[] }> = ({ rows }) => {
+export const RegionalDecomposition: React.FC<{
+  rows: RegionalRow[];
+  /** Whether the run's cell weights (the shares shown) are the estimate from public reporting. */
+  onEstimate?: boolean;
+}> = ({ rows, onEstimate = false }) => {
   const maxAbs = Math.max(...rows.map((r) => Math.abs(r.median)), 1e-9);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -335,7 +377,7 @@ export const RegionalDecomposition: React.FC<{ rows: RegionalRow[] }> = ({ rows 
             <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, fontSize: 12, fontWeight: 600, color: S.onSurface, fontFamily: BODY_FONT }}>
               <span>{r.region}</span>
               {r.share != null && (
-                <span style={{ fontSize: 10, color: S.mutedText, fontFamily: MONO_FONT }}>
+                <span style={{ fontSize: 11, color: S.mutedText, ...FIGURES }}>
                   {fmtPct(r.share, 0)}
                 </span>
               )}
@@ -345,14 +387,14 @@ export const RegionalDecomposition: React.FC<{ rows: RegionalRow[] }> = ({ rows 
                 transition={{ delay: 0.15, duration: 0.55, ease: 'easeOut' }}
                 style={{ height: '100%', backgroundColor: barColor, borderRadius: 4, opacity: 0.88 }} />
             </div>
-            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: MONO_FONT, color: valueInk, textAlign: 'right' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, ...FIGURES, color: valueInk, textAlign: 'right' }}>
               {fmtShift(r.median, 1)}
             </span>
           </div>
         );
       })}
       <div style={{ fontSize: 10.5, color: S.mutedText, fontFamily: BODY_FONT, lineHeight: 1.5, marginTop: 2 }}>
-        % = the region&rsquo;s share of this category&rsquo;s gross profit (its row of the run&rsquo;s cell weights). In every draw the category&rsquo;s shift is the share-weighted average of its regional shifts; the medians shown need not average exactly to the category&rsquo;s median.
+        % = the region&rsquo;s share of this category&rsquo;s gross profit (its row of the run&rsquo;s cell weights{onEstimate ? ', an estimate from public reporting on this run' : ''}). In every draw the category&rsquo;s shift is the share-weighted average of its regional shifts; the medians shown need not average exactly to the category&rsquo;s median.
       </div>
     </div>
   );

@@ -11,7 +11,8 @@
  *     proposal has loaded (a save from a blank draft would overwrite it); its
  *     saves go out one at a time with the newest draft; a field clicked again
  *     is cleared (sent as null); a half-typed year, or one not after the
- *     driver's onset, is never sent. A panel opened again waits for a save
+ *     driver's onset, is never sent and stays in the field with a message.
+ *     A panel opened again waits for a save
  *     still on its way before it loads, and an edit held back is sent as soon
  *     as the session ends.
  */
@@ -74,7 +75,7 @@ describe('a drill-through from another view', () => {
 
     // The user clears the search and picks a category the GLP-1 driver is not exposed to.
     fireEvent.change(screen.getByPlaceholderText('Search drivers…'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'FCN' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Fabric Clean (FCN)' }));
     expect(rows().some((t) => t?.includes('GLP-1'))).toBe(false);
 
     // The same driver opened again: a new drill-through, so it shows again.
@@ -366,7 +367,7 @@ describe('the Expert Rating panel', () => {
     await act(async () => { finishFirst(); });
     await waitFor(() => expect(API.saveMyProposal).toHaveBeenCalledTimes(2));
     expect(API.saveMyProposal.mock.calls[1]![1]).toMatchObject({ probability: 5 });
-    expect(await screen.findByText('✓ All changes saved')).toBeTruthy();
+    expect(await screen.findByText('All changes saved')).toBeTruthy();
   });
 
   it('sends an edit it is holding back as soon as the session ends, and only once', async () => {
@@ -381,7 +382,7 @@ describe('the Expert Rating panel', () => {
     expect(API.saveMyProposal.mock.calls[0]![1]).toMatchObject({ probability: 4 });
     await act(async () => { vi.advanceTimersByTime(700); });
     expect(API.saveMyProposal).toHaveBeenCalledTimes(1);
-    expect(await screen.findByText('✓ All changes saved')).toBeTruthy();
+    expect(await screen.findByText('All changes saved')).toBeTruthy();
   });
 
   it('loads again only after the save sent on closing has landed', async () => {
@@ -420,8 +421,13 @@ describe('the Expert Rating panel', () => {
     await act(async () => { vi.advanceTimersByTime(700); });
     await waitFor(() => expect(API.saveMyProposal).toHaveBeenCalledTimes(1));
     expect(API.saveMyProposal.mock.calls[0]![1]).toMatchObject({ peak_year: 2031 });
+    // A year outside the range stays in the field with a message, not silently reverted.
     fireEvent.change(year, { target: { value: '2040' } });
     fireEvent.blur(year);
-    expect((year as HTMLInputElement).value).toBe('2031');
+    expect((year as HTMLInputElement).value).toBe('2040');
+    expect(year.getAttribute('aria-invalid')).toBe('true');
+    expect(screen.getByText('A whole year from 2026 (after the onset) to 2035; your proposal keeps 2031 until this is one')).toBeTruthy();
+    await act(async () => { vi.advanceTimersByTime(700); });
+    expect(API.saveMyProposal).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,6 +1,6 @@
 /**
  * The Explorer's sources: the evidence grade as the shared chip, and a source
- * as a short linked chip coloured by its grade.
+ * as a short linked chip coloured by its grade, with the grade in words.
  */
 import type { FC } from 'react';
 import type { SourceRef, EvidenceGrade } from '@/lib/profitPoolData';
@@ -63,6 +63,9 @@ export const SourceChip: FC<{ src: SourceRef; kind: 'Revenue' | 'GP1' }> = ({ sr
       }}
     >
       {value ? `${name} (${kind}: ${value})` : name}
+      {/* The grade in words, since the colour alone does not say it. */}
+      {' '}({src.grade})
+      <span className="sr-only"> (opens in a new tab)</span>
     </a>
   );
 };

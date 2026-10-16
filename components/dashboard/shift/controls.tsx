@@ -1,10 +1,11 @@
 /**
  * The matrix toolbar's controls: the lens and impact-filter labels, the
- * segmented control and the year stepper of the attribution lenses.
+ * segmented control, the year stepper of the attribution lenses and the
+ * export menu.
  */
-import type { FC } from 'react';
+import { useEffect, useId, useRef, useState, type FC } from 'react';
 import {
-  Calendar, Layers, Globe2, Zap, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Activity,
+  Calendar, Layers, Globe2, Zap, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Activity, Download,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { BASE_YEAR, FIRST_YEAR, HORIZON, YEARS } from '@/lib/format';
@@ -12,9 +13,9 @@ import { S, SHADOW, BODY_FONT } from '@/lib/theme';
 import type { ImpactFilter, Lens } from './matrixModel';
 
 export const LENS_META: Record<Lens, { label: string; description: string; Icon: LucideIcon }> = {
-  time:   { label: 'Time Path',   description: `MC median shifts ${FIRST_YEAR}→${HORIZON}, cumulative vs ${BASE_YEAR}`, Icon: Calendar },
+  time:   { label: 'Time path',   description: `MC median shifts ${FIRST_YEAR}→${HORIZON}, cumulative vs ${BASE_YEAR}`, Icon: Calendar },
   force:  { label: 'Force attribution',       description: 'Splits each category\'s median across the forces by the size of their drivers\' effects (expected effect × exposure × force weight), not by their direction: every force takes a share in the median\'s direction. Attribution, not an independent simulation', Icon: Zap },
-  vc:     { label: 'Value-chain epicentre attribution', description: 'Splits each category\'s median by the size of the drivers\' effects and gives each driver\'s share wholly to the stage where its impact centres (its epicentre); effects are not passed up or down the chain. Attribution, not an independent simulation', Icon: Layers },
+  vc:     { label: 'Value-chain attribution', description: 'Splits each category\'s median by the size of the drivers\' effects and gives each driver\'s share wholly to the stage where its impact centres (its epicentre); effects are not passed up or down the chain. Attribution, not an independent simulation', Icon: Layers },
   region: { label: 'Region attribution',      description: 'Splits each category\'s median across the regions by the size of the drivers\' effects there (expected effect × exposure × regional exposure × the region\'s share of the category\'s gross profit), not by their direction. Attribution, not an independent simulation', Icon: Globe2 },
 };
 
@@ -156,6 +157,144 @@ export const YearStepper: FC<{
         {year}
       </span>
       {arrow(1, atMax, ChevronRight, 'Later year')}
+    </div>
+  );
+};
+
+// ─── Export menu ─────────────────────────────────────────────────────────
+
+export interface ExportItem {
+  id: string;
+  label: string;
+  onSelect: () => void;
+}
+
+/** A menu button with the export actions of a card: opens on click or
+ *  ArrowDown, the arrow keys move between the items, Escape and a click
+ *  outside close it and focus returns to the button. */
+export const ExportMenu: FC<{
+  items: ExportItem[];
+  /** The button's text; "Export" by default. */
+  label?: string;
+  /** What the menu exports, for the accessible name: "Export the matrix". */
+  ariaLabel: string;
+  /** Disables every item while an export runs. */
+  busy?: boolean;
+}> = ({ items, label = 'Export', ariaLabel, busy = false }) => {
+  const [open, setOpen] = useState(false);
+  const menuId = useId();
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  // A click outside closes the menu; Escape and Tab are handled on the menu itself.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = (e: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [open]);
+
+  const focusItem = (index: number) => {
+    const n = items.length;
+    const target = itemRefs.current[((index % n) + n) % n];
+    target?.focus();
+  };
+  const openAnd = (index: number) => {
+    setOpen(true);
+    // The items mount on the next frame.
+    requestAnimationFrame(() => focusItem(index));
+  };
+  const close = (returnFocus = true) => {
+    setOpen(false);
+    if (returnFocus) buttonRef.current?.focus();
+  };
+
+  return (
+    <div ref={rootRef} className="relative inline-flex" data-print-hide>
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        aria-label={ariaLabel}
+        onClick={() => (open ? close(false) : openAnd(0))}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') { e.preventDefault(); openAnd(0); }
+          if (e.key === 'ArrowUp') { e.preventDefault(); openAnd(items.length - 1); }
+        }}
+        className="inline-flex items-center gap-1.5 transition-all"
+        style={{
+          height: 34,
+          padding: '0 12px',
+          borderRadius: 9,
+          border: `1px solid ${open ? S.cardBorderStrong : S.cardBorder}`,
+          backgroundColor: open ? S.surfaceLow : S.surface,
+          color: open ? S.primary : S.onSurfaceVariant,
+          fontFamily: BODY_FONT,
+          fontSize: 12.5,
+          fontWeight: 600,
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <Download size={14} strokeWidth={2.3} aria-hidden />
+        {label}
+      </button>
+      {open && (
+        <div
+          id={menuId}
+          role="menu"
+          aria-label={ariaLabel}
+          className="absolute top-full right-0 mt-2 z-30 rounded-xl p-1.5"
+          style={{
+            minWidth: 200,
+            backgroundColor: S.surface,
+            border: `1px solid ${S.cardBorderStrong}`,
+            boxShadow: SHADOW.popover,
+            fontFamily: BODY_FONT,
+          }}
+          onKeyDown={(e) => {
+            const current = itemRefs.current.findIndex((el) => el === document.activeElement);
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+            else if (e.key === 'ArrowDown') { e.preventDefault(); focusItem(current + 1); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); focusItem(current - 1); }
+            else if (e.key === 'Home') { e.preventDefault(); focusItem(0); }
+            else if (e.key === 'End') { e.preventDefault(); focusItem(items.length - 1); }
+            else if (e.key === 'Tab') { close(false); }
+          }}
+        >
+          {items.map((item, i) => (
+            <button
+              key={item.id}
+              ref={(el) => { itemRefs.current[i] = el; }}
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              disabled={busy}
+              onClick={() => { close(); item.onSelect(); }}
+              className="w-full text-left rounded-lg transition-colors hover:bg-theme-surface-low focus-visible:bg-theme-surface-low"
+              style={{
+                display: 'block',
+                padding: '8px 10px',
+                border: 'none',
+                backgroundColor: 'transparent',
+                color: S.onSurface,
+                fontSize: 12.5,
+                fontWeight: 600,
+                cursor: busy ? 'progress' : 'pointer',
+                opacity: busy ? 0.6 : 1,
+                minHeight: 32,
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

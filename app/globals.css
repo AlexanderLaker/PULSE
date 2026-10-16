@@ -122,3 +122,51 @@ input:focus {
   content: none !important;
   display: none !important;
 }
+
+/* ─── Export and print ───
+   A note the page already shows elsewhere (what the bands cover, the
+   cell-weight estimate) is repeated inside a card only when the card leaves
+   the page: in an image export (lib/exportImage.ts marks the node
+   data-exporting while it renders) and in print. */
+[data-print-only] { display: none; }
+[data-exporting] [data-print-only] { display: block; }
+/* The controls leave the page while it renders, so the image has no gap where they were. */
+[data-exporting] [data-print-hide] { display: none !important; }
+
+/* ─── Print ───
+   The page prints as the evidence, not the chrome: the top bar, the
+   toolbars and anything else marked data-print-hide go; tinted cells keep their
+   colour; a scrolling table shows whole; an open dialog (a drill-down, a
+   tile) prints on its own, the page behind it left out. Landscape, because
+   the matrix is wide. */
+@media print {
+  [data-print-only] { display: block !important; }
+  @page { size: A4 landscape; margin: 12mm; }
+  html, body { background: theme('colors.theme.surface') !important; overflow: visible !important; }
+  body { padding-right: 0 !important; }
+  *, *::before, *::after {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    box-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+  [data-print-hide], [role="menu"], [role="tooltip"] { display: none !important; }
+  .sticky, [style*="position: sticky"] { position: static !important; }
+  .overflow-x-auto, .overflow-y-auto, .overflow-hidden { overflow: visible !important; }
+  main { max-width: none !important; padding: 0 !important; }
+  table { page-break-inside: auto; }
+  tr, section { page-break-inside: avoid; }
+  /* An open dialog is the document. */
+  body:has([role="dialog"][aria-modal="true"]) > div > :not(:has([role="dialog"][aria-modal="true"])) { display: none !important; }
+  [role="dialog"][aria-modal="true"] {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+  [role="dialog"][aria-modal="true"] > * { position: static !important; }
+}

@@ -12,7 +12,8 @@
  *     /dashboard and, back on the waiting page, says the account still has
  *     no access; Sign out expires the cookie first.
  *   - Nothing the waiting page imports, its layouts included, reaches the
- *     dashboard's code.
+ *     dashboard's code (the feedback link it names the PRISM team with is a
+ *     leaf piece, not the dashboard).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -76,9 +77,20 @@ describe('/dashboard', () => {
       signedIn(role);
       const page = await DashboardPage();
       expect(page.type).toBe(DashboardApp);
-      expect(page.props).toEqual({ role });
+      expect(page.props).toEqual({ role, initialView: { view: 'home', params: {} } });
     }
     expect(nav.redirect).not.toHaveBeenCalled();
+  });
+
+  it('hands the dashboard the view the address names, and drops what the taxonomy does not know', async () => {
+    signedIn('viewer');
+    const page = await DashboardPage({
+      searchParams: Promise.resolve({ view: 'shift', lens: 'force', year: '2031', category: 'LHC: FCN', bogus: 'x' }),
+    });
+    expect(page.props).toEqual({
+      role: 'viewer',
+      initialView: { view: 'shift-analysis', params: { lens: 'force', year: '2031', category: 'LHC: FCN' } },
+    });
   });
 
   it('sends a pending user to the waiting page, without the dashboard, and logs no failure', async () => {
@@ -105,8 +117,10 @@ describe('/pending', () => {
     signedIn(null);
     render(await PendingPage());
     expect(screen.getByRole('heading', { name: 'Waiting for approval' })).toBeTruthy();
-    expect(screen.getByText(/^You are signed in as ana@example\.com\. This account has no access to PRISM until an admin approves it/))
-      .toBeTruthy();
+    expect(screen.getByText(
+      /^Your account is signed in as ana@example\.com but not yet approved\. An admin has to approve it; once they tell you, press Check again\. Not sure who your admin is\? Ask /,
+    )).toBeTruthy();
+    expect(screen.getByText('the PRISM team')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Check again' })).toBeTruthy();
     expect(console.error).not.toHaveBeenCalled();
   });
@@ -190,7 +204,7 @@ describe("the waiting page's code", () => {
     });
   };
 
-  it('reaches only the layouts, the auth frame, the role check and the theme, never the dashboard', () => {
+  it('reaches only the layouts, the auth frame, the role check, the feedback link and the theme, never the dashboard', () => {
     const seen = new Set<string>();
     const queue = ['app/layout.tsx', 'app/(auth)/layout.tsx', 'app/(auth)/pending/page.tsx'].map((f) => path.join(ROOT, f));
     while (queue.length) {
@@ -206,7 +220,9 @@ describe("the waiting page's code", () => {
       'app/(auth)/shared.tsx',
       'app/globals.css',
       'app/layout.tsx',
+      'components/dashboard/FeedbackLink.tsx',
       'lib/db.ts',
+      'lib/feedback.ts',
       'lib/roles.ts',
       'lib/theme.ts',
     ]);

@@ -1,21 +1,39 @@
 /**
  * The admin editor of one tile, inline in its dialog: the name, intensity,
  * driver note, linked driver codes and Strategist Read. The edits go into the
- * board's draft; the board saves the whole tile map.
+ * board's draft; the board saves the whole tile map. The editor tells the
+ * board whether its draft differs from the tile, so a close can ask first.
  */
-import { useId, useMemo, useState, type CSSProperties, type FC } from 'react';
+import { useEffect, useId, useMemo, useState, type CSSProperties, type FC } from 'react';
 import { Check, Plus, Trash2 } from 'lucide-react';
 import type { JourneyTile } from '@/data/consumerJourney';
 import { DRIVER_CODE_MAP } from '@/data/driverCodeMap';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
-import { currentMonth, INTENSITY_LABELS, type TileEdits } from './shared';
+import { currentMonth, formatMonth, INTENSITY_LABELS, type TileEdits } from './shared';
+
+/** The edits as they would be applied: the name trimmed, the empty code slots dropped. */
+const normalise = (edits: TileEdits): TileEdits => ({
+  ...edits, name: edits.name.trim(), driverCodes: edits.driverCodes.filter(Boolean),
+});
+
+/** Whether a draft differs from the tile it started from. */
+export const draftDiffers = (initial: JourneyTile, edits: TileEdits): boolean => {
+  const e = normalise(edits);
+  return e.name !== initial.name
+    || e.intensity !== initial.intensity
+    || e.driverNote !== initial.driverNote
+    || e.driverCodes.join('|') !== initial.driverCodes.join('|')
+    || e.analysis !== (initial.analysis ?? '');
+};
 
 export const TileEditor: FC<{
   initial: JourneyTile;
   onSave: (edits: TileEdits) => void;
   onCancel: () => void;
   onRemove: () => void;
-}> = ({ initial, onSave, onCancel, onRemove }) => {
+  /** Told whenever the draft starts or stops differing from the tile. */
+  onDirtyChange?: (dirty: boolean) => void;
+}> = ({ initial, onSave, onCancel, onRemove, onDirtyChange }) => {
   const [edits, setEdits] = useState<TileEdits>({
     name: initial.name,
     intensity: initial.intensity,
@@ -23,11 +41,17 @@ export const TileEditor: FC<{
     driverCodes: initial.driverCodes.length ? [...initial.driverCodes] : [''],
     analysis: initial.analysis ?? '',
   });
+  const dirty = draftDiffers(initial, edits);
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
+  // The editor leaves with a clean slate, so a draft applied or dropped never
+  // keeps the board asking.
+  useEffect(() => () => { onDirtyChange?.(false); }, [onDirtyChange]);
+  const nameMissing = edits.name.trim() === '';
 
   const allCodes = useMemo(() => Object.keys(DRIVER_CODE_MAP).sort((a, b) => a.localeCompare(b)), []);
   const id = useId();
   const labelStyle: CSSProperties = {
-    fontSize: 10, fontWeight: 700, color: S.onSurfaceVariant, display: 'block',
+    fontSize: 11, fontWeight: 700, color: S.onSurfaceVariant, display: 'block',
     marginBottom: 5, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: HEADLINE_FONT,
   };
   const inputStyle: CSSProperties = {
@@ -39,8 +63,16 @@ export const TileEditor: FC<{
     <div className="flex flex-col gap-3">
       <div>
         <label htmlFor={`${id}-name`} style={labelStyle}>Tile name</label>
-        <input id={`${id}-name`} style={inputStyle} value={edits.name}
+        <input id={`${id}-name`} value={edits.name}
+          style={{ ...inputStyle, borderColor: nameMissing ? S.error : S.cardBorder }}
+          aria-invalid={nameMissing || undefined}
+          aria-describedby={nameMissing ? `${id}-name-error` : undefined}
           onChange={e => setEdits(p => ({ ...p, name: e.target.value }))} />
+        {nameMissing && (
+          <p id={`${id}-name-error`} role="alert" style={{ fontSize: 11, color: S.error, margin: '4px 0 0', fontWeight: 600 }}>
+            A tile needs a name
+          </p>
+        )}
       </div>
 
       <div>
@@ -118,16 +150,22 @@ export const TileEditor: FC<{
           placeholder="**1. Summary.** …  **2. Strategic Evaluation.** …"
           style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
         />
-        <p style={{ fontSize: 10, color: S.mutedText, margin: '4px 0 0', fontStyle: 'italic' }}>
-          Supports **bold** and blank-line paragraph breaks. Saving stamps this tile {currentMonth()}.
+        <p style={{ fontSize: 11, color: S.mutedText, margin: '4px 0 0', fontStyle: 'italic' }}>
+          Supports **bold** and blank-line paragraph breaks. An emptied read leaves the tile without one.
+          Saving stamps this tile {formatMonth(currentMonth())}.
         </p>
       </div>
 
       <div style={{ display: 'flex', gap: 8 }}>
         <button type="button"
-          onClick={() => onSave({ ...edits, driverCodes: edits.driverCodes.filter(Boolean) })}
+          onClick={() => { if (!nameMissing) onSave(normalise(edits)); }}
+          disabled={nameMissing}
           className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-full text-sm font-bold"
-          style={{ backgroundColor: S.primary, color: S.onPrimary, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}
+          style={{
+            backgroundColor: nameMissing ? S.surfaceHigh : S.primary,
+            color: nameMissing ? S.onSurfaceVariant : S.onPrimary,
+            border: 'none', cursor: nameMissing ? 'default' : 'pointer', fontFamily: HEADLINE_FONT,
+          }}
         >
           <Check size={13} strokeWidth={2.5} /> Apply
         </button>

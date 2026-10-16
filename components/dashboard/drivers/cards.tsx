@@ -5,11 +5,11 @@
  * section card itself is shared with the Settings sheet
  * (components/dashboard/SectionCard.tsx).
  */
-import React, { type FC } from 'react';
-import { FileText, ExternalLink, AlertTriangle } from 'lucide-react';
+import React, { useEffect, useId, useRef, useState, type FC } from 'react';
+import { FileText, ExternalLink, AlertTriangle, X } from 'lucide-react';
 import { CATEGORIES, FIRST_YEAR, HORIZON, NO_VALUE, REGIONS, SOURCE_TIERS, fmtPct } from '@/lib/format';
 import { UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
-import { S, HEADLINE_FONT } from '@/lib/theme';
+import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import Chip from '@/components/dashboard/Chip';
 import type { Driver, DriverScores, DriverSource, ExposureMap, SourceTier } from '@/types';
 import { curveLabel, uncLabel } from './shared';
@@ -35,19 +35,24 @@ export const FIELD_HELP = {
   category: 'How hard this driver hits each Hair and Laundry & Home Care category, on a 0–5 scale.',
   regional: 'How strongly this driver plays out across regions (Europe, North America, Asia, High Growth), on a 0–5 scale.',
   vc: 'The stage of the value chain, from raw materials through to the consumer, where this driver’s impact centres (its epicentre). One stage per driver: the value-chain attribution assigns the driver’s whole contribution to this stage. It does not change the shift.',
+  confidence: 'How well the driver\'s present state is evidenced: High, Medium or Low. It is not the probability of the effect.',
 } as const;
 
 // ─── Meta chip: the confidence and evidence pills of the meta row ──
-export const MetaChip: FC<{ label: string }> = ({ label }) => (
-  <span style={{
+/** A pill of the meta row. `plain` sets it in sentence case and lets it wrap
+ *  (the evidence line); `help` explains it on hover and to a screen reader. */
+export const MetaChip: FC<{ label: string; help?: string; plain?: boolean }> = ({ label, help, plain = false }) => (
+  <span title={help} style={{
     display: 'inline-flex', alignItems: 'center',
     padding: '4px 12px', borderRadius: 999,
-    fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
+    fontSize: 11, fontWeight: plain ? 600 : 700, letterSpacing: plain ? 0 : '0.04em',
     backgroundColor: S.surfaceLow,
     color: S.onSurfaceVariant,
-    textTransform: 'uppercase',
+    textTransform: plain ? 'none' : 'uppercase',
+    whiteSpace: plain ? 'normal' : 'nowrap', lineHeight: 1.4, maxWidth: '100%',
   }}>
     {label}
+    {help && <span className="sr-only">. {help}</span>}
   </span>
 );
 
@@ -66,6 +71,8 @@ export const TIER_CONFIG: Record<SourceTier, { color: string; description: strin
   'E':  { color: '#991b1b', description: 'Social media or unverified' },
 };
 export const TIER_OPTIONS: readonly SourceTier[] = SOURCE_TIERS;
+/** The whole scale in one line, for the Sources card's help. */
+export const TIER_LEGEND = `Source tiers, strongest first. ${TIER_OPTIONS.map((t) => `${t}: ${TIER_CONFIG[t].description}`).join('. ')}.`;
 
 // ─── Source item ──────────────────────────────────────────────────
 /** One source: a link when it has one, otherwise the same card as plain text. */
@@ -162,15 +169,70 @@ function baselineDifferences(d: Driver, base: DriverScores): string[] {
   return lines;
 }
 
-/** The Edited chip of a driver an admin has changed, listing the changed
- *  inputs with their baseline values; an unedited driver carries no chip. */
+/** The Edited chip of a driver an admin has changed: a button that opens the
+ *  list of changed inputs with their baseline values in a small popover
+ *  (Escape closes it and focus returns to the chip; the hover keeps the same
+ *  list as a bonus). An unedited driver carries no chip. */
 export const EditedChip: FC<{ driver: Driver }> = ({ driver }) => {
+  const [open, setOpen] = useState(false);
+  const chipRef = useRef<HTMLButtonElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const popId = useId();
+  // Focus moves to the popover's close button when it opens; a click outside closes it.
+  useEffect(() => {
+    if (!open) return undefined;
+    closeRef.current?.focus();
+    const onDown = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
   if (!driver.scores_edited) return null;
   const changes = baselineDifferences(driver, driver.baseline);
   const title = changes.length > 0
     ? ['Edited by an admin. Changed from the baseline:', ...changes].join('\n')
     : 'Edited by an admin; every score matches the baseline.';
-  return <Chip kind="edited" title={title} />;
+  const close = () => {
+    setOpen(false);
+    chipRef.current?.focus();
+  };
+  return (
+    <span ref={wrapRef} style={{ position: 'relative', display: 'inline-flex' }}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => { if (open && e.key === 'Escape') { e.stopPropagation(); close(); } }}>
+      <Chip kind="edited" title={title} onClick={() => setOpen((v) => !v)} expanded={open} buttonRef={chipRef} />
+      {open && (
+        <div role="dialog" id={popId} aria-label="Changed from the baseline" style={{
+          position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 40,
+          width: 'max(260px, min(360px, 80vw))', padding: '10px 12px', borderRadius: 10,
+          backgroundColor: S.surface, border: `1px solid ${S.cardBorder}`, boxShadow: SHADOW.popover,
+          fontFamily: BODY_FONT, fontSize: 12, lineHeight: 1.5, color: S.onSurface, fontWeight: 500,
+          textTransform: 'none', letterSpacing: 0, textAlign: 'left', whiteSpace: 'normal',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+            <span style={{ fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: S.onSurfaceVariant }}>
+              Edited by an admin
+            </span>
+            <button ref={closeRef} type="button" onClick={close} aria-label="Close" style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24,
+              borderRadius: 999, border: 'none', background: 'transparent', color: S.onSurfaceVariant, cursor: 'pointer',
+            }}>
+              <X size={13} />
+            </button>
+          </div>
+          {changes.length > 0 ? (
+            <ul style={{ margin: 0, paddingLeft: 16 }}>
+              {changes.map((line) => <li key={line}>{line}</li>)}
+            </ul>
+          ) : (
+            <p style={{ margin: 0 }}>Every score matches the baseline.</p>
+          )}
+        </div>
+      )}
+    </span>
+  );
 };
 
 export const Dash: FC = () => <span style={{ color: S.mutedText, fontSize: 12 }}>{NO_VALUE}</span>;

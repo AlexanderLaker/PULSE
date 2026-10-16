@@ -5,7 +5,7 @@
  * content. The Drivers panels use the compact size, the Settings sheet the
  * regular one.
  */
-import { useState, type FC, type ReactNode } from 'react';
+import { useId, useState, type FC, type ReactNode } from 'react';
 import { Info, type LucideIcon } from 'lucide-react';
 import { S, HEADLINE_FONT } from '@/lib/theme';
 
@@ -43,6 +43,7 @@ const SectionCard: FC<SectionCardProps> = ({
 }) => {
   const z = SIZES[size];
   const [showInfo, setShowInfo] = useState(false);
+  const infoId = useId();
   return (
     <div role="group" aria-label={title} style={{
       backgroundColor: S.surface,
@@ -68,12 +69,15 @@ const SectionCard: FC<SectionCardProps> = ({
           {title}
         </div>
         {info && (
-          <button type="button" title={info} aria-label={`About ${title}`} aria-expanded={showInfo}
+          <button type="button" aria-label={`About ${title}`} aria-expanded={showInfo}
+            aria-controls={infoId}
             onClick={() => setShowInfo((v) => !v)}
             style={{
+              // A 24 px target (WCAG 2.5.8) around a 12 px glyph; the margin
+              // keeps the glyph where the smaller button sat.
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              marginLeft: 1, padding: 2, border: 'none', borderRadius: 999, background: 'none',
-              color: S.onSurfaceVariant, cursor: 'help',
+              width: 24, height: 24, marginLeft: -3, border: 'none', borderRadius: 999, background: 'none',
+              color: S.onSurfaceVariant, cursor: 'pointer',
             }}>
             <Info size={12} strokeWidth={2.4} />
           </button>
@@ -81,7 +85,7 @@ const SectionCard: FC<SectionCardProps> = ({
         {right != null && <span style={{ marginLeft: 'auto', flexShrink: 0 }}>{right}</span>}
       </div>
       {info && showInfo && (
-        <div style={{ marginBottom: 12, fontSize: 12, lineHeight: 1.55, color: S.onSurfaceVariant }}>
+        <div id={infoId} style={{ marginBottom: 12, fontSize: 12, lineHeight: 1.55, color: S.onSurfaceVariant }}>
           {info}
         </div>
       )}

@@ -27,6 +27,7 @@ vi.mock('@/lib/apiClient', async (importOriginal) => ({
 
 import ConsumerJourney from '@/components/dashboard/ConsumerJourney';
 import { PaneActiveContext } from '@/hooks/useOverlay';
+import { ViewUrlProvider } from '@/hooks/useViewUrl';
 
 // The first Sorting tailwind tile cites T-01 (technology_r01).
 const TILE = 'AI stain/fabric recognition apps';
@@ -67,7 +68,7 @@ describe('ConsumerJourney: rail and tile dialog', () => {
     expect(screen.getByText(/the tiles do not cite their sources yet, the evidence grade on each is its author’s own, and authored content does not feed the Shift Matrix\./))
       .toBeTruthy();
     expect(screen.queryByText(/click any tile for its evidence/)).toBeNull();
-    expect(screen.getByText(/the Home Care \(dish \/ surface \/ WC\) journey is not built yet/)).toBeTruthy();
+    expect(screen.getByText(/the Home Care \(dish \/ surface \/ Toilet Care\) journey is not built yet/)).toBeTruthy();
   });
 
   it('opens a dialog with the Why-chain, the provenance and the live driver', async () => {
@@ -81,9 +82,62 @@ describe('ConsumerJourney: rail and tile dialog', () => {
     expect(dialog.getByText('AI reads the garment and prescribes the SKU.')).toBeTruthy();
     expect(dialog.getAllByText(/Tailwind/).length).toBeGreaterThan(0);
 
-    expect(dialog.getByText('Strategist-authored · 2026-09')).toBeTruthy();
-    expect(dialog.getByText('Estimate')).toBeTruthy();
+    expect(dialog.getByText('Strategist-authored · Sep 2026')).toBeTruthy();
+    expect(dialog.getByText('Grade: Estimate')).toBeTruthy();
     expect(dialog.getByText('Authored analysis, not simulated')).toBeTruthy();
+  });
+
+  it('says what the three ratings mean and writes the intensity in words', async () => {
+    render(<ConsumerJourney />);
+    const dialog = await openTile();
+    expect(dialog.getByText('Intensity: Strong (3 of 3)')).toBeTruthy();
+    expect(dialog.getByText(
+      'Grade: how well the tile is evidenced. Intensity: how hard it hits this moment. Impact: the authored size of the pool at stake.',
+    )).toBeTruthy();
+  });
+
+  it('shows the parenthetical the pill drops as the subtitle of the dialog', async () => {
+    render(<ConsumerJourney />);
+    const dialog = await openTile('Garment care advisory service');
+    expect(dialog.getByRole('heading', { level: 2 }).textContent).toBe('Garment care advisory service');
+    expect(dialog.getByText('digital')).toBeTruthy();
+  });
+
+  it('keeps the driver\'s own direction chip and says what it means for the moment', async () => {
+    render(<ConsumerJourney />);
+    const dialog = await openTile();
+    expect(dialog.getByText('Expansion')).toBeTruthy();
+    expect(dialog.getByText('tailwind for this moment')).toBeTruthy();
+    expect(dialog.getByText(/classifies this moment as/).textContent).toContain('as a tailwind.');
+    expect(dialog.queryByText(/\(benefiting\)/)).toBeNull();
+  });
+
+  it('shows the keyboard hint once a key has been used', async () => {
+    render(<ConsumerJourney />);
+    const dialog = await openTile();
+    fireEvent.keyDown(window, { key: 'Shift' });
+    expect(dialog.getByText('Esc to close, left and right arrows for the next tile')).toBeTruthy();
+  });
+
+  it('explains the tint in a legend and names side and impact grade on every pill', async () => {
+    render(<ConsumerJourney />);
+    await screen.findByText(TILE);
+    expect(screen.getByText('darker = higher authored profit-pool impact')).toBeTruthy();
+    for (const grade of ['Low', 'Med', 'High']) expect(screen.getByText(grade)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Detergent sheets & pods, tailwind, high impact' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: `${TILE}, tailwind, medium impact` })).toBeTruthy();
+  });
+
+  it('shows an unpressed type filter at full opacity, its state in the border and aria-pressed', async () => {
+    render(<ConsumerJourney />);
+    await screen.findByText(TILE);
+    const tech = screen.getByRole('button', { name: 'Tech' });
+    expect(tech.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(tech);
+    expect(tech.getAttribute('aria-pressed')).toBe('false');
+    expect(tech.style.opacity).toBe('');
+    expect(tech.style.border).toContain('1px solid');
+    expect(screen.queryByText(TILE)).toBeNull();   // a tech tile
   });
 
   it('shows the authored context of the tile\'s stage', async () => {
@@ -301,6 +355,125 @@ describe('ConsumerJourney: stored content and the admin save', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     await waitFor(() => expect(API.getJourneyContent).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByText(/texts shipped with PRISM/)).toBeNull());
+  });
+});
+
+describe('ConsumerJourney: the draft guard of the tile editor', () => {
+  /** Opens the first Sorting tile in the editor with the name changed. */
+  async function editTile() {
+    render(<ConsumerJourney isAdmin />);
+    const edit = screen.getByRole('button', { name: 'Edit board' });
+    await waitFor(() => expect((edit as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(edit);
+    const dialog = await openTile();
+    fireEvent.click(dialog.getByRole('button', { name: 'Edit tile' }));
+    const name = dialog.getByLabelText('Tile name') as HTMLInputElement;
+    fireEvent.change(name, { target: { value: `${name.value} (edited)` } });
+    return { dialog, name };
+  }
+
+  it('asks before Escape drops a draft that differs, and Keep editing keeps the dialog', async () => {
+    const { dialog } = await editTile();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(dialog.getByText('Discard the edits to this tile?')).toBeTruthy();
+    fireEvent.click(dialog.getByRole('button', { name: 'Keep editing' }));
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(screen.queryByText('Discard the edits to this tile?')).toBeNull();
+    expect((within(screen.getByRole('dialog')).getByLabelText('Tile name') as HTMLInputElement).value).toContain('(edited)');
+  });
+
+  it('Discard closes the dialog and leaves the tile as it was', async () => {
+    const { dialog } = await editTile();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.click(dialog.getByRole('button', { name: 'Discard' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByText(TILE)).toBeTruthy();
+    expect(screen.queryByText(`${TILE} (edited)`)).toBeNull();
+  });
+
+  it('closes on Escape without asking while the draft equals the tile', async () => {
+    render(<ConsumerJourney isAdmin />);
+    const edit = screen.getByRole('button', { name: 'Edit board' });
+    await waitFor(() => expect((edit as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(edit);
+    const dialog = await openTile();
+    fireEvent.click(dialog.getByRole('button', { name: 'Edit tile' }));
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('asks before a tile leaves the draft', async () => {
+    const { dialog } = await editTile();
+    fireEvent.click(dialog.getByRole('button', { name: 'Remove this tile' }));
+    expect(dialog.getByText('Remove this tile from the draft? It is gone for everyone once you save.')).toBeTruthy();
+    const pill = { name: `${TILE}, tailwind, medium impact` };
+    expect(screen.getByRole('button', pill)).toBeTruthy();   // still on the board while it asks
+    fireEvent.click(dialog.getByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.queryByRole('button', pill)).toBeNull();
+  });
+
+  it('blocks Apply on an emptied name and says why; an emptied read is allowed', async () => {
+    const { dialog, name } = await editTile();
+    fireEvent.change(name, { target: { value: '   ' } });
+    expect(dialog.getByText('A tile needs a name')).toBeTruthy();
+    expect((dialog.getByRole('button', { name: 'Apply' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(name, { target: { value: 'Renamed tile' } });
+    fireEvent.change(dialog.getByLabelText('Strategist Read (authored analysis)'), { target: { value: '' } });
+    fireEvent.click(dialog.getByRole('button', { name: 'Apply' }));
+    expect(screen.getByRole('button', { name: 'Renamed tile, tailwind, medium impact' })).toBeTruthy();
+    await new Promise((resolve) => setTimeout(resolve, 300));   // past any exit animation: the dialog stays
+    expect(within(screen.getByRole('dialog')).getByRole('heading', { level: 2 }).textContent).toBe('Renamed tile');
+    expect(within(screen.getByRole('dialog')).getByText('No authored analysis for this tile yet.')).toBeTruthy();
+  });
+});
+
+describe('ConsumerJourney: the address', () => {
+  const AI_TILE_ID = 'lhc.sorting.exp.ai-stain-fabric-recognition-apps';
+  beforeEach(() => { window.history.replaceState(null, '', '/dashboard'); });
+
+  it('opens the journey the address names', async () => {
+    render(
+      <ViewUrlProvider initial={{ view: 'consumer-journey', params: { journey: 'hair' } }}>
+        <ConsumerJourney />
+      </ViewUrlProvider>,
+    );
+    expect(await screen.findByText('Shade finders & AR try-on tools')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Hair' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.queryByText(TILE)).toBeNull();
+  });
+
+  it('opens the tile the address names once the saved journey has arrived', async () => {
+    render(
+      <ViewUrlProvider initial={{ view: 'consumer-journey', params: { journey: 'lhc', tile: AI_TILE_ID } }}>
+        <ConsumerJourney />
+      </ViewUrlProvider>,
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading', { level: 2 }).textContent).toBe(TILE);
+  });
+
+  it('writes the journey and the open tile to the address, and adopts the address when it changes', async () => {
+    render(
+      <ViewUrlProvider initial={{ view: 'consumer-journey', params: {} }}>
+        <ConsumerJourney />
+      </ViewUrlProvider>,
+    );
+    await openTile();
+    expect(window.location.search).toContain(`tile=${encodeURIComponent(AI_TILE_ID)}`);
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(window.location.search).not.toContain('tile=');
+    fireEvent.click(screen.getByRole('button', { name: 'Hair' }));
+    expect(window.location.search).toContain('journey=hair');
+    // Back: the address is the truth again.
+    window.history.replaceState(null, '', `/dashboard?view=journey&journey=lhc&tile=${AI_TILE_ID}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading', { level: 2 }).textContent).toBe(TILE);
+    window.history.replaceState(null, '', '/dashboard?view=journey&journey=lhc');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 });
 

@@ -31,7 +31,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       </div>
 
       <div
-        className="mt-10 text-[10px] font-semibold uppercase tracking-[0.22em]"
+        className="mt-10 text-[11px] font-semibold uppercase tracking-[0.22em]"
         style={{ color: S.onSurfaceVariant }}
       >
         Authorised users only

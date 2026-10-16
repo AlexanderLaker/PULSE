@@ -5,11 +5,14 @@
  */
 import type { FC, ReactNode } from 'react';
 import { TrendingUp, TrendingDown, ExternalLink } from 'lucide-react';
-import { LHC_CTX, HAIR_CTX, type JourneyKey, type JourneyTile, type TileType } from '@/data/consumerJourney';
-import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import {
-  type CitedDriver, displayTileName, forceColor, gradeBarOpacity, gradeTint, type Side,
-  TYPE_STYLES,
+  LHC_CTX, HAIR_CTX, type JourneyKey, type JourneyTile, type PoolImpactGrade, type TileType,
+} from '@/data/consumerJourney';
+import { S, SHADOW, HEADLINE_FONT, BODY_FONT, FIGURES } from '@/lib/theme';
+import Chip from '@/components/dashboard/Chip';
+import {
+  type CitedDriver, displayTileName, forceColor, gradeBarOpacity, gradeTint, impactWords, type Side,
+  sideWord, TYPE_STYLES,
 } from './shared';
 
 /** Renders a Strategist Read: **bold** spans and blank-line paragraph breaks. */
@@ -58,6 +61,7 @@ export const JourneySwitch: FC<{ label: string; active: boolean; onClick: () => 
   </button>
 );
 
+/** A type filter: pressed shows its tint, unpressed its outline; neither is dimmed, because an unpressed filter is not disabled. */
 export const TypeChip: FC<{ typeKey: TileType; active: boolean; onClick: () => void }> = ({ typeKey, active, onClick }) => {
   const st = TYPE_STYLES[typeKey];
   return (
@@ -65,10 +69,10 @@ export const TypeChip: FC<{ typeKey: TileType; active: boolean; onClick: () => v
       onClick={onClick}
       className="px-2.5 py-1 rounded-full text-[11px] font-bold transition-all duration-150"
       style={{
-        backgroundColor: active ? st.bg : S.surfaceLow,
-        color: active ? st.fg : S.mutedText,
-        opacity: active ? 1 : 0.65,
-        border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT,
+        backgroundColor: active ? st.bg : S.surface,
+        color: active ? st.fg : S.onSurfaceVariant,
+        border: `1px solid ${active ? st.fg : S.cardBorderStrong}`,
+        minHeight: 24, cursor: 'pointer', fontFamily: HEADLINE_FONT,
       }}
       aria-pressed={active}
     >
@@ -76,6 +80,34 @@ export const TypeChip: FC<{ typeKey: TileType; active: boolean; onClick: () => v
     </button>
   );
 };
+
+/**
+ * The key to the tiles' tint: the pool-impact grade an author gave a tile sets
+ * how dark it is. The board shows the grade by colour alone otherwise; each
+ * pill also says it in its accessible name.
+ */
+const LEGEND_GRADES: PoolImpactGrade[] = ['Low', 'Med', 'High'];
+export const ImpactLegend: FC = () => (
+  <div className="flex items-center gap-2 flex-wrap" style={{ fontFamily: HEADLINE_FONT }}>
+    <span className="inline-flex items-center gap-1.5">
+      {LEGEND_GRADES.map(grade => (
+        <span key={grade} className="inline-flex items-center gap-1">
+          <span
+            aria-hidden="true"
+            style={{
+              display: 'inline-block', width: 12, height: 12, borderRadius: 3,
+              backgroundColor: gradeTint(true, grade), border: `1px solid ${S.cardBorder}`,
+            }}
+          />
+          <span style={{ fontSize: 11, fontWeight: 700, color: S.onSurfaceVariant }}>{grade}</span>
+        </span>
+      ))}
+    </span>
+    <span style={{ fontSize: 11, color: S.mutedText, fontFamily: BODY_FONT }}>
+      darker = higher authored profit-pool impact
+    </span>
+  </div>
+);
 
 /**
  * Stage header rollup, so the board shows which stage matters most at a
@@ -124,7 +156,11 @@ export const DetailSection: FC<{ title: ReactNode; accent: string; children: Rea
 // Tile pill (in the stage rail)
 // ════════════════════════════════════════════════════════════════════════
 
-/** A tile in the rail: the pool-impact grade sets its tint depth and the opacity of its accent bar. */
+/**
+ * A tile in the rail: the pool-impact grade sets its tint depth and the
+ * opacity of its accent bar, and its accessible name says the side and the
+ * grade the tint shows ("Detergent sheets & pods, tailwind, high impact").
+ */
 export const TilePill: FC<{
   tile: JourneyTile;
   side: Side;
@@ -138,7 +174,7 @@ export const TilePill: FC<{
       onClick={onClick}
       className="w-full text-left rounded-lg transition-all duration-150"
       style={{
-        position: 'relative', display: 'block', padding: '2px 8px 2px 11px', marginBottom: 2,
+        position: 'relative', display: 'block', padding: '3px 8px 3px 11px', marginBottom: 2, minHeight: 24,
         backgroundColor: selected ? S.surface : gradeTint(isExp, tile.poolImpact?.grade),
         border: `1px solid ${selected ? accent : S.cardBorder}`,
         boxShadow: selected ? `0 2px 12px -4px ${accent}66` : 'none',
@@ -153,11 +189,19 @@ export const TilePill: FC<{
         }}
       />
       <span
-        // The name is never clamped; the tight line height keeps wrapped lines close together.
-        style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: S.onSurface, lineHeight: 1.1, fontFamily: HEADLINE_FONT }}
+        // The name is never clamped; the tight line height keeps wrapped
+        // lines close together, and a word longer than the column is
+        // hyphenated (the page is en-GB) or, failing that, broken, rather
+        // than running into the next stage.
+        style={{
+          display: 'block', fontSize: 11.5, fontWeight: 700, color: S.onSurface, lineHeight: 1.15,
+          fontFamily: HEADLINE_FONT, overflowWrap: 'anywhere', hyphens: 'auto',
+        }}
         title={tile.name}
       >
         {displayTileName(tile.name)}
+        {/* Inside the name's span, so the accessible name runs on without a gap before the comma. */}
+        <span className="sr-only">, {sideWord(side)}, {impactWords(tile.poolImpact?.grade)}</span>
       </span>
     </button>
   );
@@ -169,8 +213,9 @@ export const TilePill: FC<{
 
 /**
  * A driver behind the moment: the live driver once the drivers have loaded
- * (the code map's name and first sentence until then), read as a tailwind or
- * headwind by its own direction, with a link to the Drivers page.
+ * (the code map's name and first sentence until then), with its own direction
+ * chip, what that direction means for this moment, and a link to the Drivers
+ * page.
  */
 export const DriverForceCard: FC<{
   driver: CitedDriver;
@@ -186,33 +231,28 @@ export const DriverForceCard: FC<{
   return (
     <div className="rounded-xl p-3" style={{ backgroundColor: S.surfaceLow, border: `1px solid ${S.cardBorder}` }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        {/* The force colour is a dot and a tint, never the text: the force
+            palette does not reach 4.5:1 at 11 px. */}
         <span
           className="inline-flex items-center rounded-full font-bold"
-          style={{ fontSize: 10, padding: '1px 7px', backgroundColor: c, color: S.onPrimary, fontFamily: HEADLINE_FONT }}
+          style={{ fontSize: 11, padding: '1px 7px', backgroundColor: S.surface, color: S.onSurface, border: `1px solid ${S.cardBorderStrong}`, ...FIGURES }}
         >
           {code}
         </span>
         <span style={{ fontSize: 12, fontWeight: 700, color: S.onSurface, fontFamily: HEADLINE_FONT, lineHeight: 1.3, flex: 1, minWidth: 0 }}>{name}</span>
         <span
-          className="inline-flex items-center rounded-full font-bold"
-          style={{ fontSize: 9.5, padding: '1px 7px', backgroundColor: `${c}14`, color: c, fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap' }}
+          className="inline-flex items-center gap-1.5 rounded-full font-bold"
+          style={{ fontSize: 11, padding: '1px 7px', backgroundColor: `${c}14`, color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap' }}
         >
+          <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: c, display: 'inline-block' }} />
           {info.force}
         </span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 9, flexWrap: 'wrap' }}>
-        <span
-          className="inline-flex items-center gap-1 rounded-full font-bold"
-          style={{
-            fontSize: 10.5, padding: '2px 9px',
-            backgroundColor: isExp ? S.expansionContainer : S.errorContainer,
-            color: isExp ? S.onExpansionContainer : S.onErrorContainer,
-            fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap',
-          }}
-          title={isExp ? 'Expansion driver: a tailwind for this moment' : 'Contraction driver: a headwind for this moment'}
-        >
-          {isExp ? <TrendingUp size={11} strokeWidth={2.5} /> : <TrendingDown size={11} strokeWidth={2.5} />}
-          {isExp ? 'Tailwind' : 'Headwind'}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 9, flexWrap: 'wrap' }}>
+        <Chip kind={isExp ? 'expansion' : 'contraction'} compact />
+        <span className="inline-flex items-center gap-1" style={{ fontSize: 11, color: isExp ? S.expansionInk : S.contractionInk, fontWeight: 600 }}>
+          {isExp ? <TrendingUp size={11} strokeWidth={2.5} aria-hidden="true" /> : <TrendingDown size={11} strokeWidth={2.5} aria-hidden="true" />}
+          {isExp ? 'tailwind for this moment' : 'headwind for this moment'}
         </span>
       </div>
       {description && (
@@ -238,8 +278,8 @@ export const DriverForceCard: FC<{
           View in Drivers
         </button>
         {sourceCount > 0 && (
-          <span style={{ fontSize: 10, color: S.mutedText, fontFamily: HEADLINE_FONT, fontWeight: 700 }} className="tabular-nums">
-            {sourceCount} source{sourceCount === 1 ? '' : 's'}
+          <span style={{ fontSize: 11, color: S.mutedText, fontFamily: HEADLINE_FONT, fontWeight: 700 }} className="tabular-nums">
+            driver has {sourceCount} source{sourceCount === 1 ? '' : 's'}
           </span>
         )}
       </div>
@@ -269,7 +309,7 @@ export const StageContextBlock: FC<{ stageId: string; stageLabel: string; journe
       <div className="flex flex-col gap-2.5">
         {rows.map(r => (
           <div key={r.label}>
-            <div className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT, marginBottom: 2 }}>
+            <div className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT, marginBottom: 2 }}>
               {r.label}
             </div>
             <p style={{ fontSize: 12, color: S.onSurface, lineHeight: 1.55, margin: 0 }}>{r.value}</p>

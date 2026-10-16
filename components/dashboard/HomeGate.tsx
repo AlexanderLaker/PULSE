@@ -29,7 +29,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import usePrism from '@/hooks/usePrism';
 import { overlayOpen } from '@/hooks/useOverlay';
 import {
-  S, INK_RGB, PRIMARY_RGB, CONTRACTION_RGB, EXPANSION_RGB, HEADLINE_FONT, BODY_FONT, MONO_FONT,
+  S, INK_RGB, PRIMARY_RGB, CONTRACTION_RGB, EXPANSION_RGB, HEADLINE_FONT, BODY_FONT, FIGURES,
 } from '@/lib/theme';
 import { CATEGORIES, FLAT_EPS, FORCE_COLORS, HORIZON, heatFill, heatScaleFor } from '@/lib/format';
 import { getYearPercentiles } from '@/lib/shiftMatrix';
@@ -334,7 +334,7 @@ const Door: FC<{
       className="absolute right-[22px] top-6 flex h-[22px] w-[22px] items-center justify-center rounded-[7px]
                  border bg-theme-surface/85 text-[11px] opacity-0 transition-opacity duration-300
                  group-hover:opacity-90 group-focus-visible:opacity-90"
-      style={{ fontFamily: MONO_FONT, color: S.onSurfaceVariant, borderColor: S.cardBorderStrong }}
+      style={{ ...FIGURES, color: S.onSurfaceVariant, borderColor: S.cardBorderStrong }}
     >
       {keyHint}
     </span>

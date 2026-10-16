@@ -5,7 +5,7 @@
 import type { FC } from 'react';
 import { Info, Database } from 'lucide-react';
 import { CATEGORY_NAMES, REGIONS, fmtPct, fmtDateTimeUtc } from '@/lib/format';
-import { S, HEADLINE_FONT, MONO_FONT } from '@/lib/theme';
+import { S, HEADLINE_FONT, FIGURES } from '@/lib/theme';
 import { cellWeightsBasis } from '@/lib/cellWeights';
 import { codeForDriverId } from '@/data/driverCodeMap';
 import type { SimulationResult } from '@/types';
@@ -116,7 +116,7 @@ export const RunDetails: FC<{ simulation: SimulationResult }> = ({ simulation })
           <span key={k} className="inline-flex items-baseline gap-2">
             <span style={{ fontSize: 11.5, color: S.mutedText }}>{k}</span>
             <span style={{ fontSize: 11.5, fontWeight: 600, color: S.onSurface,
-              fontFamily: MONO_FONT }}>{v}</span>
+              ...FIGURES }}>{v}</span>
           </span>
         ))}
       </div>

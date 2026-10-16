@@ -13,8 +13,8 @@ export default function SignUpPage() {
   return (
     <>
       <CardHeading label="Restricted access" title="Create account">
-        Only invited or listed addresses can create an account, and an admin approves each account before the
-        dashboard opens.
+        Only invited addresses, or addresses on the allowed list, can create an account; an admin approves each
+        account before the dashboard opens.
       </CardHeading>
       <div className="flex justify-center">
         <SignUp appearance={EMBEDDED_FORM} />

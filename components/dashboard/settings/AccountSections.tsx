@@ -2,7 +2,7 @@
  * The account sections of the Settings sheet: the profile, the password and
  * the active sessions, all read from and written to Clerk.
  */
-import { useEffect, useState, type FC, type FormEvent } from 'react';
+import { useEffect, useId, useState, type FC, type FormEvent } from 'react';
 import { User, KeyRound, Monitor, LogOut } from 'lucide-react';
 import { useUser, useClerk, useSession } from '@clerk/nextjs';
 import SectionCard from '@/components/dashboard/SectionCard';
@@ -14,6 +14,9 @@ import {
   DESTRUCTIVE_BUTTON, errorText, Field, INPUT_STYLE, Muted, PRIMARY_BUTTON, READONLY_INPUT_STYLE,
   RolePill, type Status, StatusBanner, SubBlock,
 } from './parts';
+
+/** Two fields side by side from md up, one under the other on a phone. */
+const TWO_UP = 'grid grid-cols-1 md:grid-cols-2 gap-3';
 
 // ═══════════════════════════════════════════════════════════════════
 // Account: profile
@@ -63,10 +66,12 @@ export const ProfileSection: FC<{ role: Role }> = ({ role }) => {
         <Field label="Email">
           <input type="email" value={user.primaryEmailAddress?.emailAddress ?? NO_VALUE} readOnly style={READONLY_INPUT_STYLE} />
         </Field>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className={TWO_UP}>
           <Field label="First name">
             <input
               type="text"
+              name="given-name"
+              autoComplete="given-name"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               placeholder="First name"
@@ -76,6 +81,8 @@ export const ProfileSection: FC<{ role: Role }> = ({ role }) => {
           <Field label="Last name">
             <input
               type="text"
+              name="family-name"
+              autoComplete="family-name"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               placeholder="Last name"
@@ -83,7 +90,7 @@ export const ProfileSection: FC<{ role: Role }> = ({ role }) => {
             />
           </Field>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className={TWO_UP}>
           <SubBlock label="Role">
             <div style={{ padding: '9px 12px' }}>
               <RolePill role={role} />
@@ -110,6 +117,7 @@ export const ProfileSection: FC<{ role: Role }> = ({ role }) => {
 
 export const PasswordSection: FC = () => {
   const { user, isLoaded } = useUser();
+  const hintId = useId();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -159,14 +167,42 @@ export const PasswordSection: FC = () => {
     >
       <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <Field label="Current password">
-          <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} style={INPUT_STYLE} required />
+          <input
+            type="password"
+            name="current-password"
+            autoComplete="current-password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+            style={INPUT_STYLE}
+            required
+          />
         </Field>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="New password" hint="At least 8 characters.">
-            <input type="password" value={next} onChange={(e) => setNext(e.target.value)} style={INPUT_STYLE} required minLength={8} />
+        <div className={TWO_UP}>
+          <Field label="New password" hint="At least 8 characters." hintId={hintId}>
+            <input
+              type="password"
+              name="new-password"
+              autoComplete="new-password"
+              aria-describedby={hintId}
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+              style={INPUT_STYLE}
+              required
+              minLength={8}
+            />
           </Field>
           <Field label="Confirm new password">
-            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} style={INPUT_STYLE} required minLength={8} />
+            <input
+              type="password"
+              name="confirm-password"
+              autoComplete="new-password"
+              aria-describedby={hintId}
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              style={INPUT_STYLE}
+              required
+              minLength={8}
+            />
           </Field>
         </div>
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: S.onSurface, cursor: 'pointer' }}>
@@ -193,6 +229,8 @@ export const PasswordSection: FC = () => {
 // Account: active sessions
 // ═══════════════════════════════════════════════════════════════════
 
+const SIGN_OUT_QUESTION_ID = 'sign-out-everywhere-question';
+
 type ClerkUser = NonNullable<ReturnType<typeof useUser>['user']>;
 /** One of the user's active sessions, on any device, with its latest activity. */
 type DeviceSession = Awaited<ReturnType<ClerkUser['getSessions']>>[number];
@@ -204,6 +242,8 @@ export const SessionsSection: FC = () => {
   const [sessions, setSessions] = useState<DeviceSession[] | null>(null);
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [signingOutAll, setSigningOutAll] = useState(false);
+  // Sign out everywhere waits for a confirmation under its button.
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const [status, setStatus] = useState<Status | null>(null);
 
   // user.getSessions() lists the user's sessions on every device; the
@@ -244,6 +284,7 @@ export const SessionsSection: FC = () => {
 
   // Every other device first, then this browser, which lands on /sign-in.
   const signOutEverywhere = async () => {
+    setConfirmingSignOut(false);
     setSigningOutAll(true);
     setStatus(null);
     try {
@@ -330,12 +371,34 @@ export const SessionsSection: FC = () => {
         description="End every session on every device, this one included. You'll need to sign in again. A device signed out this way can still read PRISM data for up to 30 minutes."
       >
         <button type="button"
-          onClick={signOutEverywhere}
+          onClick={() => setConfirmingSignOut(true)}
           disabled={signingOutAll}
+          aria-expanded={confirmingSignOut}
+          aria-controls={confirmingSignOut ? SIGN_OUT_QUESTION_ID : undefined}
           style={{ ...DESTRUCTIVE_BUTTON, opacity: signingOutAll ? 0.6 : 1 }}
         >
           {signingOutAll ? 'Signing out…' : 'Sign out of every session'}
         </button>
+        {confirmingSignOut && (
+          <div id={SIGN_OUT_QUESTION_ID} role="group" aria-label="Confirm signing out of every session"
+            style={{
+              marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+              flexWrap: 'wrap', gap: 8, fontSize: 12.5,
+            }}>
+            <span style={{ marginRight: 'auto', color: S.onSurfaceVariant }}>This signs you out here as well. Continue?</span>
+            <button type="button" onClick={() => setConfirmingSignOut(false)}
+              style={{ ...PRIMARY_BUTTON, color: S.primary, backgroundColor: S.surfaceLow, padding: '6px 14px' }}>
+              Cancel
+            </button>
+            <button type="button" onClick={signOutEverywhere} style={{ ...DESTRUCTIVE_BUTTON, padding: '6px 14px' }}>
+              Continue
+            </button>
+          </div>
+        )}
+        {/* Says the question to a screen reader as it appears. */}
+        <p role="status" className="sr-only">
+          {confirmingSignOut ? 'This signs you out here as well. Continue or cancel under the button.' : ''}
+        </p>
       </SectionCard>
     </div>
   );

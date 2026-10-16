@@ -36,6 +36,16 @@ export const currentMonth = (): string => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** A tile's month, stored as YYYY-MM, as the page reads it: "Sep 2026". Anything else is shown as stored. */
+export const formatMonth = (yyyyMm: string): string => {
+  const m = /^(\d{4})-(\d{2})$/.exec(yyyyMm);
+  if (!m) return yyyyMm;
+  const month = MONTHS[Number(m[2]) - 1];
+  return month ? `${month} ${m[1]}` : yyyyMm;
+};
+
 /** The side of a stage a tile sits on: tailwind (benefiting) or headwind (negativelyImpacted). */
 export type Side = 'benefiting' | 'negativelyImpacted';
 
@@ -73,6 +83,20 @@ export interface CitedDriver {
 
 /** A tile's name without a trailing parenthetical; the full name stays in the content and in the tooltip. */
 export const displayTileName = (name: string): string => name.replace(/\s*\([^()]*\)\s*$/, '').trim();
+
+/** The trailing parenthetical the pill drops ("eco-formats" of "Detergent sheets & pods (eco-formats)"), for the dialog's subtitle. */
+export const tileNameSubtitle = (name: string): string | null => {
+  const m = /\(([^()]*)\)\s*$/.exec(name);
+  const inner = m?.[1]?.trim();
+  return inner ? inner : null;
+};
+
+/** The side of a tile in words, for its accessible name and the dialog. */
+export const sideWord = (side: Side): 'tailwind' | 'headwind' => (side === 'benefiting' ? 'tailwind' : 'headwind');
+
+/** The pool-impact grade in words; a tile added in the editor has no grade yet. */
+export const impactWords = (grade?: PoolImpactGrade): string =>
+  grade === 'High' ? 'high impact' : grade === 'Med' ? 'medium impact' : grade === 'Low' ? 'low impact' : 'impact not graded';
 
 /** Pool-impact grade to tile tint: High is notably dark, Low much lighter; `up` picks green (tailwind) or red (headwind). */
 export const gradeTint = (up: boolean, grade?: PoolImpactGrade): string => {
