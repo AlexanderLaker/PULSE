@@ -3,9 +3,10 @@
  * from a blank slate with the baseline on hover. Changes save as they are
  * made, one request at a time with the newest draft.
  */
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, type FC } from 'react';
+import { useState, useEffect, useId, useLayoutEffect, useRef, useCallback, type FC } from 'react';
 import {
-  Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper, Info, PenLine, MessageSquare,
+  Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper, Info, PenLine, MessageSquare, Check, AlertTriangle,
+  ArrowRight,
 } from 'lucide-react';
 import { saveMyProposal } from '@/lib/apiClient';
 import { queueProposalSave, registerPendingSave } from '@/lib/proposalSaves';
@@ -25,36 +26,56 @@ import { useDriverProposals } from './useDriverProposals';
 
 /** A year field for the Expert Rating: the proposal takes the value only while
  *  it is a whole year from `min` (the year after the driver's onset) to the
- *  horizon, so a half-typed year is never sent; leaving the field with
- *  anything else puts the last valid year back. */
+ *  horizon, so a half-typed year is never sent; anything else stays in the
+ *  field with a message under it until it is corrected or cleared. */
 const ProposalYearInput: FC<{
   value: number | null | undefined; min: number; onChange: (v: number | null) => void; title?: string;
 }> = ({ value, min, onChange, title }) => {
   const [text, setText] = useState(value == null ? '' : String(value));
   const [shownFor, setShownFor] = useState(value);
+  const msgId = useId();
   if (shownFor !== value) {
     setShownFor(value);
     setText(value == null ? '' : String(value));
   }
   const valid = (t: string) => /^\d{4}$/.test(t) && Number(t) >= min && Number(t) <= HORIZON;
+  const invalid = text !== '' && !valid(text);
   return (
-    <input type="text" inputMode="numeric" value={text} placeholder={NO_VALUE} title={title}
-      aria-label={`Peak year, ${min} to ${HORIZON}`} aria-invalid={text !== '' && !valid(text)}
-      onChange={(e) => {
-        const t = e.target.value.trim();
-        setText(t);
-        if (t === '') onChange(null);
-        else if (valid(t)) onChange(Number(t));
-      }}
-      onBlur={() => { if (text !== '' && !valid(text)) setText(value == null ? '' : String(value)); }}
-      style={{ width: 110, padding: '8px 10px', borderRadius: 8, border: `1px solid ${text !== '' && !valid(text) ? S.error : S.cardBorder}`,
-        backgroundColor: S.surfaceLow, color: S.onSurface, fontSize: 13, fontWeight: 700 }} />
+    <div>
+      <input type="text" inputMode="numeric" value={text} placeholder={NO_VALUE} title={title}
+        aria-label={`Peak year, ${min} to ${HORIZON}`} aria-invalid={invalid} aria-describedby={msgId}
+        onChange={(e) => {
+          const t = e.target.value.trim();
+          setText(t);
+          if (t === '') onChange(null);
+          else if (valid(t)) onChange(Number(t));
+        }}
+        style={{ width: 110, padding: '8px 10px', borderRadius: 8, border: `1px solid ${invalid ? S.error : S.cardBorder}`,
+          backgroundColor: S.surfaceLow, color: S.onSurface, fontSize: 13, fontWeight: 700 }} />
+      <div id={msgId} style={{ fontSize: 11, color: invalid ? S.error : S.mutedText, marginTop: 4 }}>
+        {invalid
+          ? `A whole year from ${min} (after the onset) to ${HORIZON}; your proposal keeps ${value == null ? 'no year' : value} until this is one`
+          : `A whole year from ${min} to ${HORIZON}`}
+      </div>
+    </div>
   );
 };
 
+/** The next unrated driver in the list's order (Drivers.tsx): its id, or why
+ *  there is none, and how to open it. */
+export interface NextUnrated {
+  id: string | null;
+  reason: string | null;
+  go: () => void;
+}
+
 // ── Expert Rating panel: the expert's own proposal, scored from a blank
 //    slate and saved automatically, with the baseline on hover ──
-export const ExpertRatingPanel: FC<{ driver: Driver; onMyChange: (driverId: string, my: DriverProposal) => void }> = ({ driver, onMyChange }) => {
+export const ExpertRatingPanel: FC<{
+  driver: Driver;
+  onMyChange: (driverId: string, my: DriverProposal) => void;
+  nextUnrated?: NextUnrated;
+}> = ({ driver, onMyChange, nextUnrated }) => {
   const { data, loaded, failed, retry } = useDriverProposals(driver.id);
   const [draft, setDraft] = useState<DriverProposal>({});
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -113,6 +134,13 @@ export const ExpertRatingPanel: FC<{ driver: Driver; onMyChange: (driverId: stri
     }
   }, [sendNow]);
 
+  // "Retry" after a failed save: the newest draft goes out again at once.
+  const retrySave = useCallback(() => {
+    setStatus('saving');
+    pendingSave.current = true;
+    sendPending();
+  }, [sendPending]);
+
   const flush = useCallback(() => {
     setStatus('saving');
     pendingSave.current = true;
@@ -131,10 +159,10 @@ export const ExpertRatingPanel: FC<{ driver: Driver; onMyChange: (driverId: stri
   const myVcStage = draft.vc_epicentre ?? null;
   const gp1Int = draft.gp1_pct_affected != null ? Math.round(draft.gp1_pct_affected * 100) : undefined;
   const dist = data?.aggregate.diffusion_curve?.distribution;
-  const statusText = status === 'saving' ? 'Saving…'
-    : status === 'saved' ? '✓ All changes saved'
-    : status === 'error' ? '⚠ Save failed; it retries on your next change'
-    : 'Changes auto-save';
+  const statusText = status === 'saving' ? 'Saving'
+    : status === 'saved' ? 'All changes saved'
+    : status === 'error' ? 'Save failed'
+    : 'Changes save as you make them';
 
   // Until the stored proposal has loaded nothing can be edited: a save made
   // from a blank draft would overwrite what the expert entered before.
@@ -143,21 +171,36 @@ export const ExpertRatingPanel: FC<{ driver: Driver; onMyChange: (driverId: stri
       <div onClick={(e) => e.stopPropagation()} style={{ padding: '0 32px', backgroundColor: S.surface, borderTop: `1px solid ${S.cardBorder}` }}>
         {failed
           ? <ProposalsUnavailable what="your proposal cannot be edited right now" onRetry={retry} />
-          : <div style={{ padding: '26px 0', textAlign: 'center', fontSize: 14, color: S.onSurfaceVariant }}>Loading your proposal…</div>}
+          : <div role="status" style={{ padding: '26px 0', textAlign: 'center', fontSize: 14, color: S.onSurfaceVariant }}>Loading your proposal…</div>}
       </div>
     );
   }
 
   return (
-    <div onClick={(e) => e.stopPropagation()} style={{ padding: '24px 32px 32px', backgroundColor: S.surface, borderTop: `1px solid ${S.cardBorder}` }}>
+    <div onClick={(e) => e.stopPropagation()} className="px-4 pt-6 pb-8 md:px-8" style={{ backgroundColor: S.surface, borderTop: `1px solid ${S.cardBorder}` }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 18 }}>
         <span className="inline-flex items-center gap-2" style={{ fontFamily: HEADLINE_FONT, fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: S.primary }}>
           <PenLine size={13} strokeWidth={2.4} /> Expert Rating · your proposal
         </span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: status === 'error' ? S.error : status === 'saved' ? REVIEWED_COLOR : S.onSurfaceVariant }}>{statusText}</span>
+        <span className="inline-flex items-center gap-2 flex-wrap">
+          <span role="status" className="inline-flex items-center gap-1.5"
+            style={{ fontSize: 12, fontWeight: 700, color: status === 'error' ? S.error : status === 'saved' ? REVIEWED_COLOR : S.onSurfaceVariant }}>
+            {status === 'saved' && <Check size={12} strokeWidth={2.6} aria-hidden />}
+            {status === 'error' && <AlertTriangle size={12} strokeWidth={2.4} aria-hidden />}
+            {statusText}
+          </span>
+          {status === 'error' && (
+            <button type="button" onClick={retrySave} style={{
+              padding: '4px 12px', borderRadius: 999, border: `1px solid ${S.error}`, background: 'transparent',
+              color: S.error, fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 700, cursor: 'pointer', minHeight: 24,
+            }}>
+              Retry
+            </button>
+          )}
+        </span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(0,1fr)', gap: 20 }}>
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-5">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <SectionCard title="Context" icon={FileText}>
             <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: S.onSurface, whiteSpace: 'pre-wrap' }}>
@@ -171,20 +214,26 @@ export const ExpertRatingPanel: FC<{ driver: Driver; onMyChange: (driverId: stri
             </div>
           </SectionCard>
 
-          <SectionCard title="Probability" icon={Zap} info={FIELD_HELP.probability} footnote="1 = Very Unlikely · 3 = Possible · 5 = Almost Certain. Hover the dots for the baseline; click the selected dot again to clear your score.">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-              <span title={`Baseline ${base.probability} / 5`} style={{ cursor: 'help' }}>
-                <DotBar value={draft.probability ?? 0} editable onChange={(v) => patch({ probability: v === draft.probability ? null : v })} />
+          <SectionCard title="Probability" icon={Zap} info={FIELD_HELP.probability} footnote="1 = Very Unlikely, 3 = Possible, 5 = Almost Certain. The ring marks the baseline; click the selected dot again to clear your score.">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+              <span title={`Baseline ${base.probability} / 5`}>
+                <DotBar value={draft.probability ?? 0} editable baseline={base.probability}
+                  onChange={(v) => patch({ probability: v === draft.probability ? null : v })} />
               </span>
               <BaselineRef value={`${base.probability}/5`} />
             </div>
           </SectionCard>
 
           <SectionCard title="GP1 % affected" icon={BarChart3} info={FIELD_HELP.gp1} footnote="Share of category GP1 this driver can move at full materialisation.">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <input type="range" min={1} max={100} step={1} value={gp1Int ?? 1}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              {/* While unscored the slider sits muted at the baseline: moving
+                  it scores the share, nothing is scored by its position alone. */}
+              <input type="range" min={1} max={100} step={1} value={gp1Int ?? Math.round(base.gp1_pct_affected * 100)}
+                aria-label="GP1 % affected"
+                aria-valuetext={gp1Int == null ? 'not scored' : `${gp1Int}%`}
                 onChange={(e) => patch({ gp1_pct_affected: parseInt(e.target.value, 10) / 100 })}
-                title={`Baseline ${fmtPct(base.gp1_pct_affected, 0)}`} style={{ flex: 1, cursor: 'help' }} />
+                title={`Baseline ${fmtPct(base.gp1_pct_affected, 0)}`}
+                style={{ flex: '1 1 160px', minWidth: 120, cursor: 'pointer', opacity: gp1Int == null ? 0.45 : 1 }} />
               <input type="number" min={1} max={100} step={1} value={gp1Int ?? ''} placeholder={NO_VALUE}
                 aria-label="GP1 % affected, in percent"
                 onChange={(e) => {
@@ -195,6 +244,7 @@ export const ExpertRatingPanel: FC<{ driver: Driver; onMyChange: (driverId: stri
                 title={`Baseline ${fmtPct(base.gp1_pct_affected, 0)}`}
                 style={{ width: 70, padding: '6px 8px', borderRadius: 8, border: `1px solid ${S.cardBorder}`, backgroundColor: S.surfaceLow, color: S.onSurface, fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 15, textAlign: 'right' }} />
               <span style={{ color: S.mutedText, fontSize: 12 }}>%</span>
+              {gp1Int == null && <span style={{ color: S.mutedText, fontSize: 11 }}>not scored</span>}
               <BaselineRef value={fmtPct(base.gp1_pct_affected, 0)} />
             </div>
           </SectionCard>
@@ -203,10 +253,10 @@ export const ExpertRatingPanel: FC<{ driver: Driver; onMyChange: (driverId: stri
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
                 <FieldLabel>Peak year</FieldLabel>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
                   <ProposalYearInput value={draft.peak_year} min={firstPeakYear(driver.start_year)} onChange={(v) => patch({ peak_year: v })}
                     title={`Baseline ${base.peak_year}`} />
-                  <BaselineRef value={String(base.peak_year)} />
+                  <span style={{ marginTop: 8 }}><BaselineRef value={String(base.peak_year)} /></span>
                 </div>
               </div>
               <div>
@@ -217,8 +267,8 @@ export const ExpertRatingPanel: FC<{ driver: Driver; onMyChange: (driverId: stri
             </div>
           </SectionCard>
 
-          <SectionCard title="Uncertainty" icon={Zap} info={FIELD_HELP.uncertainty} footnote="0 = fixed by law or contract · 3 = size could be half or double · 5 = the sign could differ. Sets the band width and the timing jitter of this driver; the mean stays where probability puts it.">
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+          <SectionCard title="Uncertainty" icon={Zap} info={FIELD_HELP.uncertainty} footnote="0 = fixed by law or contract, 3 = size could be half or double, 5 = the sign could differ. Sets the band width and the timing jitter of this driver; the mean stays where probability puts it.">
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
               <UncertaintyPicker value={draft.uncertainty} baseline={base.uncertainty}
                 onChange={(v) => patch({ uncertainty: v })} onClear={() => patch({ uncertainty: null })} />
               <BaselineRef value={`${base.uncertainty}/5`} />
@@ -235,11 +285,11 @@ export const ExpertRatingPanel: FC<{ driver: Driver; onMyChange: (driverId: stri
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <SectionCard title="Category exposure" icon={Layers} info={FIELD_HELP.category} footnote="Grey = unscored. A cell you leave blank is not part of your proposal; click a selected dot again to clear it.">
+          <SectionCard title="Category exposure" icon={Layers} info={FIELD_HELP.category} footnote="Grey means unscored; the ring marks the baseline score. A cell you leave blank is not part of your proposal; click a selected dot again to clear it.">
             <EditableCategoryGrid clearable exposures={draft.category_exposure ?? {}}
               onChange={(e) => patch({ category_exposure: Object.keys(e).length ? e : null })} baseline={base.category_exposure} />
           </SectionCard>
-          <SectionCard title="Regional exposure" icon={MapPin} accent={S.onSecondaryContainer} info={FIELD_HELP.regional}>
+          <SectionCard title="Regional exposure" icon={MapPin} accent={S.onSecondaryContainer} info={FIELD_HELP.regional} footnote="The ring marks the baseline score.">
             <EditableRegionGrid clearable exposures={draft.regional_exposure ?? {}}
               onChange={(e) => patch({ regional_exposure: Object.keys(e).length ? e : null })} baseline={base.regional_exposure} />
           </SectionCard>
@@ -284,9 +334,29 @@ export const ExpertRatingPanel: FC<{ driver: Driver; onMyChange: (driverId: stri
         </div>
       </div>
 
-      <div className="inline-flex items-center gap-1.5" style={{ marginTop: 18, padding: '8px 14px', borderRadius: 10, backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontSize: 12.5, lineHeight: 1.5 }}>
-        <Info size={13} style={{ flexShrink: 0, color: S.primary }} />
-        <span>Your scores are a proposal and never change the driver: the model reads the driver&apos;s own scores. An admin endorses a proposal by editing the driver.</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginTop: 18 }}>
+        <div className="inline-flex items-center gap-1.5" style={{ padding: '8px 14px', borderRadius: 10, backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontSize: 12.5, lineHeight: 1.5 }}>
+          <Info size={13} style={{ flexShrink: 0, color: S.primary }} />
+          <span>Your scores are a proposal and never change the driver: the model reads the driver&apos;s own scores. An admin endorses a proposal by editing the driver.</span>
+        </div>
+        {nextUnrated && (
+          <span className="inline-flex items-center gap-2 flex-wrap" data-print-hide>
+            {nextUnrated.id == null && nextUnrated.reason && (
+              <span id={`next-unrated-${driver.id}`} style={{ fontSize: 11.5, color: S.mutedText }}>{nextUnrated.reason}</span>
+            )}
+            <button type="button" onClick={nextUnrated.go} disabled={nextUnrated.id == null}
+              aria-describedby={nextUnrated.id == null ? `next-unrated-${driver.id}` : undefined}
+              className="inline-flex items-center gap-1.5"
+              style={{
+                padding: '8px 16px', borderRadius: 999, border: 'none',
+                backgroundColor: S.primary, color: S.onPrimary, fontFamily: HEADLINE_FONT,
+                fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                cursor: nextUnrated.id == null ? 'not-allowed' : 'pointer', opacity: nextUnrated.id == null ? 0.5 : 1,
+              }}>
+              Next unrated <ArrowRight size={12} strokeWidth={2.6} aria-hidden />
+            </button>
+          </span>
+        )}
       </div>
     </div>
   );

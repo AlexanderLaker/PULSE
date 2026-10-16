@@ -3,7 +3,9 @@
  * Review & Endorse on the Drivers page. Endorsing writes the expert mean of
  * the fields and cells experts scored and leaves every other value as it is
  * now, so an admin's earlier edit is never reverted to the baseline without a
- * choice to do so; every endorse names the revision it was made on.
+ * choice to do so; every endorse names the revision it was made on. A value
+ * the driver already holds is not written, and when nothing would be, the
+ * Endorse button says so and stays off.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor, within, act } from '@testing-library/react';
@@ -89,13 +91,13 @@ describe('Review & Endorse', () => {
     expect(await screen.findByRole('button', { name: /Endorse driver/ })).toBeTruthy();
   });
 
-  it('clears the Endorsed mark when a choice changes', async () => {
+  it('names the fields it wrote, and clears the mark when a choice changes', async () => {
     await openReview(reviewedDriver());
     await endorse();
-    expect(await screen.findByText('✓ Endorsed')).toBeTruthy();
+    expect(await screen.findByText('Endorsed: probability, category exposure (Care), regional exposure (Asia)')).toBeTruthy();
     const gp1 = screen.getByRole('group', { name: 'GP1 % affected' });
-    fireEvent.click(within(gp1).getByRole('button', { name: 'Baseline' }));
-    expect(screen.queryByText('✓ Endorsed')).toBeNull();
+    fireEvent.click(within(gp1).getByRole('radio', { name: 'Baseline' }));
+    expect(screen.queryByText(/^Endorsed: /)).toBeNull();
   });
 
   it('writes the expert mean where experts scored and keeps every other value as it is now', async () => {
@@ -137,16 +139,33 @@ describe('Review & Endorse', () => {
     await openReview(reviewedDriver());
     await waitFor(() => expect(screen.getByText(/2 experts scored/)).toBeTruthy());
     const gp1 = screen.getByRole('group', { name: 'GP1 % affected' });
-    fireEvent.click(within(gp1).getByRole('button', { name: 'Baseline' }));
+    fireEvent.click(within(gp1).getByRole('radio', { name: 'Baseline' }));
     const [, update] = await endorse();
     expect(update.gp1_pct_affected).toBe(0.22);
   });
 
-  it('writes nothing but the revision when every field is kept', async () => {
+  it('holds Endorse, with the reason, when nothing differs from the stored driver', async () => {
+    // Every field kept: the update would carry the revision alone, so it is not sent.
     await openReview(reviewedDriver());
     fireEvent.click(await screen.findByRole('button', { name: 'Keep current' }));
+    const button = screen.getByRole('button', { name: /Endorse driver/ }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    const reason = screen.getByText('Nothing differs from the stored driver');
+    expect(button.getAttribute('aria-describedby')).toBe(reason.getAttribute('id'));
+    expect(STORE.current!.updateDriver).not.toHaveBeenCalled();
+    // A choice that differs from the stored driver enables it again.
+    const gp1 = screen.getByRole('group', { name: 'GP1 % affected' });
+    fireEvent.click(within(gp1).getByRole('radio', { name: 'Baseline' }));
+    expect((screen.getByRole('button', { name: /Endorse driver/ }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('leaves out a chosen value the driver already holds', async () => {
+    // The expert mean of Hair: Care rounds to 5; a driver already at 5 there gets no cell for it.
+    const driver = reviewedDriver();
+    driver.category_exposure = { ...driver.category_exposure, 'Hair: Care': 5 };
+    await openReview(driver);
     const [, update] = await endorse();
-    expect(update).toEqual({ revision: 4 });
+    expect(update).toEqual({ revision: 4, probability: 4, regional_exposure: { Asia: 1 } });
   });
 
   it('explains a refusal because the driver changed meanwhile', async () => {

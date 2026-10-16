@@ -25,7 +25,7 @@ export const EMBEDDED_FORM = {
 export function CardHeading({ label, title, children }: { label: string; title: string; children?: ReactNode }) {
   return (
     <div className="text-center mb-8">
-      <div className="text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: S.onSurfaceVariant }}>
+      <div className="text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: S.onSurfaceVariant }}>
         {label}
       </div>
       <h1 className="mt-2 text-2xl font-extrabold tracking-tight" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>

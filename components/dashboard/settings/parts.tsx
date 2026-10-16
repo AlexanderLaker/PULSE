@@ -5,7 +5,7 @@
  */
 import type { CSSProperties, FC, ReactNode } from 'react';
 import { ShieldCheck, Check, AlertCircle, Info, Clock } from 'lucide-react';
-import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
+import { S, HEADLINE_FONT, BODY_FONT, FIGURES } from '@/lib/theme';
 import type { Access } from '@/types';
 
 export type Status = { kind: 'success' | 'error' | 'info'; message: string };
@@ -18,6 +18,9 @@ export const Muted: FC<{ children: ReactNode }> = ({ children }) => (
   <div style={{ color: S.mutedText, fontSize: 13 }}>{children}</div>
 );
 
+/** An access as a reader sees it: "Admin", "Viewer", "Pending", never the code's lower case. */
+export const accessLabel = (access: Access): string => access.charAt(0).toUpperCase() + access.slice(1);
+
 /** A user's access: admin with a shield, viewer, or pending (no role yet) in amber with a clock. */
 export const RolePill: FC<{ role: Access }> = ({ role }) => {
   const { bg, fg } = role === 'admin'
@@ -27,12 +30,12 @@ export const RolePill: FC<{ role: Access }> = ({ role }) => {
       : { bg: S.secondaryContainer, fg: S.onSecondaryContainer };
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase"
-      style={{ backgroundColor: bg, color: fg }}
+      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold"
+      style={{ backgroundColor: bg, color: fg, letterSpacing: '0.01em' }}
     >
-      {role === 'admin' && <ShieldCheck size={11} strokeWidth={2.5} />}
-      {role === 'pending' && <Clock size={11} strokeWidth={2.5} />}
-      {role}
+      {role === 'admin' && <ShieldCheck size={11} strokeWidth={2.5} aria-hidden />}
+      {role === 'pending' && <Clock size={11} strokeWidth={2.5} aria-hidden />}
+      {accessLabel(role)}
     </span>
   );
 };
@@ -43,12 +46,15 @@ export const LABEL_STYLE: CSSProperties = {
   textTransform: 'uppercase', color: S.onSurfaceVariant,
 };
 
-/** A form control with its label; the <label> wraps the control. */
-export const Field: FC<{ label: string; hint?: string; children: ReactNode }> = ({ label, hint, children }) => (
+/** A form control with its label; the <label> wraps the control. `hintId`
+ *  names the hint, so the control can point at it with aria-describedby. */
+export const Field: FC<{ label: string; hint?: string; hintId?: string; children: ReactNode }> = ({
+  label, hint, hintId, children,
+}) => (
   <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
     <span style={LABEL_STYLE}>{label}</span>
     {children}
-    {hint && <span style={{ fontSize: 11, color: S.mutedText }}>{hint}</span>}
+    {hint && <span id={hintId} style={{ fontSize: 11, color: S.mutedText }}>{hint}</span>}
   </label>
 );
 
@@ -98,8 +104,10 @@ export const PRIMARY_BUTTON: CSSProperties = { ...BUTTON, color: S.onPrimary, ba
 export const DESTRUCTIVE_BUTTON: CSSProperties = { ...BUTTON, color: S.error, backgroundColor: S.errorContainer };
 
 export const StatusBanner: FC<{ kind: Status['kind']; children: ReactNode }> = ({ kind, children }) => {
+  // The success text takes the expansion ink: the lighter green of the shift
+  // pair falls short of 4.5:1 on the success container.
   const { bg, fg, Icon } = kind === 'success'
-    ? { bg: S.successContainer, fg: S.success, Icon: Check }
+    ? { bg: S.successContainer, fg: S.expansionInk, Icon: Check }
     : kind === 'error'
       ? { bg: S.errorContainer, fg: S.onErrorContainer, Icon: AlertCircle }
       : { bg: S.surfaceLow, fg: S.primary, Icon: Info };
@@ -133,15 +141,18 @@ export const ROW_LABEL: CSSProperties = {
   textTransform: 'none', letterSpacing: 0, fontSize: 11.5,
 };
 export const CELL_NUM: CSSProperties = {
-  fontFamily: MONO_FONT, fontSize: 12, color: S.onSurface,
+  ...FIGURES, fontSize: 12, color: S.onSurface,
   padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap',
   fontVariantNumeric: 'tabular-nums',
   borderTop: `1px solid ${S.cardBorder}`,
 };
 export const CELL_SUM: CSSProperties = { ...CELL_NUM, fontWeight: 700, color: S.onSurfaceVariant };
 
-/** Scrolls a wide table sideways instead of clipping it. */
-export const TableScroller: FC<{ label: string; children: ReactNode }> = ({ label, children }) => (
+/** Scrolls a wide table sideways instead of clipping it. `tableClassName`
+ *  reaches the table itself, for a table whose rows stack on a phone. */
+export const TableScroller: FC<{ label: string; tableClassName?: string; children: ReactNode }> = ({
+  label, tableClassName, children,
+}) => (
   <div
     role="region"
     aria-label={label}
@@ -153,6 +164,6 @@ export const TableScroller: FC<{ label: string; children: ReactNode }> = ({ labe
       backgroundColor: S.surface,
     }}
   >
-    <table style={{ borderCollapse: 'collapse', width: '100%' }}>{children}</table>
+    <table className={tableClassName} style={{ borderCollapse: 'collapse', width: '100%' }}>{children}</table>
   </div>
 );

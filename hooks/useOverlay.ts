@@ -117,12 +117,16 @@ export default function useOverlay(
       const first = focusables[0]!;
       const last = focusables[focusables.length - 1]!;
       const active = document.activeElement as HTMLElement | null;
+      // The container itself holds focus after a click on text inside it;
+      // from there Tab goes to the first focusable and Shift+Tab to the last,
+      // never out of the overlay.
+      const outside = !container.contains(active) || active === container;
       if (e.shiftKey) {
-        if (active === first || !container.contains(active)) {
+        if (active === first || outside) {
           e.preventDefault();
           last.focus();
         }
-      } else if (active === last || !container.contains(active)) {
+      } else if (active === last || outside) {
         e.preventDefault();
         first.focus();
       }

@@ -140,7 +140,7 @@ and the served run's cell weights:
   tailwinds counted by size, and add up to 100 percent; the readings quote
   shares of the net shift, which are larger where tailwinds offset
   headwinds. The panel's footer says both.
-- The Time Path's Expansion drivers and Contraction drivers filters show the
+- The Time path's Expansion drivers and Contraction drivers filters show the
   sums of the expanding and of the contracting drivers' contributions in each
   category and year, scaled the same way, so the two parts add up to the
   cell's median (`signParts`); they are a split of the one simulated number,

@@ -1,30 +1,36 @@
 'use client';
 
 /**
- * The dashboard: the top navigation, the panes behind it and two dialogs
- * (settings and the welcome dialog), all inside one PrismProvider, so the
- * data loads once and every pane reads the same store.
+ * The dashboard: the top navigation, the panes behind it and three dialogs
+ * (settings, help and the welcome dialog), all inside one PrismProvider, so
+ * the data loads once and every pane reads the same store.
  *
  * Only users with a role get here: proxy.ts sends everyone else away, and
  * app/dashboard/page.tsx reads the role again on the server and passes it
  * in; the dashboard hands it to every view with admin controls as
  * `isAdmin`. Clerk supplies the identity. Every tab is open to both roles.
  *
- * Users land on the entry gate, a pane outside the top nav that the PRISM
- * wordmark returns to. A pane mounts on its first visit and then stays
- * mounted, hidden while another shows, so its lens, year, filters, open
- * drill-down and scroll survive a tab switch and nothing reloads; an overlay
- * in a hidden pane lets go of the page (PaneActiveContext, hooks/useOverlay).
- * Below md the tabs sit behind a menu button.
+ * The address bar carries the active view and its parameters
+ * (lib/viewUrl.ts, hooks/useViewUrl.tsx): a view can be linked, and Back
+ * returns to the previous one. A new sign-in without an address lands on the
+ * entry gate; a returning user lands on the view they left (remembered per
+ * user in this browser), with the gate one click away on the wordmark. A
+ * pane mounts on its first visit and then stays mounted, hidden while another
+ * shows, so its lens, year, filters, open drill-down and scroll survive a tab
+ * switch and nothing reloads; an overlay in a hidden pane lets go of the page
+ * (PaneActiveContext, hooks/useOverlay). Below lg the tabs sit behind a menu
+ * button.
  */
 
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { MotionConfig } from 'framer-motion';
-import { AlertTriangle, LogOut, Settings, Menu, X } from 'lucide-react';
+import { AlertTriangle, CircleHelp, LogOut, Settings, Menu, MessageSquare, Sparkles, X } from 'lucide-react';
 import { useUser, useClerk, useSession } from '@clerk/nextjs';
 import * as api from '@/lib/apiClient';
-import { endSession } from '@/lib/session';
+import { endSession, markSessionEnded } from '@/lib/session';
+import { FEEDBACK_URL } from '@/lib/feedback';
+import { type ViewId, type ViewUrlState } from '@/lib/viewUrl';
 import ShiftAnalysis from '@/components/dashboard/ShiftAnalysis';
 import Drivers, { type DriverSearch } from '@/components/dashboard/Drivers';
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
@@ -35,7 +41,8 @@ import WelcomeModal from '@/components/dashboard/WelcomeModal';
 import { FullPageSkeleton, PaneSkeleton } from '@/components/dashboard/LoadingSkeleton';
 import { PrismProvider } from '@/hooks/usePrism';
 import { PaneActiveContext } from '@/hooks/useOverlay';
-import { S, SHADOW, HEADLINE_FONT } from '@/lib/theme';
+import useViewUrl, { ViewUrlProvider } from '@/hooks/useViewUrl';
+import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import type { Role } from '@/types';
 
 // The Consumer Journey and the Explorer load on their first visit: their
@@ -50,17 +57,12 @@ const ProfitPoolExplorer = dynamic(
   { loading: () => <PaneSkeleton />, ssr: false },
 );
 
-type DashboardTab =
-  | 'home'
-  | 'drivers'
-  | 'consumer-journey'
-  | 'shift-analysis'
-  | 'profit-pool-explorer';
+type DashboardTab = ViewId;
 
 interface TabDef {
   id: DashboardTab;
   label: string;
-  /** Beta: muted grey, pinned to the right of the nav. */
+  /** Beta: muted, pinned to the right of the nav. */
   beta?: boolean;
   /** Not in the nav: the entry gate, which the wordmark opens. */
   hidden?: boolean;
@@ -75,32 +77,60 @@ const TABS: TabDef[] = [
 ];
 const MAIN_TABS = TABS.filter((t) => !t.hidden && !t.beta);
 const BETA_TABS = TABS.filter((t) => !t.hidden && t.beta);
+const VIEW_IDS = new Set<string>(TABS.map((t) => t.id));
 
-// Beta tabs read in muted grey, a step back from the production tabs' blue.
-const BETA_INACTIVE = S.neutral;
-const BETA_ACTIVE = S.mutedText;
+// Beta tabs read in the muted scale, a step back from the production tabs'
+// blue; both shades keep 4.5:1 on the bar.
+const BETA_INACTIVE = S.mutedText;
+const BETA_ACTIVE = S.onSurfaceVariant;
 
-// The welcome dialog opens once per Clerk session: dismissing it stores the
-// session id in sessionStorage, so a refresh stays quiet and a new sign-in
-// (a new session id) shows it again.
-const welcomeSeenKey = (sessionId: string) => `prism.welcomeSeen.${sessionId}`;
+// The welcome dialog opens once per user in a browser: dismissing it stores
+// the user's id in localStorage, so a new sign-in stays quiet; Help offers it
+// again. The key carries a version, so a rewritten welcome shows once more.
+const welcomeSeenKey = (userId: string) => `prism.welcomeSeen.v2.${userId}`;
+/** The view a user left last, remembered per user in this browser. */
+const lastViewKey = (userId: string) => `prism.lastView.${userId}`;
 
-/** Whether this session has seen the dialog. Unreadable storage (private
- *  mode) reads as not seen, so the dialog still shows. */
-function welcomeSeen(sessionId: string): boolean {
-  try { return !!window.sessionStorage.getItem(welcomeSeenKey(sessionId)); } catch { return false; }
+/** Subscribers to the welcome flag: this page's own writes and other tabs' storage events. */
+const welcomeListeners = new Set<() => void>();
+const subscribeToWelcomeFlag = (listener: () => void) => {
+  welcomeListeners.add(listener);
+  window.addEventListener('storage', listener);
+  return () => { welcomeListeners.delete(listener); window.removeEventListener('storage', listener); };
+};
+
+const readStorage = (key: string): string | null => {
+  try { return window.localStorage.getItem(key); } catch { return null; }
+};
+const writeStorage = (key: string, value: string) => {
+  try { window.localStorage.setItem(key, value); } catch { /* private mode: nothing is remembered */ }
+};
+
+/** The gate, parsed from no address: what the dashboard shows without one. */
+const HOME: ViewUrlState = { view: 'home', params: {} };
+
+export default function DashboardApp({ role, initialView = HOME }: { role: Role; initialView?: ViewUrlState }) {
+  // The visited panes, kept mounted; the provider tells the shell of every
+  // change of view, including Back and Forward.
+  const [visitedTabs, setVisitedTabs] = useState<DashboardTab[]>([initialView.view]);
+  const onViewChange = useCallback((view: ViewId) => {
+    setVisitedTabs((prev) => (prev.includes(view) ? prev : [...prev, view]));
+  }, []);
+  return (
+    <ViewUrlProvider initial={initialView} onViewChange={onViewChange}>
+      <DashboardShell role={role} visitedTabs={visitedTabs} initialView={initialView} />
+    </ViewUrlProvider>
+  );
 }
 
-/** Only this page writes the flag, and dismissing re-renders anyway: nothing to subscribe to. */
-const subscribeToWelcomeFlag = () => () => {};
-
-export default function DashboardApp({ role }: { role: Role }) {
+function DashboardShell({ role, visitedTabs, initialView }: {
+  role: Role; visitedTabs: DashboardTab[]; initialView: ViewUrlState;
+}) {
   const { isLoaded, isSignedIn, user } = useUser();
   const { signOut } = useClerk();
   const { session } = useSession();
+  const { view: activeTab, openView } = useViewUrl();
 
-  const [activeTab, setActiveTab] = useState<DashboardTab>('home');
-  const [visitedTabs, setVisitedTabs] = useState<DashboardTab[]>(['home']);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -113,29 +143,36 @@ export default function DashboardApp({ role }: { role: Role }) {
 
   // Every admin write is checked on the server again, whatever this says.
   const isAdmin = role === 'admin';
+  const userId = user?.id ?? null;
 
-  // The flag lives outside React, so it is read with useSyncExternalStore; the
-  // server snapshot says "seen", so the dialog never opens while hydrating.
-  const sessionId = session?.id ?? null;
+  // The welcome flag lives in localStorage, outside React, so it is read with
+  // useSyncExternalStore; the server snapshot says "seen", so the dialog never
+  // opens while hydrating. Dismissing closes it at once (private mode cannot
+  // store the flag); Help can open it again at any time.
   const seenInStorage = useSyncExternalStore(
     subscribeToWelcomeFlag,
-    () => (sessionId ? welcomeSeen(sessionId) : true),
+    () => (userId ? !!readStorage(welcomeSeenKey(userId)) : true),
     () => true,
   );
-  // Closes the dialog at once; the stored flag keeps it closed after a refresh.
-  const [dismissedSession, setDismissedSession] = useState<string | null>(null);
-  const welcomeOpen =
-    !!isSignedIn && sessionId !== null && !seenInStorage && dismissedSession !== sessionId;
-
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
+  const [welcomeForced, setWelcomeForced] = useState(false);
+  const welcomeOpen = !!isSignedIn && userId !== null
+    && (welcomeForced || (!seenInStorage && dismissedFor !== userId));
   const closeWelcome = () => {
-    if (!sessionId) return;
-    setDismissedSession(sessionId);
-    try {
-      window.sessionStorage.setItem(welcomeSeenKey(sessionId), '1');
-    } catch {
-      // Private mode: the dialog shows again after a refresh.
-    }
+    setWelcomeForced(false);
+    setDismissedFor(userId);
+    if (userId) { writeStorage(welcomeSeenKey(userId), '1'); welcomeListeners.forEach((listener) => listener()); }
   };
+
+  // A returning user who opened the bare address lands on the view they left.
+  const landed = useRef(false);
+  useEffect(() => {
+    if (landed.current || !userId) return;
+    landed.current = true;
+    if (initialView.view !== 'home' || Object.keys(initialView.params).length) return;
+    const last = readStorage(lastViewKey(userId));
+    if (last && last !== 'home' && VIEW_IDS.has(last)) openView(last as ViewId, { push: false });
+  }, [userId, initialView, openView]);
 
   // A session that ends while the page is open: the viewer cookie is expired
   // (it is not tied to the Clerk session), then a full navigation to /sign-in
@@ -143,21 +180,25 @@ export default function DashboardApp({ role }: { role: Role }) {
   // to a dashboard that can no longer load its data.
   useEffect(() => {
     if (!isLoaded || isSignedIn) return;
+    markSessionEnded();
     void api.clearViewerCookie().then(() => { window.location.replace('/sign-in'); });
   }, [isLoaded, isSignedIn]);
 
-  // Opening a tab mounts it for good and closes the mobile menu. The panes
-  // share the window's scroll position, so every switch starts at the top.
+  // Opening a tab pushes a history entry, mounts the pane for good and closes
+  // the mobile menu. The panes share the window's scroll position, so every
+  // switch starts at the top.
   const openTab = (id: DashboardTab) => {
-    setActiveTab(id);
-    setVisitedTabs((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    openView(id, { push: true });
     setMobileNavOpen(false);
+    if (userId) writeStorage(lastViewKey(userId), id);
     window.scrollTo({ top: 0, behavior: 'auto' });
   };
 
   const openDriver = (query: string) => {
     setDriversSearch((prev) => ({ query, seq: (prev?.seq ?? 0) + 1 }));
-    openTab('drivers');
+    openView('drivers', { push: true, params: { q: query, driver: null } });
+    if (userId) writeStorage(lastViewKey(userId), 'drivers');
+    window.scrollTo({ top: 0, behavior: 'auto' });
   };
 
   const handleLogout = async () => {
@@ -185,6 +226,7 @@ export default function DashboardApp({ role }: { role: Role }) {
   if (!isSignedIn) return null;
 
   const userEmail = user.primaryEmailAddress?.emailAddress ?? 'Signed in';
+  const sessionId = session?.id ?? null;
 
   const renderTabButton = (tab: TabDef) => {
     const isActive = activeTab === tab.id;
@@ -195,7 +237,7 @@ export default function DashboardApp({ role }: { role: Role }) {
         key={tab.id}
         onClick={() => openTab(tab.id)}
         aria-current={isActive ? 'page' : undefined}
-        className="relative pb-1 text-sm font-semibold tracking-tight transition-colors"
+        className="relative pb-1 text-sm font-semibold tracking-tight transition-colors whitespace-nowrap"
         style={{
           fontFamily: HEADLINE_FONT,
           color: isActive ? activeColor : inactiveColor,
@@ -251,19 +293,20 @@ export default function DashboardApp({ role }: { role: Role }) {
     <MotionConfig reducedMotion="user">
     <div className="min-h-screen" style={{ backgroundColor: S.bg }}>
       <nav
+        data-print-hide
         className="sticky top-0 z-50 backdrop-blur-xl"
         style={{
           backgroundColor: S.glass,
           boxShadow: SHADOW.nav,
         }}
       >
-        <div className="max-w-[1440px] mx-auto px-4 md:px-8 h-16 flex items-center justify-between gap-4 md:gap-6">
-          <div className="flex items-center gap-4 md:gap-8 min-w-0">
+        <div className="max-w-[1440px] mx-auto px-4 md:px-8 h-16 flex items-center justify-between gap-3 md:gap-6">
+          <div className="flex items-center gap-3 md:gap-6 xl:gap-8 min-w-0">
             <button type="button"
               onClick={() => setMobileNavOpen((v) => !v)}
               aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
               aria-expanded={mobileNavOpen}
-              className="md:hidden p-2 -ml-1 rounded-full transition-colors hover:bg-theme-on-surface/5"
+              className="lg:hidden p-2 -ml-1 rounded-full transition-colors hover:bg-theme-on-surface/5"
               style={{ color: S.onBg }}
             >
               {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
@@ -278,18 +321,19 @@ export default function DashboardApp({ role }: { role: Role }) {
               PRISM
             </button>
 
-            <div className="hidden md:flex items-center gap-6">
+            <div className="hidden lg:flex items-center gap-5 xl:gap-6">
               {MAIN_TABS.map(renderTabButton)}
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             <div
-              className="hidden md:flex items-center gap-5 pr-3 mr-1 border-r"
+              className="hidden lg:flex items-center gap-5 pr-3 mr-1 border-r"
               style={{ borderColor: S.cardBorder }}
             >
               {BETA_TABS.map(renderTabButton)}
             </div>
+            <HelpMenu onShowWelcome={() => setWelcomeForced(true)} />
             <button type="button"
               onClick={() => setSettingsOpen(true)}
               aria-label="Settings"
@@ -300,7 +344,7 @@ export default function DashboardApp({ role }: { role: Role }) {
             </button>
 
             <div
-              className="hidden sm:flex flex-col items-end leading-tight"
+              className="hidden xl:flex flex-col items-end leading-tight"
               style={{ color: S.onBg }}
             >
               <span className="text-xs font-semibold">{userEmail}</span>
@@ -310,7 +354,7 @@ export default function DashboardApp({ role }: { role: Role }) {
               onClick={handleLogout}
               disabled={isLoggingOut}
               aria-label="Sign out"
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors disabled:opacity-50 whitespace-nowrap"
               style={{ backgroundColor: S.surfaceLow, color: S.primary }}
             >
               <LogOut size={14} />
@@ -323,7 +367,7 @@ export default function DashboardApp({ role }: { role: Role }) {
 
         {mobileNavOpen && (
           <div
-            className="md:hidden border-t"
+            className="lg:hidden border-t"
             style={{
               backgroundColor: S.surface,
               borderColor: S.cardBorder,
@@ -338,7 +382,9 @@ export default function DashboardApp({ role }: { role: Role }) {
               Beta
             </div>
             {BETA_TABS.map(renderMobileTabRow)}
-            <div className="h-2" />
+            <div className="px-6 pt-2 pb-3 text-xs" style={{ color: S.onSurfaceVariant }}>
+              {userEmail}
+            </div>
           </div>
         )}
       </nav>
@@ -366,9 +412,112 @@ export default function DashboardApp({ role }: { role: Role }) {
       </div>
 
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} isAdmin={isAdmin} />
-      <WelcomeModal open={welcomeOpen} onClose={closeWelcome} />
+      <WelcomeModal open={welcomeOpen} onClose={closeWelcome} key={sessionId ?? 'welcome'} />
     </div>
     </MotionConfig>
     </PrismProvider>
+  );
+}
+
+// ─── Help ──────────────────────────────────────────────────────────────────
+
+/** The help menu in the top bar: the welcome again, the feedback address when
+ *  one is configured, and the keyboard shortcuts. A small menu rather than a
+ *  page, because everything it holds is one line. */
+function HelpMenu({ onShowWelcome }: { onShowWelcome: () => void }) {
+  const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  // As the Export menu: Escape closes and returns focus to the button, a
+  // click outside closes, the arrows move between the items and wrap, Home
+  // and End go to the ends, Tab leaves and closes. A disabled note takes no focus.
+  useEffect(() => {
+    if (!open) return undefined;
+    const items = () => Array.from(
+      menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])') ?? []);
+    const focusItem = (index: number) => {
+      const list = items();
+      if (list.length === 0) return;
+      list[((index % list.length) + list.length) % list.length]?.focus();
+    };
+    focusItem(0);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); buttonRef.current?.focus(); return; }
+      if (!menuRef.current?.contains(e.target as Node)) return;
+      const current = items().indexOf(document.activeElement as HTMLElement);
+      if (e.key === 'ArrowDown') { e.preventDefault(); focusItem(current + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); focusItem(current - 1); }
+      else if (e.key === 'Home') { e.preventDefault(); focusItem(0); }
+      else if (e.key === 'End') { e.preventDefault(); focusItem(-1); }
+      else if (e.key === 'Tab') setOpen(false);
+    };
+    const onPointer = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (menuRef.current?.contains(target) || buttonRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onPointer);
+    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onPointer); };
+  }, [open]);
+
+  const item: CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
+    padding: '9px 12px', borderRadius: 8, border: 'none', background: 'transparent',
+    color: S.onSurface, fontFamily: BODY_FONT, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+  };
+
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setOpen(true); }
+        }}
+        aria-label="Help"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="p-2 rounded-full transition-colors hover:bg-theme-on-surface/5"
+        style={{ color: S.onSurfaceVariant }}
+      >
+        <CircleHelp size={18} />
+      </button>
+      {open && (
+        <div
+          ref={menuRef}
+          role="menu"
+          aria-label="Help"
+          className="absolute right-0 top-full mt-2 z-50 rounded-xl p-1.5"
+          style={{
+            minWidth: 260, backgroundColor: S.surface, border: `1px solid ${S.cardBorderStrong}`,
+            boxShadow: SHADOW.popover,
+          }}
+        >
+          <button type="button" role="menuitem" style={item} className="hover:bg-theme-surface-low"
+            onClick={() => { setOpen(false); onShowWelcome(); }}>
+            <Sparkles size={15} style={{ color: S.primary }} /> Show the welcome again
+          </button>
+          {FEEDBACK_URL ? (
+            <a role="menuitem" href={FEEDBACK_URL}
+              target={FEEDBACK_URL.startsWith('mailto:') ? undefined : '_blank'}
+              rel={FEEDBACK_URL.startsWith('mailto:') ? undefined : 'noopener noreferrer'}
+              style={{ ...item, textDecoration: 'none' }} className="hover:bg-theme-surface-low"
+              onClick={() => setOpen(false)}>
+              <MessageSquare size={15} style={{ color: S.primary }} /> Send feedback to the PRISM team
+            </a>
+          ) : (
+            <div role="menuitem" aria-disabled="true" style={{ ...item, color: S.onSurfaceVariant, cursor: 'default', fontWeight: 500 }}>
+              <MessageSquare size={15} /> Feedback: ask your PRISM admin for the address
+            </div>
+          )}
+          <div style={{ padding: '8px 12px 6px', fontSize: 11.5, lineHeight: 1.5, color: S.onSurfaceVariant, borderTop: `1px solid ${S.cardBorder}`, marginTop: 4 }}>
+            Keys 1 to 4 open the views from the entry gate; Escape closes any dialog; the address bar carries the view you are on, so a copied link opens the same lens, year or drill-down.
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

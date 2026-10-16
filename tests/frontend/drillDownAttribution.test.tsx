@@ -92,7 +92,7 @@ function buildStore(configLoaded: boolean, driversLoaded = true): PrismStore {
 
 function openFabricClean(container: HTMLElement): HTMLElement {
   fireEvent.click(screen.getByRole('button', { name: /Open Fabric Clean detail/ }));
-  const aside = container.querySelector('aside') as HTMLElement;
+  const aside = container.querySelector('[role="dialog"]') as HTMLElement;
   expect(aside).toBeTruthy();
   return aside;
 }
@@ -121,6 +121,10 @@ describe('category drill-down: contributing drivers at the score means', () => {
       .map((d) => d.id)
       .sort((a, b) => Math.abs(FIXTURE.expected.byDriver[b].category[FCN]['2035'])
         - Math.abs(FIXTURE.expected.byDriver[a].category[FCN]['2035']));
+    expect(expected.length).toBeGreaterThan(10);
+    // The first ten are shown; the rest behind "Show all".
+    expect(cardOrder(aside)).toEqual(expected.slice(0, 10));
+    fireEvent.click(within(aside).getByRole('button', { name: `Show all ${expected.length}` }));
     const order = cardOrder(aside);
     expect(order.slice(0, 3)).toEqual(['competitive_r15', 'consumer_r01', 'consumer_r06']);
     expect(order).toEqual(expected);
@@ -129,6 +133,34 @@ describe('category drill-down: contributing drivers at the score means', () => {
 
     fireEvent.click(within(aside).getAllByRole('button', { name: /Opens it on the Drivers page$/ })[0]);
     expect(openDriver).toHaveBeenCalledWith('competitive_r15');
+  });
+
+  it('shows ten drivers, then all of them on "Show all", and folds them again on "Show fewer"', () => {
+    STORE.store = buildStore(true);
+    const { container } = render(<ShiftAnalysis onNavigateToDriver={vi.fn()} />);
+    const aside = openFabricClean(container);
+    const exposed = FIXTURE.inputs.drivers.filter((d) => d.category_exposure[FCN] > 0).length;
+    expect(cardOrder(aside)).toHaveLength(10);
+    const toggle = within(aside).getByRole('button', { name: `Show all ${exposed}` });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(toggle);
+    expect(cardOrder(aside)).toHaveLength(exposed);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(toggle.textContent).toBe('Show fewer');
+    fireEvent.click(toggle);
+    expect(cardOrder(aside)).toHaveLength(10);
+  });
+
+  it('shows each driver\'s code as a chip and lets a long name wrap to two lines', () => {
+    STORE.store = buildStore(true);
+    const { container } = render(<ShiftAnalysis onNavigateToDriver={vi.fn()} />);
+    const aside = openFabricClean(container);
+    const first = within(aside).getAllByRole('button', { name: /Opens it on the Drivers page$/ })[0];
+    // competitive_r15 is X-15 in the generated code map.
+    expect(within(first).getByText('X-15')).toBeTruthy();
+    const name = within(first).getByTitle('competitive_r15') as HTMLElement;
+    expect(name.style.whiteSpace).not.toBe('nowrap');
+    expect(name.style.webkitLineClamp).toBe('2');
   });
 
   it('says the drivers cannot be attributed when the configuration did not load, and ranks nothing', () => {
@@ -147,6 +179,52 @@ describe('category drill-down: contributing drivers at the score means', () => {
     const aside = openFabricClean(container);
     expect(aside.textContent).toContain('attributed with the drivers, which did not load');
     expect(within(aside).queryAllByRole('button', { name: /Opens it on the Drivers page$/ })).toHaveLength(0);
+  });
+});
+
+describe('the drill-down header actions', () => {
+  it('downloads the panel as CSV: the shift path, the force attribution, then the ranked drivers with their codes', async () => {
+    STORE.store = buildStore(true);
+    const blobs: Blob[] = [];
+    const create = vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => { blobs.push(blob as Blob); return 'blob:x'; });
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const downloads: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      downloads.push(this.download);
+    });
+    try {
+      const { container } = render(<ShiftAnalysis onNavigateToDriver={vi.fn()} />);
+      const aside = openFabricClean(container);
+      fireEvent.click(within(aside).getByRole('button', { name: 'Download this drill-down as CSV' }));
+      expect(within(aside).getByRole('status').textContent).toBe('CSV downloaded');
+      expect(downloads).toEqual(['PRISM-Fabric-Clean-drill-down-2035.csv']);
+      const lines = (await blobs[0].text()).split('\r\n');
+      expect(lines[0]).toBe('PRISM Shift Analysis drill-down');
+      expect(lines[1]).toBe('Category,Fabric Clean,Laundry & Home Care');
+      expect(lines[2]).toBe('Year,2035');
+      expect(lines).toContain('Year,Median,P10,P90');
+      expect(lines.filter((l) => /^20\d\d,[+-]?\d+\.\d%,[+-]?\d+\.\d%,[+-]?\d+\.\d%$/.test(l))).toHaveLength(10);
+      expect(lines).toContain('Force,Attribution 2035');
+      const rankHeader = lines.indexOf('Rank,Driver,Code,Force,Exposure,Share of movement,Contribution 2035');
+      expect(rankHeader).toBeGreaterThan(0);
+      expect(lines[rankHeader + 1]).toMatch(/^1,competitive_r15,X-15,Competitive,\d\/5,\d+%,-\d+\.\d%$/);
+      // Every exposed driver is in the file, not only the ten on screen.
+      const exposed = FIXTURE.inputs.drivers.filter((d) => d.category_exposure[FCN] > 0).length;
+      expect(lines.slice(rankHeader + 1).filter(Boolean)).toHaveLength(exposed);
+    } finally {
+      click.mockRestore();
+      create.mockRestore();
+      revoke.mockRestore();
+    }
+  });
+
+  it('shows "Esc to close" only once a key has been pressed in the session', () => {
+    STORE.store = buildStore(true);
+    const { container } = render(<ShiftAnalysis onNavigateToDriver={vi.fn()} />);
+    const aside = openFabricClean(container);
+    expect(within(aside).queryByText('Esc to close')).toBeNull();
+    fireEvent.keyDown(document.body, { key: 'Shift' });
+    expect(within(aside).getByText('Esc to close')).toBeTruthy();
   });
 });
 

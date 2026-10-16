@@ -40,33 +40,52 @@ const Chip: React.FC<{
   /** Tighter padding for dense rows. */
   compact?: boolean;
   style?: React.CSSProperties;
-}> = ({ kind, label, title, compact, style }) => {
+  /** Makes the chip a button that opens something, such as a popover with
+   *  the detail behind it; `expanded` says whether that is open. */
+  onClick?: () => void;
+  expanded?: boolean;
+  buttonRef?: React.Ref<HTMLButtonElement>;
+}> = ({ kind, label, title, compact, style, onClick, expanded, buttonRef }) => {
   const spec = SPECS[kind];
-  return (
-    <span
-      title={title}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        padding: compact ? '1px 7px' : '2px 8px',
-        borderRadius: 999,
-        backgroundColor: spec.bg,
-        color: spec.ink,
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: '0.04em',
-        textTransform: 'uppercase',
-        fontFamily: BODY_FONT,
-        whiteSpace: 'nowrap',
-        lineHeight: 1.4,
-        ...style,
-      }}
-    >
+  const look: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: compact ? '1px 7px' : '2px 8px',
+    borderRadius: 999,
+    backgroundColor: spec.bg,
+    color: spec.ink,
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+    fontFamily: BODY_FONT,
+    whiteSpace: 'nowrap',
+    lineHeight: 1.4,
+    ...style,
+  };
+  const body = (
+    <>
       {spec.glyph && <span aria-hidden>{spec.glyph}</span>}
       {label ?? spec.label}
-    </span>
+    </>
   );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        ref={buttonRef}
+        title={title}
+        onClick={onClick}
+        aria-expanded={expanded}
+        aria-haspopup="dialog"
+        style={{ ...look, border: 'none', cursor: 'pointer' }}
+      >
+        {body}
+      </button>
+    );
+  }
+  return <span title={title} style={look}>{body}</span>;
 };
 
 export default Chip;

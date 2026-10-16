@@ -28,7 +28,7 @@ or a weight changes.
   all it takes to bring new readings everywhere.
 - The Shift Analysis uses a TypeScript port of the same decomposition, held
   to the Python one by a parity fixture: the category drill-down ranks its
-  drivers with it and the Time Path's impact filter splits the median with
+  drivers with it and the Time path's impact filter splits the median with
   it.
 
 ## Consequences

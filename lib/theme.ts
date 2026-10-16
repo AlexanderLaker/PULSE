@@ -6,17 +6,19 @@
  * (shiftColor, the heat ramp) on the shift pair defined here, and holds the
  * force and category palettes.
  *
- * Manrope, Inter and JetBrains Mono are self-hosted with next/font
- * (app/layout.tsx) and exposed as CSS variables; the stacks fall back to
- * installed copies, then to system fonts.
+ * Manrope and Inter are self-hosted with next/font (app/layout.tsx) and
+ * exposed as CSS variables; the stacks fall back to installed copies, then
+ * to system fonts.
  */
 
 export const HEADLINE_FONT =
   "var(--font-manrope), 'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
 export const BODY_FONT =
   "var(--font-inter), 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
-export const MONO_FONT =
-  "var(--font-jetbrains-mono), 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace";
+/** Figures (matrix cells, bands, shares, codes, parameters): the body face
+ *  with tabular numerals, so columns of numbers line up. Spread into a
+ *  style object: `style={{ ...FIGURES, fontSize: 12 }}`. */
+export const FIGURES = { fontFamily: BODY_FONT, fontVariantNumeric: 'tabular-nums' } as const;
 
 /** RGB channels of the text navy, the primary blue and the shift pair, for
  *  tints with their own alpha: `rgba(${INK_RGB}, 0.12)`. */
@@ -62,7 +64,7 @@ export const S = {
   outlineVariant:   '#81b5f6',
   cardBorder:       `rgba(${INK_RGB}, 0.10)`,
   cardBorderStrong: `rgba(${INK_RGB}, 0.16)`,
-  mutedText:        '#64748b',
+  mutedText:        '#56657a',
   /** The backdrop behind a dialog or drawer. */
   scrim:            `rgba(${INK_RGB}, 0.35)`,
   /** The translucent top bar. */
@@ -94,7 +96,7 @@ export const S = {
   /* ─── Drivers page: the expert aggregate and the delta chip ─── */
   expert:     '#6b4fc4',
   expertSoft: 'rgba(107, 79, 196, 0.10)',
-  delta:      '#b07d2b',
+  delta:      '#7a5200',
   deltaSoft:  'rgba(176, 125, 43, 0.15)',
 } as const;
 

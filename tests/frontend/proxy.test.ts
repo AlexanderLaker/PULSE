@@ -30,7 +30,7 @@ vi.mock('@clerk/nextjs/server', () => ({
 vi.mock('@clerk/nextjs', () => ({ ClerkProvider: () => null }));
 vi.mock('next/font/google', () => {
   const font = () => ({ variable: 'font' });
-  return { Inter: font, Manrope: font, JetBrains_Mono: font };
+  return { Inter: font, Manrope: font };
 });
 
 const roles = vi.hoisted(() => ({ getRole: vi.fn() }));

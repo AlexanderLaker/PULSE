@@ -7,7 +7,7 @@ import type { CSSProperties, FC } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import SectionCard from '@/components/dashboard/SectionCard';
-import { S, MONO_FONT } from '@/lib/theme';
+import { S, BODY_FONT, FIGURES } from '@/lib/theme';
 import { BASE_YEAR, CATEGORY_NAMES, FORCES, NO_VALUE, REGIONS, categoryFullName } from '@/lib/format';
 import { cellWeightsBasis, matchesEstimate } from '@/lib/cellWeights';
 import { categoryShares } from '@/lib/shiftMatrix';
@@ -15,14 +15,12 @@ import { UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import type { ForceName, ModelConfig, SimulationResult } from '@/types';
 import {
   CELL_LABEL, CELL_NUM, CELL_SUM, CELL_TH, LABEL_STYLE, Muted, ROW_LABEL, StatusBanner, SubBlock,
-  TableScroller, VALUE_STYLE,
+  TableScroller,
 } from './parts';
 import { CellWeightProvenance } from './CellWeightProvenance';
 
-const FORCE_ABBR: Record<ForceName, string> = {
-  Consumer: 'Cons.', Customer: 'Cust.', Technology: 'Tech.',
-  Government: 'Gov.', Environmental: 'Env.', Competitive: 'Comp.',
-};
+/** A column headed by a force, in full; a long name wraps rather than widening the table. */
+const FORCE_TH: CSSProperties = { ...CELL_TH, whiteSpace: 'normal', minWidth: 72, verticalAlign: 'bottom' };
 
 /** A number to fixed digits; the missing-value mark when there is none. */
 const fixed = (v: number | undefined, digits: number): string =>
@@ -44,8 +42,10 @@ const ForceRowsTable: FC<{
   <TableScroller label={label}>
     <thead>
       <tr>
-        <th style={{ ...CELL_LABEL, backgroundColor: S.surfaceContainer }} aria-label="Parameter" />
-        {FORCES.map((f) => <th key={f} style={CELL_TH} title={f}>{FORCE_ABBR[f]}</th>)}
+        <th scope="col" style={{ ...CELL_LABEL, backgroundColor: S.surfaceContainer }}>
+          <span className="sr-only">Parameter</span>
+        </th>
+        {FORCES.map((f) => <th key={f} scope="col" style={FORCE_TH}>{f}</th>)}
       </tr>
     </thead>
     <tbody>
@@ -70,10 +70,10 @@ const ForceMatrixTable: FC<{
   <TableScroller label={label}>
     <thead>
       <tr>
-        <th style={{ ...CELL_LABEL, backgroundColor: S.surfaceContainer, textTransform: 'none', letterSpacing: 0 }}>
+        <th scope="col" style={{ ...CELL_LABEL, backgroundColor: S.surfaceContainer, textTransform: 'none', letterSpacing: 0 }}>
           row \ col
         </th>
-        {FORCES.map((f) => <th key={f} style={CELL_TH} title={f}>{FORCE_ABBR[f]}</th>)}
+        {FORCES.map((f) => <th key={f} scope="col" style={FORCE_TH}>{f}</th>)}
       </tr>
     </thead>
     <tbody>
@@ -92,8 +92,21 @@ const ForceMatrixTable: FC<{
 );
 
 const PARAM_GRID: CSSProperties = {
-  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12,
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, margin: 0,
 };
+
+/** One read-only parameter of the definition list: its name, its value and what it means. */
+const Parameter: FC<{ label: string; value: string; hint?: string }> = ({ label, value, hint }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <dt style={LABEL_STYLE}>{label}</dt>
+    <dd style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span style={{ fontFamily: BODY_FONT, fontSize: 14, fontWeight: 600, color: S.onSurface, fontVariantNumeric: 'tabular-nums' }}>
+        {value}
+      </span>
+      {hint && <span style={{ fontSize: 11, lineHeight: 1.55, color: S.mutedText }}>{hint}</span>}
+    </dd>
+  </div>
+);
 
 /** The code's parameters, from GET /api/v1/config. */
 const ParameterCards: FC<{ config: ModelConfig }> = ({ config }) => {
@@ -109,38 +122,35 @@ const ParameterCards: FC<{ config: ModelConfig }> = ({ config }) => {
         icon={SlidersHorizontal}
         description="The engine's defaults, as the code sets them."
       >
-        <div style={PARAM_GRID}>
-          <SubBlock label="Path horizon" hint="Relative-shift paths over these years.">
-            <div style={VALUE_STYLE}>{horizon}</div>
-          </SubBlock>
-          <SubBlock label="Base year" hint="Materialisation anchor.">
-            <div style={VALUE_STYLE}>{BASE_YEAR}</div>
-          </SubBlock>
-          <SubBlock
+        <dl style={PARAM_GRID}>
+          <Parameter label="Path horizon" value={horizon} hint="Relative-shift paths over these years." />
+          <Parameter label="Base year" value={String(BASE_YEAR)} hint="Materialisation anchor." />
+          <Parameter
             label="Peak-year jitter"
+            value={jitter ? 'On' : 'Off'}
             hint={jitter
               ? `Each iteration moves every driver's peak year by up to the width its uncertainty score sets, ${Math.min(...UNCERTAINTY_PEAK_JITTER)} to ${Math.max(...UNCERTAINTY_PEAK_JITTER)} years.`
               : 'Every driver peaks in its scored year in every iteration.'}
-          >
-            <div style={VALUE_STYLE}>{jitter ? 'On' : 'Off'}</div>
-          </SubBlock>
-        </div>
+          />
+        </dl>
       </SectionCard>
 
       <SectionCard size="regular"
         title="Copula dependence (Gaussian)"
         icon={SlidersHorizontal}
-        description={`How driver correlations flow through the Monte Carlo. The correlations are latent-scale: they set the co-movement of the underlying Gaussian variables, not of the Beta-distributed probability draws, whose rank correlation is a little lower (${fixed(rankCorrelation(config.within_force_rho), 2)} for a latent ${fixed(config.within_force_rho, 2)} within a force). They lie between 0 and 1, so negative dependence cannot be expressed. The production run refuses a setting that is not positive definite on the loaded drivers rather than repairing it silently.`}
+        description={`Drivers do not land independently: when one happens, related ones are more likely to happen too, and these settings say how strongly. How driver correlations flow through the Monte Carlo. The correlations are latent-scale: they set the co-movement of the underlying Gaussian variables, not of the Beta-distributed probability draws, whose rank correlation is a little lower (${fixed(rankCorrelation(config.within_force_rho), 2)} for a latent ${fixed(config.within_force_rho, 2)} within a force). They lie between 0 and 1, so negative dependence cannot be expressed. The production run refuses a setting that is not positive definite on the loaded drivers rather than repairing it silently.`}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={PARAM_GRID}>
-            <SubBlock label="Within-force ρ" hint="Correlation between two drivers of the same force.">
-              <div style={VALUE_STYLE}>{fixed(config.within_force_rho, 2)}</div>
-            </SubBlock>
-          </div>
+          <dl style={PARAM_GRID}>
+            <Parameter
+              label="Within-force correlation (rho)"
+              value={fixed(config.within_force_rho, 2)}
+              hint="Drivers of the same force tend to happen together; this number says how strongly. Correlation between two drivers of the same force."
+            />
+          </dl>
           <SubBlock
             label="Force correlation matrix"
-            hint="Correlation between drivers of two forces; positive definite as entered on the current drivers."
+            hint="How strongly drivers of two different forces happen together. Correlation between drivers of two forces; positive definite as entered on the current drivers."
           >
             <ForceMatrixTable matrix={config.force_correlation_matrix} digits={2} label="Force correlation matrix" />
           </SubBlock>
@@ -150,7 +160,7 @@ const ParameterCards: FC<{ config: ModelConfig }> = ({ config }) => {
       <SectionCard size="regular"
         title="Attenuation & overlap"
         icon={SlidersHorizontal}
-        description={`The engine dampens each force's combined driver effect with a per-force attenuation, 0.5 × (1 − mean between-force overlap of that force's row), and dampens the drivers within a force by their within-force overlap, for the mechanisms they share. Source: ${config.overlap_correction_source}, a structured-judgment overlap correction built on the drivers' category exposures.`}
+        description={`Two drivers can describe the same mechanism, so adding their effects would count it twice; the engine trims that double counting. It dampens each force's combined driver effect with a per-force attenuation, 0.5 × (1 − mean between-force overlap of that force's row), and dampens the drivers within a force by their within-force overlap, for the mechanisms they share. Source: ${config.overlap_correction_source}, a structured-judgment overlap correction built on the drivers' category exposures.`}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <ForceRowsTable
@@ -162,7 +172,7 @@ const ParameterCards: FC<{ config: ModelConfig }> = ({ config }) => {
           />
           <SubBlock
             label="Between-force overlap matrix"
-            hint="The input the attenuation is derived from; the engine reads the attenuation. Read row → column: the share of the row force's signal already captured by the column force. Asymmetric by design (a narrow force is covered by a broad one more than the other way round), bounded 0–0.45. The within-force overlap above covers the diagonal."
+            hint="How much of one force's story another force already tells. The input the attenuation is derived from; the engine reads the attenuation. Read row → column: the share of the row force's signal already captured by the column force. Asymmetric by design (a narrow force is covered by a broad one more than the other way round), bounded 0–0.45. The within-force overlap above covers the diagonal."
           >
             <ForceMatrixTable matrix={config.force_overlap_matrix} digits={3} hideDiagonal label="Between-force overlap matrix" />
           </SubBlock>
@@ -178,7 +188,7 @@ const BasisBadge: FC<{ estimate: boolean }> = ({ estimate }) => (
       ? 'An estimate of the HCB gross-profit mix from public reporting, not Henkel P&L'
       : 'The shares of the file the production run was given; its label says where they come from'}
     style={{
-      fontFamily: MONO_FONT, fontSize: 10.5, fontWeight: 700,
+      ...FIGURES, fontSize: 10.5, fontWeight: 700,
       padding: '2px 8px', borderRadius: 999,
       backgroundColor: estimate ? S.amberContainer : S.surfaceLow,
       color: estimate ? S.onAmberContainer : S.onSurfaceVariant,
@@ -214,9 +224,9 @@ const RunCellWeights: FC<{ run: SimulationResult }> = ({ run }) => {
       <TableScroller label="Cell weights: share of HCB gross profit per category and region">
         <thead>
           <tr>
-            <th style={CELL_LABEL}>Category</th>
-            {REGIONS.map((r) => <th key={r} style={CELL_TH}>{r}</th>)}
-            <th style={CELL_TH} title="Row sum: the category's share of the pool">Σ category</th>
+            <th scope="col" style={CELL_LABEL}>Category</th>
+            {REGIONS.map((r) => <th key={r} scope="col" style={CELL_TH}>{r}</th>)}
+            <th scope="col" style={CELL_TH} title="Row sum: the category's share of the pool">Σ category</th>
           </tr>
         </thead>
         <tbody>
@@ -238,6 +248,10 @@ const RunCellWeights: FC<{ run: SimulationResult }> = ({ run }) => {
           </tr>
         </tfoot>
       </TableScroller>
+      <div style={{ fontSize: 11, lineHeight: 1.55, color: S.mutedText }}>
+        Σ category is the row sum: the category's share of the pool. Σ region is the column sum: the region's share
+        of the pool.
+      </div>
       <div style={{ fontSize: 11.5, color: S.mutedText, lineHeight: 1.55 }}>
         {estimate ? (
           <>
@@ -277,7 +291,7 @@ export const ModelSection: FC = () => {
       <SectionCard size="regular"
         title="Aggregation weights"
         icon={SlidersHorizontal}
-        description="Force weights scale each force's contribution before the forces compound. A run rolls its category × region cells up with one matrix of gross-profit shares: a category's shift is the share-weighted mean of its row, the portfolio's the share-weighted sum of all cells. Row sums are the category shares, column sums the region shares. The value-chain lens carries no weights: it assigns each driver wholly to its epicentre stage."
+        description="A bigger share of gross profit counts for more: these weights say how much each force, and each category and region, counts in the result. Force weights scale each force's contribution before the forces compound. A run rolls its category × region cells up with one matrix of gross-profit shares: a category's shift is the share-weighted mean of its row, the portfolio's the share-weighted sum of all cells. Row sums are the category shares, column sums the region shares. The value-chain lens carries no weights: it assigns each driver wholly to its epicentre stage."
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {config && (

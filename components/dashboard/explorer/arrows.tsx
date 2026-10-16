@@ -6,8 +6,9 @@ import type { FC } from 'react';
 import type { CagrRating } from '@/lib/profitPoolData';
 import { S, HEADLINE_FONT } from '@/lib/theme';
 
+/** The colour of a rating's arrows and label; a flat rating reads in the muted text colour, which keeps its contrast. */
 export const arrowColorFor = (tone: CagrRating['tone']): string =>
-  tone === 'green' ? S.expansion : tone === 'red' ? S.contraction : S.neutral;
+  tone === 'green' ? S.expansion : tone === 'red' ? S.contraction : S.mutedText;
 
 const arrowGlyphs = (rating: CagrRating): string =>
   rating.direction === 'flat' ? '↔' :

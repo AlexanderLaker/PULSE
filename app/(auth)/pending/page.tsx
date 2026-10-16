@@ -2,8 +2,9 @@
  * /pending: the waiting page. A signed-in user without a role sees it instead
  * of the dashboard: proxy.ts sends them here before the dashboard renders, so
  * nothing of the dashboard reaches their browser. It says that an admin has
- * to approve the account (Settings, User management) and offers to check
- * again or sign out (PendingActions.tsx).
+ * to approve the account (Settings, User management), names the PRISM team
+ * for a user who does not know their admin, and offers to check again or sign
+ * out (PendingActions.tsx).
  *
  * The page checks again on the server for every request: a user who has a
  * role by now goes on to the dashboard, and a check that failed (the
@@ -14,6 +15,7 @@
 import { redirect } from 'next/navigation';
 import { requireAuth, UnauthorizedError } from '@/lib/roles';
 import { CardHeading } from '@/app/(auth)/shared';
+import FeedbackLink from '@/components/dashboard/FeedbackLink';
 import PendingActions from './PendingActions';
 
 export const dynamic = 'force-dynamic';
@@ -33,8 +35,8 @@ export default async function PendingPage() {
     <>
       {checked ? (
         <CardHeading label="Access pending" title="Waiting for approval">
-          You are signed in{checked.email ? ` as ${checked.email}` : ''}. This account has no access to PRISM
-          until an admin approves it in PRISM&rsquo;s settings. Once they have, choose Check again.
+          Your account is signed in{checked.email ? ` as ${checked.email}` : ''} but not yet approved. An admin
+          has to approve it; once they tell you, press Check again. Not sure who your admin is? Ask <FeedbackLink />.
         </CardHeading>
       ) : (
         <CardHeading label="Access" title="Access could not be checked">

@@ -10,7 +10,7 @@
 
 'use client';
 
-import { useRef, useState, type CSSProperties, type FC, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type FC, type ReactNode, type RefObject } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import useOverlay from '@/hooks/useOverlay';
+import FeedbackLink from '@/components/dashboard/FeedbackLink';
 import { HORIZON } from '@/lib/format';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 
@@ -44,6 +45,17 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
 
   const modalRef = useRef<HTMLDivElement | null>(null);
   useOverlay(open, onClose, modalRef);
+
+  // Focus starts on the step's heading, and moves to the new heading on Next
+  // and Back, so a screen reader hears the step from its title. The frame's
+  // delay lets useOverlay's own move to the first control run first (its
+  // effect is declared above, so its frame comes first).
+  const headingRef = useRef<HTMLHeadingElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const raf = requestAnimationFrame(() => headingRef.current?.focus({ preventScroll: true }));
+    return () => cancelAnimationFrame(raf);
+  }, [open, step]);
 
   return (
     <AnimatePresence>
@@ -103,26 +115,10 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
                 pointerEvents: 'auto',
               }}
             >
-            <button type="button"
-              onClick={onClose}
-              aria-label="Close"
-              style={{
-                position: 'absolute',
-                top: 16,
-                right: 16,
-                background: 'transparent',
-                border: 'none',
-                padding: 6,
-                borderRadius: 999,
-                cursor: 'pointer',
-                color: S.onSurfaceVariant,
-                zIndex: 2,
-              }}
-            >
-              <X size={18} />
-            </button>
-
+            {/* The step dots; their hidden text says the step, and the
+                change is announced when Next or Back is pressed. */}
             <div
+              role="status"
               style={{
                 position: 'absolute',
                 top: 22,
@@ -135,6 +131,7 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
               }}
             >
               <span
+                aria-hidden
                 style={{
                   width: step === 1 ? 22 : 6,
                   height: 6,
@@ -144,6 +141,7 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
                 }}
               />
               <span
+                aria-hidden
                 style={{
                   width: step === 2 ? 22 : 6,
                   height: 6,
@@ -152,21 +150,22 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
                   transition: 'all 0.2s ease',
                 }}
               />
+              <span className="sr-only">Step {step} of 2</span>
             </div>
 
             <div
+              className="px-5 pt-14 pb-6 md:px-10 md:pb-7"
               style={{
-                padding: '56px 40px 28px',
                 overflowY: 'auto',
                 flex: 1,
               }}
             >
-              {step === 1 ? <Step1Welcome /> : <Step2Views />}
+              {step === 1 ? <Step1Welcome headingRef={headingRef} /> : <Step2Views headingRef={headingRef} />}
             </div>
 
             <div
+              className="px-5 pt-4 pb-5 md:px-10 md:pt-5 md:pb-7"
               style={{
-                padding: '20px 40px 28px',
                 borderTop: `1px solid ${S.cardBorder}`,
                 backgroundColor: S.surface,
                 display: 'flex',
@@ -232,6 +231,31 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
                 )}
               </button>
             </div>
+
+            {/* Last in the dialog, so the step's own controls come first in
+                the tab order; its place is the top right corner. */}
+            <button type="button"
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                background: 'transparent',
+                border: 'none',
+                width: 34,
+                height: 34,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 999,
+                cursor: 'pointer',
+                color: S.onSurfaceVariant,
+                zIndex: 2,
+              }}
+            >
+              <X size={18} aria-hidden />
+            </button>
             </motion.div>
           </div>
         </>
@@ -240,8 +264,10 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
   );
 };
 
+type StepProps = { headingRef: RefObject<HTMLHeadingElement | null> };
+
 // ─── Step 1: early access ───────────────────────────────────────────
-const Step1Welcome: FC = () => (
+const Step1Welcome: FC<StepProps> = ({ headingRef }) => (
   <div>
     <div
       style={{
@@ -265,6 +291,8 @@ const Step1Welcome: FC = () => (
     </div>
 
     <h2
+      ref={headingRef}
+      tabIndex={-1}
       style={{
         fontFamily: HEADLINE_FONT,
         fontSize: 28,
@@ -286,7 +314,8 @@ const Step1Welcome: FC = () => (
         color: S.onSurface,
       }}
     >
-      You&rsquo;re one of our early access users. Thanks for being here.
+      You are an early-access user. We are testing whether PRISM&rsquo;s logic and workflow hold up; the
+      numbers may still change as sources are checked.
     </p>
 
     <p
@@ -297,33 +326,17 @@ const Step1Welcome: FC = () => (
         color: S.onSurface,
       }}
     >
-      The focus right now is on validating the{' '}
-      <strong style={{ color: S.onBg }}>logic and functionality</strong> of the
-      tool, not on the specific insights or details you&rsquo;ll see in the views.
-      Note that the{' '}
-      <strong style={{ color: S.onBg }}>underlying data may still change</strong>{' '}
-      as sources are checked.
-    </p>
-
-    <p
-      style={{
-        marginTop: 14,
-        fontSize: 15,
-        lineHeight: 1.6,
-        color: S.onSurface,
-      }}
-    >
-      Your feedback matters: please share what works, what&rsquo;s confusing, and
-      what&rsquo;s missing with the{' '}
-      <strong style={{ color: S.primary }}>PRISM team</strong>.
+      Tell us what works, what confuses and what is missing: <FeedbackLink />.
     </p>
   </div>
 );
 
 // ─── Step 2: the three views ────────────────────────────────────────
-const Step2Views: FC = () => (
+const Step2Views: FC<StepProps> = ({ headingRef }) => (
   <div>
     <h2
+      ref={headingRef}
+      tabIndex={-1}
       style={{
         fontFamily: HEADLINE_FONT,
         fontSize: 26,
@@ -345,11 +358,9 @@ const Step2Views: FC = () => (
         color: S.onSurfaceVariant,
       }}
     >
-      Three views, in the order shown in the header.{' '}
+      Three views, left to right in the header.{' '}
       <strong style={{ color: S.onBg }}>Start with Drivers:</strong>{' '}
-      the model computes from their scores and its own configuration, which
-      includes an estimated gross-profit mix (from public reporting, not Henkel
-      P&amp;L). The Profit Pool Explorer, a beta, sits apart from the model.
+      everything the model computes comes from their scores.
     </p>
 
     <SectionLabel>Input</SectionLabel>

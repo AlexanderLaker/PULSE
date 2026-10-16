@@ -6,14 +6,21 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowUpRight } from 'lucide-react';
 import { FORCE_COLORS, HORIZON, NO_VALUE, fmtShift, fmtPct } from '@/lib/format';
-import { S, SHADOW, BODY_FONT, MONO_FONT } from '@/lib/theme';
+import { S, SHADOW, BODY_FONT, FIGURES } from '@/lib/theme';
 import { reconciliationFactor, type AttributionResult } from '@/lib/driverAttribution';
+import { codeForDriverId } from '@/data/driverCodeMap';
 import type { Driver } from '@/types';
 
 // ─── Contributing drivers ──────────────────────────────────────────────────
 
+/** A driver's display code (C-01, X-15), from the generated code map; a
+ *  driver added since the map was generated has none yet. */
+export function driverCode(driver: Pick<Driver, 'id'>): string | undefined {
+  return codeForDriverId(driver.id);
+}
+
 /** One driver's part in the category's terminal-year shift. */
-interface Contributor {
+export interface Contributor {
   driver: Driver;
   /** The driver's exposure score for the category: 0 to 5, and above 0 for every contributor. */
   exposure: number;
@@ -85,6 +92,7 @@ export const DriverCard: React.FC<DriverCardProps> = ({ contributor, index, onOp
   const barWidth = share > 0 ? Math.max(2, Math.min(100, share * 100)) : 0;
   const shareLabel = share > 0 ? fmtPct(share, share >= 0.1 ? 0 : 1) : NO_VALUE;
   const contribLabel = contribution !== 0 ? fmtShift(contribution, 1) : NO_VALUE;
+  const code = driverCode(driver);
 
   const interactive = !!onOpen;
 
@@ -129,7 +137,7 @@ export const DriverCard: React.FC<DriverCardProps> = ({ contributor, index, onOp
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontFamily: MONO_FONT,
+          ...FIGURES,
           fontSize: 11.5,
           fontWeight: 700,
         }}
@@ -138,6 +146,7 @@ export const DriverCard: React.FC<DriverCardProps> = ({ contributor, index, onOp
       </div>
 
       <div style={{ minWidth: 0 }}>
+        {/* The name wraps to two lines and is cut after them; the title holds the whole. */}
         <div
           style={{
             fontSize: 12.5,
@@ -145,16 +154,18 @@ export const DriverCard: React.FC<DriverCardProps> = ({ contributor, index, onOp
             color: S.onSurface,
             fontFamily: BODY_FONT,
             lineHeight: 1.3,
-            whiteSpace: 'nowrap',
-            textOverflow: 'ellipsis',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
+            overflowWrap: 'anywhere',
           }}
           title={driver.name}
         >
           {driver.name}
         </div>
 
-        {/* Force, exposure and direction */}
+        {/* Code, force, exposure and direction */}
         <div
           style={{
             marginTop: 4,
@@ -167,7 +178,19 @@ export const DriverCard: React.FC<DriverCardProps> = ({ contributor, index, onOp
             fontFamily: BODY_FONT,
           }}
         >
-          <span style={{ color: forceColor, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          {code && (
+            <span
+              style={{
+                ...FIGURES,
+                fontSize: 11, fontWeight: 600, letterSpacing: '0.02em',
+                color: S.mutedText, backgroundColor: S.surfaceLow,
+                padding: '1px 6px', borderRadius: 5, whiteSpace: 'nowrap',
+              }}
+            >
+              {code}
+            </span>
+          )}
+          <span style={{ color: S.onSurfaceVariant, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <span aria-hidden style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: forceColor, display: 'inline-block', flexShrink: 0 }} />
             {driver.force}
           </span>
@@ -244,7 +267,7 @@ export const DriverCard: React.FC<DriverCardProps> = ({ contributor, index, onOp
           style={{
             fontSize: 15,
             fontWeight: 800,
-            fontFamily: MONO_FONT,
+            ...FIGURES,
             color: dirColor,
             lineHeight: 1,
             letterSpacing: '-0.01em',
@@ -256,7 +279,7 @@ export const DriverCard: React.FC<DriverCardProps> = ({ contributor, index, onOp
           style={{
             fontSize: 11,
             color: S.mutedText,
-            fontFamily: MONO_FONT,
+            ...FIGURES,
             letterSpacing: '0.04em',
             textTransform: 'uppercase',
             fontWeight: 600,
@@ -269,7 +292,7 @@ export const DriverCard: React.FC<DriverCardProps> = ({ contributor, index, onOp
             marginTop: 2,
             fontSize: 11,
             color: S.onSurfaceVariant,
-            fontFamily: MONO_FONT,
+            ...FIGURES,
             fontWeight: 600,
           }}
         >
@@ -291,5 +314,67 @@ export const DriverCard: React.FC<DriverCardProps> = ({ contributor, index, onOp
         />
       )}
     </motion.div>
+  );
+};
+
+// ─── ContributorList ──────────────────────────────────────────────────────
+
+/** How many drivers the list shows before "Show all". */
+export const CONTRIBUTORS_SHOWN = 10;
+
+/** The ranked cards: the first ten, then a button for the rest. A print
+ *  shows the whole list whatever the button says. */
+export const ContributorList: React.FC<{
+  contributors: Contributor[];
+  onOpenDriver?: (name: string) => void;
+}> = ({ contributors, onOpenDriver }) => {
+  const [expanded, setExpanded] = useState(false);
+  const hidden = contributors.length - CONTRIBUTORS_SHOWN;
+  const folded = !expanded && hidden > 0;
+  const card = (contributor: Contributor, idx: number) => (
+    <DriverCard
+      key={contributor.driver.id}
+      contributor={contributor}
+      index={idx}
+      onOpen={onOpenDriver ? () => onOpenDriver(contributor.driver.name) : undefined}
+    />
+  );
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {contributors.slice(0, CONTRIBUTORS_SHOWN).map(card)}
+      {hidden > 0 && (
+        // The rest are rendered once: off the screen while folded (and off
+        // the accessibility tree), on paper always.
+        <div
+          className={folded ? 'hidden print:flex flex-col gap-2' : 'contents'}
+          aria-hidden={folded || undefined}
+        >
+          {contributors.slice(CONTRIBUTORS_SHOWN).map((c, i) => card(c, CONTRIBUTORS_SHOWN + i))}
+        </div>
+      )}
+      {hidden > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          data-print-hide
+          className="self-start rounded-full transition-colors hover:bg-theme-surface-container"
+          style={{
+            marginTop: 2,
+            padding: '6px 14px',
+            minHeight: 28,
+            border: `1px solid ${S.cardBorder}`,
+            backgroundColor: S.surfaceLow,
+            color: S.primary,
+            fontFamily: BODY_FONT,
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          {expanded ? 'Show fewer' : `Show all ${contributors.length}`}
+        </button>
+      )}
+    </div>
   );
 };

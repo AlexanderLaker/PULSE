@@ -3,10 +3,26 @@
  * and value-chain labels, the uncertainty label and the colours of the
  * scoring modes.
  */
+import { DRIVER_CODE_MAP, codeForDriverId } from '@/data/driverCodeMap';
 import { EXPANSION } from '@/lib/format';
 import { S } from '@/lib/theme';
 import { UNCERTAINTY_LABELS } from '@/lib/uncertainty';
 import { VC_STAGES, stageIndex } from '@/lib/valueChain';
+import type { DriverProposal } from '@/types';
+
+// ─── Display codes ─────────────────────────────────────────────────
+/** A driver's display code ("C-01") from the generated code map: by its id,
+ *  else by its name (a database seeded from an older base may carry an id the
+ *  map does not know); undefined when neither matches. */
+export const driverCode = (d: { id: string; name: string }): string | undefined =>
+  codeForDriverId(d.id) ?? Object.entries(DRIVER_CODE_MAP).find(([, v]) => v.name === d.name)?.[0];
+
+// ─── A proposal counts as a rating ─────────────────────────────────
+/** The rule behind the Rated pill and the rating progress: a proposal with a
+ *  probability, a GP1 share and at least one category exposure. */
+export const isRated = (my: DriverProposal | null | undefined): boolean =>
+  my?.probability != null && my.gp1_pct_affected != null
+  && !!my.category_exposure && Object.keys(my.category_exposure).length > 0;
 
 // ─── Diffusion curves ─────────────────────────────────────────────
 // The shapes of prism/config.py compute_materialization_schedule.
@@ -49,3 +65,16 @@ export const DELTA_COLOR    = S.delta;     // the delta chip: gold
 // A proposal may leave the score empty ("unscored").
 export const uncLabel = (v: number | null | undefined): string =>
   v == null ? 'unscored' : `${v} · ${UNCERTAINTY_LABELS[Math.round(v)]}`;
+
+/** The plain reading of each score (docs/DRIVERS.md, the uncertainty table). */
+const UNCERTAINTY_READINGS: readonly string[] = [
+  'fixed by law or contract, no material dispersion',
+  'size within about 25 percent either way, timing dated or within a year',
+  'well-evidenced mechanism, size within about 50 percent, timing within one to two years',
+  'size could be half or double, or the onset depends on an undated trigger',
+  'size could be near zero or more than double',
+  'the sign could differ across scenarios, or the effect may not materialise at all',
+];
+/** "Uncertainty 3: size could be half or double, or the onset depends on an undated trigger". */
+export const uncReading = (v: number | null | undefined): string =>
+  v == null ? 'Uncertainty unscored' : `Uncertainty ${Math.round(v)}: ${UNCERTAINTY_READINGS[Math.round(v)]}`;

@@ -49,7 +49,7 @@ export const WhyChain: FC<{
     background: `linear-gradient(${S.outline}, ${S.outline}33)`,  // fades to 20% opacity
   };
   const stepLabel: CSSProperties = {
-    fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase',
+    fontSize: 11, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase',
     color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT,
   };
 
@@ -97,11 +97,11 @@ export const WhyChain: FC<{
             </div>
             <p style={{ fontSize: 12.5, color: S.onSurface, lineHeight: 1.5, margin: '9px 0 0' }}>
               {dominant ? <>Dominant force <strong style={{ fontFamily: HEADLINE_FONT }}>{dominant}</strong>. </> : null}
-              The strategist classifies this moment as <strong style={{ fontFamily: HEADLINE_FONT, color: accent }}>{isExp ? 'a tailwind (benefiting)' : 'a headwind (declining)'}</strong>.
+              The strategist classifies this moment as <strong style={{ fontFamily: HEADLINE_FONT, color: accent }}>{isExp ? 'a tailwind' : 'a headwind'}</strong>.
             </p>
             {tile.poolImpact && (
               <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
+                <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
                   Profit-pool impact
                 </span>
                 <span className="inline-flex items-center gap-1 rounded-full" style={{ fontSize: 11, fontWeight: 800, padding: '1px 10px', color: S.onPrimary, backgroundColor: accent, fontFamily: HEADLINE_FONT }}>

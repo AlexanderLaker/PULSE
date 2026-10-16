@@ -4,56 +4,133 @@
  * and slider, and the category and regional exposure grids, read-only and
  * editable.
  */
-import { useState, type FC } from 'react';
+import { useRef, useState, type FC, type KeyboardEvent } from 'react';
 import { CATEGORIES, REGIONS, shortCat } from '@/lib/format';
 import { UNCERTAINTY_LABELS } from '@/lib/uncertainty';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { VC_STAGES, VC_SHORT_LABELS, stageIndex, type VcStage } from '@/lib/valueChain';
 import type { ExposureMap } from '@/types';
-import { DELTA_COLOR, DIFFUSION_LABELS, EXPERT_COLOR, uncLabel, vcPos, vcStageLabel } from './shared';
+import { DELTA_COLOR, DIFFUSION_LABELS, EXPERT_COLOR, uncReading, vcPos, vcStageLabel } from './shared';
+
+// ─── Roving tabindex for the radio groups ─────────────────────────
+/** The props of one item of a radio group with a roving tabindex: one tab
+ *  stop per group (the checked item, else the first that can be chosen), the
+ *  arrow keys move the focus and check the item it lands on, Home and End
+ *  jump to the ends. Items `disabled` says so are skipped. Enter and Space
+ *  are left to the item (a button clicks itself). */
+export function useRovingRadio(
+  count: number,
+  checked: number,
+  select: (index: number) => void,
+  disabled?: (index: number) => boolean,
+): (index: number) => {
+  tabIndex: number;
+  ref: (el: HTMLElement | null) => void;
+  onKeyDown: (e: KeyboardEvent) => void;
+} {
+  const items = useRef<Array<HTMLElement | null>>([]);
+  const isOff = (i: number): boolean => disabled?.(i) ?? false;
+  let stop = checked >= 0 && checked < count && !isOff(checked) ? checked : -1;
+  for (let i = 0; stop < 0 && i < count; i++) if (!isOff(i)) stop = i;
+  const land = (i: number) => {
+    select(i);
+    items.current[i]?.focus();
+  };
+  const step = (from: number, by: 1 | -1) => {
+    let i = from;
+    for (let n = 0; n < count; n++) {
+      i = (i + by + count) % count;
+      if (!isOff(i)) { land(i); return; }
+    }
+  };
+  const edge = (which: 'first' | 'last') => {
+    const order = [...Array(count).keys()];
+    if (which === 'last') order.reverse();
+    const i = order.find((k) => !isOff(k));
+    if (i != null) land(i);
+  };
+  return (index) => ({
+    tabIndex: index === stop ? 0 : -1,
+    ref: (el) => { items.current[index] = el; },
+    onKeyDown: (e) => {
+      switch (e.key) {
+        case 'ArrowRight': case 'ArrowDown': e.preventDefault(); step(index, 1); break;
+        case 'ArrowLeft': case 'ArrowUp': e.preventDefault(); step(index, -1); break;
+        case 'Home': e.preventDefault(); edge('first'); break;
+        case 'End': e.preventDefault(); edge('last'); break;
+        default: break;
+      }
+    },
+  });
+}
+
+/** The ring that marks the baseline score on a dot: hollow, in the text ink,
+ *  a little wider than the dot so it reads on a filled and an empty dot alike. */
+const BaselineRing: FC<{ inset: number }> = ({ inset }) => (
+  <span aria-hidden style={{
+    position: 'absolute', inset, borderRadius: 999, boxSizing: 'border-box',
+    border: `2px solid ${S.onSurface}`, pointerEvents: 'none',
+  }} />
+);
 
 // ─── Probability dot bar ──────────────────────────────────────────
 interface DotBarProps {
   value: number;
   editable?: boolean;
   onChange?: (next: number) => void;
+  /** The baseline score, marked with a ring on its dot. */
+  baseline?: number;
 }
-export const DotBar: FC<DotBarProps> = ({ value, editable = false, onChange }) => (
-  <div
-    className="flex gap-1.5"
-    role={editable ? 'radiogroup' : undefined}
-    aria-label={`Probability ${value} of 5`}
-  >
-    {[1, 2, 3, 4, 5].map((d) => {
-      const filled = d <= value;
-      // A 24px hit area around the 10px dot: padding 7 with margin -7 keeps
-      // the dot-and-gap layout, background-clip paints only the dot, and the
-      // global :focus-visible ring marks keyboard focus.
-      return (
-        <span
-          key={d}
-          role={editable ? 'radio' : undefined}
-          // One radio in the group is checked: the selected value.
-          aria-checked={editable ? d === value : undefined}
-          aria-label={editable ? `${d} of 5` : undefined}
-          tabIndex={editable ? 0 : -1}
-          onClick={editable && onChange ? (e) => { e.stopPropagation(); onChange(d); } : undefined}
-          onKeyDown={editable && onChange ? (e) => {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChange(d); }
-          } : undefined}
-          className="inline-block rounded-full"
-          style={{
-            width: 24, height: 24, padding: 7, margin: -7,
-            boxSizing: 'border-box', backgroundClip: 'content-box',
-            backgroundColor: filled ? S.primary : S.surfaceHigh,
-            cursor: editable ? 'pointer' : 'default',
-            transition: 'background-color 140ms',
-          }}
-        />
-      );
-    })}
-  </div>
-);
+export const DotBar: FC<DotBarProps> = ({ value, editable = false, onChange, baseline }) => {
+  const item = useRovingRadio(5, value - 1, (i) => onChange?.(i + 1));
+  return (
+    <div
+      className="flex gap-1.5"
+      role={editable ? 'radiogroup' : 'img'}
+      aria-label={`Probability ${value} of 5`}
+    >
+      {editable && baseline != null && <span className="sr-only">Baseline {baseline} of 5</span>}
+      {[1, 2, 3, 4, 5].map((d) => {
+        const filled = d <= value;
+        const roving = editable ? item(d - 1) : null;
+        // A 24px hit area around the 10px dot: padding 7 with margin -7 keeps
+        // the dot-and-gap layout, background-clip paints only the dot, and the
+        // global :focus-visible ring marks keyboard focus.
+        return (
+          <span
+            key={d}
+            role={editable ? 'radio' : undefined}
+            // One radio in the group is checked: the selected value.
+            aria-checked={editable ? d === value : undefined}
+            aria-label={editable ? `${d} of 5` : undefined}
+            tabIndex={roving ? roving.tabIndex : undefined}
+            ref={roving?.ref}
+            onClick={editable && onChange ? (e) => { e.stopPropagation(); onChange(d); } : undefined}
+            onKeyDown={editable && onChange ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChange(d); return; }
+              roving?.onKeyDown(e);
+            } : undefined}
+            className="inline-block rounded-full"
+            style={{
+              position: 'relative',
+              width: 24, height: 24, padding: 7, margin: -7,
+              boxSizing: 'border-box', backgroundClip: 'content-box',
+              backgroundColor: filled ? S.primary : S.surfaceHigh,
+              cursor: editable ? 'pointer' : 'default',
+              transition: 'background-color 140ms',
+            }}
+          >
+            {baseline === d && <BaselineRing inset={4} />}
+          </span>
+        );
+      })}
+    </div>
+  );
+};
+
+/** The category grids wrap by width: six 14 px dots with their gaps need
+ *  104 px, so a cell never overlaps its neighbour. */
+const CATEGORY_GRID_COLUMNS = 'repeat(auto-fill, minmax(112px, 1fr))';
 
 // ─── Category exposure grid (read-only), grouped Hair / LHC ───────
 export const CategoryExposureGrid: FC<{ exposures: ExposureMap }> = ({ exposures }) => {
@@ -71,7 +148,7 @@ export const CategoryExposureGrid: FC<{ exposures: ExposureMap }> = ({ exposures
           >
             {group.toUpperCase()}
           </div>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid gap-3" style={{ gridTemplateColumns: CATEGORY_GRID_COLUMNS }}>
             {cats.map((cat) => (
               <div key={cat.name} className="flex flex-col items-center gap-1.5">
                 <ReadDots value={exposures[cat.name]} color={S.primary} />
@@ -89,6 +166,7 @@ export const CategoryExposureGrid: FC<{ exposures: ExposureMap }> = ({ exposures
     </div>
   );
 };
+
 
 /** The baseline's mark: an outlined diamond, as on the value-chain rails. */
 export const BaselineMark: FC<{ size?: number }> = ({ size = 9 }) => (
@@ -211,7 +289,7 @@ export const EpicentreSlider: FC<{
       ))}
     </div>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
-      <span style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: S.neutral, fontWeight: 700 }}>Upstream</span>
+      <span style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: S.mutedText, fontWeight: 700 }}>Upstream</span>
       <span title="The driver's baseline stage" style={{
         display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 999,
         backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontSize: 11, fontWeight: 700,
@@ -219,7 +297,7 @@ export const EpicentreSlider: FC<{
       }}>
         <BaselineMark /> Baseline: {baseline}
       </span>
-      <span style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: S.neutral, fontWeight: 700 }}>Downstream</span>
+      <span style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: S.mutedText, fontWeight: 700 }}>Downstream</span>
     </div>
   </div>
   );
@@ -227,7 +305,7 @@ export const EpicentreSlider: FC<{
 
 // ─── Regional exposure grid (read-only) ───────────────────────────
 export const RegionExposureGrid: FC<{ exposures: ExposureMap }> = ({ exposures }) => (
-  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
     {REGIONS.map((region) => (
       <div key={region} className="flex flex-col gap-1.5">
         <div className="text-[11px] font-medium" style={{ color: S.onSurface }}>
@@ -248,36 +326,50 @@ export const UncertaintyPicker: FC<{
   onChange: (v: number) => void;
   /** Clicking the selected score again clears it (Expert Rating). */
   onClear?: () => void;
-}> = ({ value, baseline, onChange, onClear }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-    <div role="radiogroup" aria-label="Uncertainty score" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}
-      title={`Baseline ${baseline} / 5 (${UNCERTAINTY_LABELS[baseline]})`}>
-      {[0, 1, 2, 3, 4, 5].map((v) => {
-        const on = value != null && Math.round(value) === v;
-        return (
-          <button
-            key={v}
-            type="button"
-            role="radio"
-            aria-checked={on}
-            onClick={() => (on && onClear ? onClear() : onChange(v))}
-            title={`${v}: ${UNCERTAINTY_LABELS[v]}${baseline === v ? ' (baseline)' : ''}${on && onClear ? ', click again to clear' : ''}`}
-            style={{
-              minWidth: 44, padding: '6px 8px', borderRadius: 8,
-              border: `1px solid ${baseline === v && !on ? S.primary : 'transparent'}`,
-              backgroundColor: on ? S.primary : S.surfaceLow,
-              color: on ? S.onPrimary : S.onSurface,
-              fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, cursor: 'pointer',
-            }}
-          >
-            {v}
-          </button>
-        );
-      })}
+}> = ({ value, baseline, onChange, onClear }) => {
+  const checked = value == null ? -1 : Math.round(value);
+  const item = useRovingRadio(6, checked, onChange);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div role="radiogroup" aria-label="Uncertainty score" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}
+        title={`Baseline ${baseline} / 5 (${UNCERTAINTY_LABELS[baseline]})`}>
+        <span className="sr-only">Baseline {baseline} of 5</span>
+        {[0, 1, 2, 3, 4, 5].map((v) => {
+          const on = checked === v;
+          return (
+            <button
+              key={v}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              {...item(v)}
+              onClick={() => (on && onClear ? onClear() : onChange(v))}
+              title={`${v}: ${UNCERTAINTY_LABELS[v]}${baseline === v ? ' (baseline)' : ''}${on && onClear ? ', click again to clear' : ''}`}
+              style={{
+                position: 'relative', minWidth: 44, padding: '6px 8px', borderRadius: 8,
+                border: `1px solid ${baseline === v && !on ? S.primary : 'transparent'}`,
+                backgroundColor: on ? S.primary : S.surfaceLow,
+                color: on ? S.onPrimary : S.onSurface,
+                fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, cursor: 'pointer',
+              }}
+            >
+              {v}
+              {baseline === v && (
+                <span style={{ position: 'absolute', top: 3, right: 3, display: 'inline-flex' }}><BaselineMark size={7} /></span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      <span style={{ fontSize: 11, color: S.mutedText, lineHeight: 1.5 }} className="flex flex-col gap-0.5">
+        <span>{uncReading(value)}</span>
+        <span className="inline-flex items-center gap-1.5">
+          <BaselineMark size={8} /> The diamond marks the baseline, {baseline} ({UNCERTAINTY_LABELS[baseline]})
+        </span>
+      </span>
     </div>
-    <span style={{ fontSize: 11, color: S.mutedText }}>{uncLabel(value)}</span>
-  </div>
-);
+  );
+};
 
 /** The hover on an exposure cell: its baseline score, where the grid shows one;
  *  without it the dots keep their own "N / 5" labels. */
@@ -307,7 +399,7 @@ export const ColorDots: FC<{ value: number; color: string; title?: string; muted
 
 export const DeltaChip: FC<{ value: number; unit?: string; digits?: number }> = ({ value, unit = '', digits = 1 }) => {
   const zero = Math.abs(value) < (digits === 0 ? 0.5 : 0.05);
-  const sign = value > 0 ? '+' : '−';
+  const sign = value > 0 ? '+' : '-';
   return (
     <span style={{
       fontSize: 11, fontWeight: 800, padding: '1px 7px', borderRadius: 999, whiteSpace: 'nowrap',
@@ -350,38 +442,56 @@ export const DiffusionPicker: FC<{
   onChange: (curve: string) => void;
   /** Clicking the selected curve again clears it (Expert Rating). */
   onClear?: () => void;
-}> = ({ value, baseline, distribution, onChange, onClear }) => (
-  <div className="flex flex-wrap gap-2">
-    {Object.entries(DIFFUSION_LABELS).map(([key, meta]) => {
-      const selected = value === key;
-      const n = distribution?.[key];
-      return (
-        <button key={key} type="button" onClick={() => (selected && onClear ? onClear() : onChange(key))}
-          title={`${baseline === key ? `${meta.label} (baseline): ` : ''}${meta.description}${selected && onClear ? ' (click again to clear)' : ''}`}
-          aria-pressed={selected} style={{
-            position: 'relative', minWidth: 78, textAlign: 'center', padding: '8px 10px 6px', borderRadius: 9, cursor: 'pointer',
-            backgroundColor: S.surface, border: `1px solid ${selected ? S.primary : S.cardBorder}`,
-            boxShadow: selected ? `inset 0 0 0 1px ${S.primary}` : 'none',
-          }}>
-          {baseline === key && (
-            <span style={{ position: 'absolute', top: 6, right: 6, display: 'inline-flex' }}><BaselineMark size={8} /></span>
-          )}
-          <DiffusionGlyph curve={key} color={selected ? S.primary : S.onSurfaceVariant} />
-          <div style={{ fontSize: 11, fontWeight: 700, color: S.onSurface, marginTop: 3 }}>{meta.label}</div>
-          {n != null && n > 0 && <div style={{ fontSize: 11, fontWeight: 800, color: EXPERT_COLOR, marginTop: 2 }}>×{n}</div>}
-        </button>
-      );
-    })}
-  </div>
-);
+}> = ({ value, baseline, distribution, onChange, onClear }) => {
+  const keys = Object.keys(DIFFUSION_LABELS);
+  const item = useRovingRadio(keys.length, value ? keys.indexOf(value) : -1, (i) => onChange(keys[i]!));
+  return (
+    <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Diffusion curve">
+      {baseline && <span className="sr-only">Baseline {DIFFUSION_LABELS[baseline]?.label ?? baseline}</span>}
+      {keys.map((key, i) => {
+        const meta = DIFFUSION_LABELS[key]!;
+        const selected = value === key;
+        const n = distribution?.[key];
+        return (
+          <button key={key} type="button" role="radio" aria-checked={selected} {...item(i)}
+            onClick={() => (selected && onClear ? onClear() : onChange(key))}
+            title={`${baseline === key ? `${meta.label} (baseline): ` : ''}${meta.description}${selected && onClear ? ' (click again to clear)' : ''}`}
+            style={{
+              position: 'relative', minWidth: 78, textAlign: 'center', padding: '8px 10px 6px', borderRadius: 9, cursor: 'pointer',
+              backgroundColor: S.surface, border: `1px solid ${selected ? S.primary : S.cardBorder}`,
+              boxShadow: selected ? `inset 0 0 0 1px ${S.primary}` : 'none',
+            }}>
+            {baseline === key && (
+              <span style={{ position: 'absolute', top: 6, right: 6, display: 'inline-flex' }}><BaselineMark size={8} /></span>
+            )}
+            <DiffusionGlyph curve={key} color={selected ? S.primary : S.onSurfaceVariant} />
+            <div style={{ fontSize: 11, fontWeight: 700, color: S.onSurface, marginTop: 3 }}>{meta.label}</div>
+            {n != null && n > 0 && (
+              <div style={{ fontSize: 11, fontWeight: 800, color: EXPERT_COLOR, marginTop: 2 }}>
+                {n} {n === 1 ? 'vote' : 'votes'}
+              </div>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
 
-// ── Read-only 0–5 dot scale: six dots including the 0 dot, like EditableDots ──
+// ── Read-only 0–5 dot scale: six dots including the 0 dot, like EditableDots.
+//    An unscored cell shows six hollow dots, so it never reads as a 0. ──
 export const ReadDots: FC<{ value?: number; color: string }> = ({ value, color }) => (
   <div className="flex gap-1" role="img" aria-label={value != null ? `${value} of 5` : 'unscored'}>
     {[0, 1, 2, 3, 4, 5].map((d) => {
+      if (value == null) {
+        return (
+          <span key={d} className="inline-block rounded-full"
+            style={{ width: 14, height: 14, boxSizing: 'border-box', border: `1.5px solid ${color}`, opacity: 0.45 }} />
+        );
+      }
       const bg = d === 0
         ? (value === 0 ? color : S.surfaceHigh)
-        : dotFill(value == null ? 0 : Math.max(0, Math.min(1, value - (d - 1))), color);
+        : dotFill(Math.max(0, Math.min(1, value - (d - 1))), color);
       return (
         <span key={d} className="inline-block rounded-full"
           style={{ width: 14, height: 14, background: bg, opacity: d === 0 ? 0.4 : 1 }} />
@@ -400,43 +510,51 @@ export const EditableDots: FC<{
   label: string;
   /** Clicking the selected dot again clears the cell (Expert Rating). */
   clearable?: boolean;
-  /** When set (e.g. "Baseline 3 / 5"), hovering the dots shows it, the same
-   *  plain hover the Probability and GP1 % fields use, instead of the
-   *  per-dot "N / 5" label. */
+  /** When set (e.g. "Baseline 3 / 5"), hovering the dots shows it as well. */
   hint?: string;
-}> = ({ value, onChange, label, clearable = false, hint }) => (
-  <div className="flex gap-1" role="radiogroup"
-    aria-label={`${label}: ${value == null ? 'not scored' : `${value} of 5`}`}
-    title={hint} style={{ cursor: hint ? 'help' : undefined }}>
-    {/* A 24px hit area per dot: padding and background-clip keep the painted
-        dot at 14px, the negative margin keeps the 4px gap, and the global
-        :focus-visible ring marks keyboard focus. */}
-    {[0, 1, 2, 3, 4, 5].map((d) => (
-      <button
-        key={d}
-        type="button"
-        onClick={() => onChange(clearable && d === value ? undefined : d)}
-        aria-checked={d === value}
-        aria-label={`${d} of 5`}
-        role="radio"
-        title={hint ?? (clearable && d === value ? `${d} / 5, click again to clear` : `${d} / 5`)}
-        style={{
-          width: 24, height: 24, borderRadius: 999,
-          border: 'none', padding: 5, margin: -5,
-          boxSizing: 'border-box', backgroundClip: 'content-box',
-          cursor: hint ? 'help' : 'pointer',
-          backgroundColor: value == null
-            ? S.surfaceHigh
-            : d === 0
-              ? (value === 0 ? S.primary : S.surfaceHigh)
-              : (d <= value ? S.primary : S.surfaceHigh),
-          opacity: d === 0 ? 0.35 : 1,
-          transition: 'background-color 120ms',
-        }}
-      />
-    ))}
-  </div>
-);
+  /** The baseline score, marked with a ring on its dot. */
+  baseline?: number;
+}> = ({ value, onChange, label, clearable = false, hint, baseline }) => {
+  const item = useRovingRadio(6, value ?? -1, (i) => onChange(i));
+  return (
+    <div className="flex gap-1" role="radiogroup"
+      aria-label={`${label}: ${value == null ? 'not scored' : `${value} of 5`}`}
+      title={hint}>
+      {baseline != null && <span className="sr-only">Baseline {baseline} of 5</span>}
+      {/* A 24px hit area per dot: padding and background-clip keep the painted
+          dot at 14px, the negative margin keeps the 4px gap, and the global
+          :focus-visible ring marks keyboard focus. */}
+      {[0, 1, 2, 3, 4, 5].map((d) => (
+        <button
+          key={d}
+          type="button"
+          {...item(d)}
+          onClick={() => onChange(clearable && d === value ? undefined : d)}
+          aria-checked={d === value}
+          aria-label={`${d} of 5`}
+          role="radio"
+          title={hint ?? (clearable && d === value ? `${d} / 5, click again to clear` : `${d} / 5`)}
+          style={{
+            position: 'relative',
+            width: 24, height: 24, borderRadius: 999,
+            border: 'none', padding: 5, margin: -5,
+            boxSizing: 'border-box', backgroundClip: 'content-box',
+            cursor: 'pointer',
+            backgroundColor: value == null
+              ? S.surfaceHigh
+              : d === 0
+                ? (value === 0 ? S.primary : S.surfaceHigh)
+                : (d <= value ? S.primary : S.surfaceHigh),
+            opacity: d === 0 && baseline !== d ? 0.35 : 1,
+            transition: 'background-color 120ms',
+          }}
+        >
+          {baseline === d && <BaselineRing inset={3} />}
+        </button>
+      ))}
+    </div>
+  );
+};
 
 // ─── Editable exposure grids (the admin editor and Expert Rating) ──
 /** The map with one cell set, or removed when `val` is undefined. */
@@ -467,7 +585,7 @@ export const EditableCategoryGrid: FC<{
           >
             {group.toUpperCase()}
           </div>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid gap-3" style={{ gridTemplateColumns: CATEGORY_GRID_COLUMNS }}>
             {cats.map((cat) => (
               <div key={cat.name} className="flex flex-col items-center gap-1.5">
                 <EditableDots
@@ -476,6 +594,7 @@ export const EditableCategoryGrid: FC<{
                   label={`${cat.name} exposure`}
                   clearable={clearable}
                   hint={baselineHint(baseline, cat.name)}
+                  baseline={baseline?.[cat.name]}
                 />
                 <div
                   className="text-[11px] font-medium text-center"
@@ -499,7 +618,7 @@ export const EditableRegionGrid: FC<{
   /** Cells may be left unscored and cleared again (Expert Rating). */
   clearable?: boolean;
 }> = ({ exposures, onChange, baseline, clearable = false }) => (
-  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
     {REGIONS.map((region) => (
       <div key={region} className="flex flex-col gap-1.5">
         <div className="text-[11px] font-medium" style={{ color: S.onSurface }}>
@@ -511,6 +630,7 @@ export const EditableRegionGrid: FC<{
           label={`${region} exposure`}
           clearable={clearable}
           hint={baselineHint(baseline, region)}
+          baseline={baseline?.[region]}
         />
       </div>
     ))}

@@ -15,6 +15,10 @@
  *   Navigation: Laundry & Home Care | Hair, then Value Chain | Categories | Core + Adjacent.
  *
  * Every indicator runs over the same horizon, FY2025 → 2030.
+ *
+ * The address carries the group, the kind of view and the open pool
+ * (hooks/useViewUrl.tsx): a link opens the same chart and drawer, and Back
+ * closes the drawer.
  */
 
 'use client';
@@ -26,6 +30,7 @@ import {
   PROFIT_POOL_VIEWS, POOL_CAGR_THRESHOLDS, POOL_HORIZON_LABEL, viewPoolSummary, toPoolRating,
   type PoolItem, type PoolViewKind, type PoolGroup,
 } from '@/lib/profitPoolData';
+import { useViewParams } from '@/hooks/useViewUrl';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { arrowColorFor, ArrowLegend, ArrowsHTML, fmtEurBn } from './explorer/arrows';
 import { GradeChip } from './explorer/sources';
@@ -34,11 +39,45 @@ import { DetailPanel } from './explorer/DetailPanel';
 import { GroupToggle, KindPills, KINDS } from './explorer/controls';
 import { ExplorerBetaNotice, NOTICE_ACK_KEY, noticeAcked } from './explorer/BetaNotice';
 
+/** The group and kind an address names; the Laundry value chain when it names none. */
+const groupOf = (param: string | undefined): PoolGroup => (param === 'Hair' ? 'Hair' : 'LHC');
+const kindOf = (param: string | undefined): PoolViewKind =>
+  (param === 'Categories' || param === 'CoreAdjacent' ? param : 'ValueChain');
+
 const ProfitPoolExplorer: FC = () => {
-  const [group, setGroup] = useState<PoolGroup>('LHC');
-  const [kind, setKind] = useState<PoolViewKind>('ValueChain');
+  const [params, setParams] = useViewParams('profit-pool-explorer');
+  const [group, setGroupState] = useState<PoolGroup>(() => groupOf(params.group));
+  const [kind, setKindState] = useState<PoolViewKind>(() => kindOf(params.kind));
   const [hover, setHover] = useState<{ item: PoolItem; x: number; y: number } | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedIdState] = useState<string | null>(() => params.pool ?? null);
+
+  // The view writes every change to the address and adopts the address when
+  // it changes under it (Back, Forward, a pasted link). The adoption compares
+  // the address with the state, during render as React documents for state
+  // that follows a prop; a value the view wrote itself already matches, and a
+  // view without a provider (its parameters always empty) sees no change.
+  const setGroup = useCallback((g: PoolGroup) => {
+    setGroupState(g);
+    setSelectedIdState(null);
+    setParams({ group: g, pool: null });
+  }, [setParams]);
+  const setKind = useCallback((k: PoolViewKind) => {
+    setKindState(k);
+    setSelectedIdState(null);
+    setParams({ kind: k, pool: null });
+  }, [setParams]);
+  /** Opens a pool's drawer (pushing a history entry, so Back closes it) or closes it. */
+  const setSelectedId = useCallback((id: string | null) => {
+    setSelectedIdState(id);
+    setParams({ pool: id }, { push: !!id });
+  }, [setParams]);
+  const [prevParams, setPrevParams] = useState({ group: params.group, kind: params.kind, pool: params.pool });
+  if (params.group !== prevParams.group || params.kind !== prevParams.kind || params.pool !== prevParams.pool) {
+    setPrevParams({ group: params.group, kind: params.kind, pool: params.pool });
+    if (groupOf(params.group) !== group) setGroupState(groupOf(params.group));
+    if (kindOf(params.kind) !== kind) setKindState(kindOf(params.kind));
+    if ((params.pool ?? null) !== selectedId) setSelectedIdState(params.pool ?? null);
+  }
 
   // The Beta notice opens once per browser: on the first Explorer visit
   // (the tab stays mounted once visited) and never again once acknowledged.
@@ -49,6 +88,7 @@ const ProfitPoolExplorer: FC = () => {
   // against and no effect is needed to reach the open state.
   const [noticeOpen, setNoticeOpen] = useState(() => !noticeAcked());
   const closeNotice = useCallback(() => setNoticeOpen(false), []);
+  const openNotice = useCallback(() => setNoticeOpen(true), []);
   const ackNotice = useCallback(() => {
     try { window.localStorage.setItem(NOTICE_ACK_KEY, '1'); } catch { /* storage unavailable: dismiss only */ }
     setNoticeOpen(false);
@@ -69,10 +109,10 @@ const ProfitPoolExplorer: FC = () => {
   const summary = useMemo(() => viewPoolSummary(view), [view]);
   const viewPoolRating = toPoolRating(summary.weightedPoolCagr);
 
-  const closePanel = useCallback(() => setSelectedId(null), []);
+  const closePanel = useCallback(() => setSelectedId(null), [setSelectedId]);
 
   return (
-    <div
+    <main
       className="min-h-screen"
       style={{
         // The page shell every dashboard tab shares: centred, max 1440px wide,
@@ -98,31 +138,46 @@ const ProfitPoolExplorer: FC = () => {
             Profit pool views. Arrows show the development of the
             <b> profit pool</b> (revenue × GP1 proxy, {POOL_HORIZON_LABEL}). Click any bar for the
             revenue / margin decomposition, € pool sizes and clickable sources.
-            Y-axis = <b>GP1 proxy</b> (estimated). Market sizing: public triangulations on the <b>Euromonitor</b>
-            (consumer hair · laundry/home care) and <b>Kline</b> (professional hair) category trees.
+            Y-axis = <b>GP1 proxy</b> (estimated).
+          </p>
+          <p style={{ color: S.onSurfaceVariant, fontSize: 13, margin: '6px 0 0', maxWidth: 780 }}>
+            These are published industry figures and PRISM&rsquo;s own estimates on them; nothing here comes
+            from the simulation and nothing feeds the Shift Matrix.{' '}
+            <button type="button"
+              onClick={openNotice}
+              data-print-hide
+              style={{
+                background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit',
+                color: S.primary, fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: 2,
+              }}
+            >
+              About this data
+            </button>
           </p>
         </div>
 
         {/* Horizon badge (view selection lives in the Group/Kind toggles below) */}
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
           <div
             style={{
               padding: '8px 14px', borderRadius: 10,
               background: S.surface, border: `1px solid ${S.cardBorder}`,
               fontFamily: HEADLINE_FONT, fontWeight: 700, fontSize: 12, color: S.onSurfaceVariant,
             }}
-            title="All development indicators compound over this horizon"
           >
             Horizon · {POOL_HORIZON_LABEL}
+          </div>
+          <div style={{ fontSize: 11, color: S.mutedText, paddingLeft: 2 }}>
+            Every development rate compounds over these five years.
           </div>
         </div>
       </div>
 
       {/* Hierarchical navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 20 }}>
-        <GroupToggle group={group} onSelect={(g) => { setGroup(g); setSelectedId(null); }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 20 }} data-print-hide>
+        <GroupToggle group={group} onSelect={setGroup} />
         <div style={{ width: 1, height: 26, background: S.cardBorderStrong }} aria-hidden />
-        <KindPills kind={kind} onSelect={(k) => { setKind(k); setSelectedId(null); }} />
+        <KindPills kind={kind} onSelect={setKind} />
       </div>
 
       {/* Main card: borderless, rounded, soft shadow */}
@@ -209,6 +264,9 @@ const ProfitPoolExplorer: FC = () => {
             Nominal terms · € at 1.15 · click any bar for the full assessment
           </div>
         </div>
+        <div style={{ fontSize: 11, color: S.mutedText, lineHeight: 1.5, marginTop: 4 }}>
+          Reported = as published; Derived = arithmetic on published figures; Estimate = structured judgment.
+        </div>
 
         {/* How-to-read key and the caveat on the development arrows */}
         <div
@@ -293,7 +351,7 @@ const ProfitPoolExplorer: FC = () => {
 
       {/* Beta notice, shown on the first visit */}
       <ExplorerBetaNotice open={noticeOpen} onAck={ackNotice} onClose={closeNotice} />
-    </div>
+    </main>
   );
 };
 

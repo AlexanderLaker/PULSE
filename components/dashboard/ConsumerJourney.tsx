@@ -16,6 +16,9 @@
  *
  * This view sits one tab away from computed output, so it has to read as
  * authored judgment, never as model output.
+ *
+ * The address carries the journey and the open tile (hooks/useViewUrl.tsx):
+ * a tile link opens the tile once the content is known, and Back closes it.
  */
 
 'use client';
@@ -25,17 +28,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, TrendingDown, ArrowRight, Edit3, Info, CircleCheck, Plus, Save } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import useOverlay, { PaneActiveContext } from '@/hooks/useOverlay';
+import { useViewParams } from '@/hooks/useViewUrl';
 import { ApiError, getJourneyContent, saveJourneyContent } from '@/lib/apiClient';
 import {
-  LHC_JOURNEY, HAIR_JOURNEY, type JourneyContent, type JourneyKey, type JourneyTile, type TileType,
+  LHC_JOURNEY, HAIR_JOURNEY, type JourneyContent, type JourneyKey, type JourneyStageDef, type JourneyTile,
+  type TileType,
 } from '@/data/consumerJourney';
 import { S, SHADOW, EXPANSION_RGB, CONTRACTION_RGB, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import {
   type ContentOrigin, currentMonth, displayTileName, type SaveState, type SelectedTile,
   type Side, sortTilesForDisplay, stageSpan, type TileEdits, TYPE_STYLES,
 } from './journey/shared';
-import { JourneySwitch, StageRollup, TilePill, TypeChip } from './journey/tiles';
-import { PanelBody } from './journey/PanelBody';
+import { ImpactLegend, JourneySwitch, StageRollup, TilePill, TypeChip } from './journey/tiles';
+import { PanelBody, type PanelQuestion, watchKeyboard } from './journey/PanelBody';
 
 interface ConsumerJourneyProps {
   /** Opens the Drivers page searched for this driver name. */
@@ -44,16 +49,37 @@ interface ConsumerJourneyProps {
   isAdmin?: boolean;
 }
 
+/** The journey an address names; the Laundry journey when it names none. */
+const journeyOf = (param: string | undefined): JourneyKey => (param === 'hair' ? 'hair' : 'lhc');
+
+/** A tile of a journey by id, with its stage and side, or null. */
+const locateTile = (stages: JourneyStageDef[], id: string): SelectedTile | null => {
+  for (const s of stages) {
+    for (const side of ['benefiting', 'negativelyImpacted'] as const) {
+      const tile = s[side].find(t => t.id === id);
+      if (tile) return { tile, stageId: s.id, stageLabel: s.label, side };
+    }
+  }
+  return null;
+};
+
 const ConsumerJourney: FC<ConsumerJourneyProps> = ({
   onNavigateToDriver,
   isAdmin = false,
 }) => {
   const { drivers } = usePrism();
+  const [params, setParams] = useViewParams('consumer-journey');
+  // The dialog's keyboard hint waits for the first key pressed on the page.
+  useEffect(watchKeyboard, []);
 
-  const [tab, setTab] = useState<JourneyKey>('lhc');
+  const [tab, setTabState] = useState<JourneyKey>(() => journeyOf(params.journey));
   const [typeFilter, setTypeFilter] = useState<Set<TileType>>(() => new Set(['product', 'tech', 'service']));
   const [selected, setSelected] = useState<SelectedTile | null>(null);
   const [editing, setEditing] = useState(false);
+  // Whether the editor's draft differs from the tile; a close then asks first.
+  const [draftDirty, setDraftDirty] = useState(false);
+  // The question the dialog is asking, if any, and what a yes does.
+  const [pending, setPending] = useState<{ kind: 'discard' | 'remove'; run: () => void } | null>(null);
   // The editing controls stay hidden until an admin turns them on.
   const [editMode, setEditMode] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
@@ -85,16 +111,6 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
       });
     return () => { cancelled = true; };
   }, [loadAttempt]);
-  /** Load the stored content again, dropping unsaved edits (after a conflict or a failed load). */
-  const loadStored = useCallback(() => {
-    setSelected(null);
-    setEditing(false);
-    setSaveState('idle');
-    setSaveMsg(null);
-    setOrigin('loading');
-    setLoadAttempt((n) => n + 1);
-  }, []);
-
   const stages = content[tab];
   // Nothing is shown from the bundled copy while the saved journey loads: it
   // would flash, and a tile opened from it would stay the old text.
@@ -108,16 +124,113 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
     headwinds: stages.reduce((n, s) => n + s.negativelyImpacted.length, 0),
   }), [stages]);
 
-  const openTile = useCallback((tile: JourneyTile, stageId: string, stageLabel: string, side: Side) => {
-    setSelected({ tile, stageId, stageLabel, side });
+  // ── The address: the journey and the open tile ──
+  // The view writes both as they change and adopts them when they change
+  // under it (Back, Forward, a pasted link). The adoption compares the
+  // address with what the board shows, during render as React documents for
+  // state that follows a prop: a value the view wrote itself already matches
+  // and changes nothing, and a view without a provider (its parameters always
+  // empty) never sees a change.
+  const selectedRef = useRef(selected);
+  useEffect(() => { selectedRef.current = selected; }, [selected]);
+
+  /** Opens a tile. Opening from the board pushes a history entry (Back
+   *  closes the tile); stepping from one tile to the next replaces it. */
+  const showTile = useCallback((sel: SelectedTile) => {
+    const wasOpen = !!selectedRef.current;
+    setSelected(sel);
     setEditing(false);
-  }, []);
-  const closePanel = useCallback(() => { setSelected(null); setEditing(false); }, []);
+    setPending(null);
+    setParams({ tile: sel.tile.id }, { push: !wasOpen });
+  }, [setParams]);
+  /** Closes the dialog without asking. */
+  const hideTile = useCallback(() => {
+    setSelected(null);
+    setEditing(false);
+    setPending(null);
+    setParams({ tile: null });
+  }, [setParams]);
+
+  const openTile = useCallback((tile: JourneyTile, stageId: string, stageLabel: string, side: Side) => {
+    showTile({ tile, stageId, stageLabel, side });
+  }, [showTile]);
+
+  // A close, a step to another tile or a change of journey drops the editor's
+  // draft; while that draft differs from the tile, the dialog asks first and
+  // does the action on a yes.
+  const guarded = useCallback((action: () => void) => {
+    if (editing && draftDirty) setPending({ kind: 'discard', run: action });
+    else action();
+  }, [editing, draftDirty]);
+  const closePanel = useCallback(() => {
+    // Escape while the question is showing keeps the editor.
+    if (pending) { setPending(null); return; }
+    guarded(() => hideTile());
+  }, [pending, guarded, hideTile]);
+
+  const setTab = useCallback((key: JourneyKey) => {
+    guarded(() => {
+      setTabState(key);
+      setSelected(null);
+      setEditing(false);
+      setParams({ journey: key, tile: null });
+    });
+  }, [guarded, setParams]);
+
+  /** Load the stored content again, dropping unsaved edits (after a conflict or a failed load). */
+  const loadStored = useCallback(() => {
+    hideTile();
+    setSaveState('idle');
+    setSaveMsg(null);
+    setOrigin('loading');
+    setLoadAttempt((n) => n + 1);
+  }, [hideTile]);
+
+  // Adopt a journey the address names anew.
+  const [prevJourneyParam, setPrevJourneyParam] = useState(params.journey);
+  if (params.journey !== prevJourneyParam) {
+    setPrevJourneyParam(params.journey);
+    if (journeyOf(params.journey) !== tab) {
+      setTabState(journeyOf(params.journey));
+      setSelected(null);
+      setEditing(false);
+      setPending(null);
+    }
+  }
+  // Adopt a tile the address names anew: opened once the content is known (a
+  // pasted link arrives before the saved journey does), closed when the
+  // address drops it. `null` marks the first render, so a link opens its tile.
+  const [prevTileParam, setPrevTileParam] = useState<string | undefined | null>(null);
+  if (params.tile !== prevTileParam && (!params.tile || ready)) {
+    setPrevTileParam(params.tile);
+    if (!params.tile) {
+      if (selected) { setSelected(null); setEditing(false); setPending(null); }
+    } else if (params.tile !== selected?.tile.id) {
+      const found = locateTile(content[journeyOf(params.journey)], params.tile);
+      if (found) { setSelected(found); setEditing(false); setPending(null); }
+    }
+  }
 
   // The tile dialog shares the overlay behaviour: Escape closes it, focus stays
   // inside and returns to the tile, and the page behind does not scroll.
   const panelRef = useRef<HTMLDivElement | null>(null);
   useOverlay(!!selected, closePanel, panelRef);
+
+  // The rail's width in stage units, and whether it has more to the right
+  // than the viewport shows (the fade on its edge says so).
+  const railUnits = stages.reduce((n, s) => n + stageSpan(s, tab), 0);
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const [railHasMore, setRailHasMore] = useState(false);
+  const updateRailEdge = useCallback(() => {
+    const el = railRef.current;
+    if (!el) return;
+    setRailHasMore(el.scrollWidth - el.clientWidth - el.scrollLeft > 1);
+  }, []);
+  useEffect(() => {
+    updateRailEdge();
+    window.addEventListener('resize', updateRailEdge);
+    return () => window.removeEventListener('resize', updateRailEdge);
+  }, [updateRailEdge, ready, railUnits, typeFilter]);
 
   // The visible tiles in rail order (stage by stage, tailwind before headwind,
   // filtered and sorted as rendered), so ◀ ▶ step through neighbours you can see.
@@ -139,9 +252,8 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
     if (selectedIndex < 0) return;
     const ni = selectedIndex + delta;
     if (ni < 0 || ni >= flatTiles.length) return;
-    setSelected(flatTiles[ni]);
-    setEditing(false);
-  }, [selectedIndex, flatTiles]);
+    guarded(() => showTile(flatTiles[ni]!));
+  }, [selectedIndex, flatTiles, guarded, showTile]);
 
   // ← and → step to the neighbouring tiles while the dialog is open and its
   // pane is on screen, but not while a tile is being edited or the caret is in
@@ -180,6 +292,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
   const contentRef = useRef(content);
   useEffect(() => { contentRef.current = content; }, [content]);
 
+  // The editor blocks an empty name; an emptied read leaves the tile without one.
   const applyEdits = useCallback((sel: SelectedTile, edits: TileEdits) => {
     const updated: JourneyTile = {
       ...sel.tile,
@@ -187,18 +300,25 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
       intensity: edits.intensity,
       driverNote: edits.driverNote,
       driverCodes: edits.driverCodes,
-      analysis: edits.analysis.trim() ? edits.analysis : sel.tile.analysis,
+      analysis: edits.analysis.trim() ? edits.analysis : null,
       provenance: { ...sel.tile.provenance, date: currentMonth() },   // an edit re-dates the tile
     };
     mutateTiles(sel.stageId, sel.side, tiles => tiles.map(t => (t.id === sel.tile.id ? updated : t)));
     setSelected({ ...sel, tile: updated });
     setEditing(false);
+    setPending(null);
   }, [mutateTiles]);
 
+  /** Asks before a tile leaves the draft; a yes removes it and closes the dialog. */
   const removeTile = useCallback((sel: SelectedTile) => {
-    mutateTiles(sel.stageId, sel.side, tiles => tiles.filter(t => t.id !== sel.tile.id));
-    closePanel();
-  }, [mutateTiles, closePanel]);
+    setPending({
+      kind: 'remove',
+      run: () => {
+        mutateTiles(sel.stageId, sel.side, tiles => tiles.filter(t => t.id !== sel.tile.id));
+        hideTile();
+      },
+    });
+  }, [mutateTiles, hideTile]);
 
   const addTile = useCallback((stageId: string, side: Side) => {
     const slug = Math.random().toString(36).slice(2, 8);
@@ -214,9 +334,22 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
     };
     mutateTiles(stageId, side, tiles => [...tiles, tile]);
     const stageLabel = stages.find(s => s.id === stageId)?.label ?? stageId;
-    setSelected({ tile, stageId, stageLabel, side });
+    showTile({ tile, stageId, stageLabel, side });
     setEditing(true);
-  }, [mutateTiles, tab, stages]);
+  }, [mutateTiles, tab, stages, showTile]);
+
+  // The question the dialog shows for the pending action.
+  const question = useMemo<PanelQuestion | null>(() => {
+    if (!pending) return null;
+    const onKeep = () => setPending(null);
+    const onConfirm = () => { setPending(null); pending.run(); };
+    return pending.kind === 'discard'
+      ? { question: 'Discard the edits to this tile?', confirmLabel: 'Discard', keepLabel: 'Keep editing', onConfirm, onKeep }
+      : {
+        question: 'Remove this tile from the draft? It is gone for everyone once you save.',
+        confirmLabel: 'Remove', keepLabel: 'Keep editing', onConfirm, onKeep,
+      };
+  }, [pending]);
 
   /** Saves the whole tile map for every user; the route answers 403 unless the
    *  caller is an admin, and 409 when someone saved after this content loaded. */
@@ -309,13 +442,13 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
         )}
 
         {/* ─── Tabs and filters ─── */}
-        <section className="mb-3 flex items-center justify-between gap-4 flex-wrap">
+        <section className="mb-3 flex items-center justify-between gap-4 flex-wrap" data-print-hide>
           <div className="flex items-center gap-2 flex-wrap">
-            <JourneySwitch label="Laundry" active={tab === 'lhc'} onClick={() => { setTab('lhc'); closePanel(); }} />
-            <JourneySwitch label="Hair" active={tab === 'hair'} onClick={() => { setTab('hair'); closePanel(); }} />
+            <JourneySwitch label="Laundry" active={tab === 'lhc'} onClick={() => setTab('lhc')} />
+            <JourneySwitch label="Hair" active={tab === 'hair'} onClick={() => setTab('hair')} />
             {isAdmin && (
               <button type="button"
-                onClick={() => { if (editMode) setEditing(false); setEditMode(v => !v); }}
+                onClick={() => { if (editMode) guarded(() => { setEditing(false); setEditMode(false); }); else setEditMode(true); }}
                 // Editing starts once the saved journey is known: an edit made on
                 // the bundled copy while it loads would be replaced when it arrives.
                 disabled={!editMode && origin === 'loading'}
@@ -337,7 +470,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
             )}
             {tab === 'lhc' && (
               <span className="text-[11px]" style={{ color: S.mutedText, fontStyle: 'italic', fontFamily: BODY_FONT }}>
-                Laundry only: the Home Care (dish / surface / WC) journey is not built yet.
+                Laundry only: the Home Care (dish / surface / Toilet Care) journey is not built yet.
               </span>
             )}
           </div>
@@ -352,6 +485,8 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                 </span>
               </div>
             )}
+            <div className="h-5 w-px" style={{ backgroundColor: S.cardBorder }} aria-hidden="true" />
+            <ImpactLegend />
             <div className="h-5 w-px" style={{ backgroundColor: S.cardBorder }} aria-hidden="true" />
             <div className="flex gap-1.5">
               {(Object.keys(TYPE_STYLES) as TileType[]).map(key => (
@@ -384,19 +519,30 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
               Loading the saved journey…
             </div>
           ) : (
-          <div>
+          <div style={{ position: 'relative' }}>
+            {/* The rail. Below 1280 px it scrolls sideways: every stage unit
+                keeps 132 px (a two-unit stage twice that; the --rail-unit
+                class below), the rail is capped to the viewport so the
+                stage headers stay in view while its rows scroll beneath them,
+                and a fade on the right edge shows there is more. From 1280 px
+                the unit minimum is 0 and every stage fits the width. */}
             <div
-              className="grid"
-              style={{
-                // Every stage fits the width: minmax(0, 1fr) lets the columns
-                // shrink equally. A wide stage takes two units, so the unit
-                // count is the number of stages plus the wide ones; the header,
-                // tailwind and headwind rows each add up to that count, which
-                // keeps the three rows aligned.
-                gridTemplateColumns: `repeat(${stages.reduce((n, s) => n + stageSpan(s, tab), 0)}, minmax(0, 1fr))`,
-                width: '100%', gap: 0,
-              }}
+              ref={railRef}
+              onScroll={updateRailEdge}
+              className="overflow-x-auto overflow-y-auto max-xl:max-h-[calc(100vh_-_7rem)] print:max-h-none"
             >
+              <div
+                className="grid [--rail-unit:132px] xl:[--rail-unit:0px]"
+                style={{
+                  // A wide stage takes two units, so the unit count is the
+                  // number of stages plus the wide ones; the header, tailwind
+                  // and headwind rows each add up to that count, which keeps
+                  // the three rows aligned.
+                  gridTemplateColumns: `repeat(${railUnits}, minmax(var(--rail-unit), 1fr))`,
+                  minWidth: `calc(var(--rail-unit) * ${railUnits})`,
+                  width: '100%', gap: 0,
+                }}
+              >
               {/* Stage headers with the tailwind / headwind rollup */}
               {stages.map((stage, i) => (
                 <div
@@ -410,9 +556,11 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                     // (the grid gives every header the same height), so the
                     // bars line up whether a title takes one line or two.
                     display: 'flex', flexDirection: 'column',
+                    // Pinned to the top of the rail while its rows scroll.
+                    position: 'sticky', top: 0, zIndex: 1,
                   }}
                 >
-                  <div style={{ fontSize: 10, fontWeight: 800, color: S.onSurfaceVariant, letterSpacing: '0.15em', textTransform: 'uppercase', fontFamily: HEADLINE_FONT }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: S.onSurfaceVariant, letterSpacing: '0.15em', textTransform: 'uppercase', fontFamily: HEADLINE_FONT }}>
                     Stage {i + 1}
                   </div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: S.onSurface, marginTop: 3, lineHeight: 1.25, fontFamily: HEADLINE_FONT, letterSpacing: '-0.01em' }}>
@@ -442,13 +590,14 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 9, fontWeight: 800, color: S.expansion, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: HEADLINE_FONT }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 800, color: S.expansion, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: HEADLINE_FONT }}>
                         <TrendingUp size={10} strokeWidth={2.5} /> Tailwind
                       </span>
                       {isAdmin && editMode && (
                         <button type="button"
                           onClick={() => addTile(stage.id, 'benefiting')}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.expansion, padding: 0, display: 'inline-flex' }}
+                          data-print-hide
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.expansion, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24 }}
                           title={`Add a tailwind tile to ${stage.label}`}
                           aria-label={`Add a tailwind tile to ${stage.label}`}
                         >
@@ -483,13 +632,14 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 9, fontWeight: 800, color: S.error, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: HEADLINE_FONT }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 800, color: S.error, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: HEADLINE_FONT }}>
                         <TrendingDown size={10} strokeWidth={2.5} /> Headwind
                       </span>
                       {isAdmin && editMode && (
                         <button type="button"
                           onClick={() => addTile(stage.id, 'negativelyImpacted')}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.error, padding: 0, display: 'inline-flex' }}
+                          data-print-hide
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.error, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24 }}
                           title={`Add a headwind tile to ${stage.label}`}
                           aria-label={`Add a headwind tile to ${stage.label}`}
                         >
@@ -509,7 +659,18 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                   </div>
                 );
               })}
+              </div>
             </div>
+            {railHasMore && (
+              <div
+                aria-hidden="true"
+                className="xl:hidden"
+                style={{
+                  position: 'absolute', top: 0, right: 0, bottom: 0, width: 40, pointerEvents: 'none',
+                  background: `linear-gradient(to right, transparent, ${S.surface})`,
+                }}
+              />
+            )}
           </div>
           )}
 
@@ -525,7 +686,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
 
         {/* ─── Admin save bar, shown in edit mode ─── */}
         {isAdmin && editMode && (
-          <div className="mt-5 flex items-center justify-between gap-4 flex-wrap rounded-2xl px-5 py-3.5" style={{ backgroundColor: S.surface, boxShadow: SHADOW.card }}>
+          <div className="mt-5 flex items-center justify-between gap-4 flex-wrap rounded-2xl px-5 py-3.5" style={{ backgroundColor: S.surface, boxShadow: SHADOW.card }} data-print-hide>
             <div className="flex items-center gap-2">
               <Edit3 size={14} strokeWidth={2.5} style={{ color: S.onSurfaceVariant }} />
               <span className="text-[12px]" style={{ color: S.onSurfaceVariant, fontFamily: BODY_FONT }}>
@@ -619,6 +780,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                   canEdit={isAdmin && editMode}
                   editing={editing}
                   position={selectedIndex >= 0 ? { index: selectedIndex, total: flatTiles.length } : null}
+                  question={question}
                   onPrev={() => stepSelection(-1)}
                   onNext={() => stepSelection(1)}
                   onClose={closePanel}
@@ -626,6 +788,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                   onCancelEdit={() => setEditing(false)}
                   onApplyEdits={edits => applyEdits(selected, edits)}
                   onRemove={() => removeTile(selected)}
+                  onDraftDirty={setDraftDirty}
                   onNavigateToDriver={onNavigateToDriver}
                 />
               </div>

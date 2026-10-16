@@ -17,10 +17,12 @@ export const KINDS: { id: PoolViewKind; label: string }[] = [
   { id: 'CoreAdjacent', label: 'Core + Adjacent' },
 ];
 
+// Both controls are groups of pressed buttons, not tabs: they switch the one
+// chart below, which is no tab panel of theirs.
 export const GroupToggle: FC<{ group: PoolGroup; onSelect: (g: PoolGroup) => void }> = ({ group, onSelect }) => (
   <div
-    role="tablist"
-    aria-label="Category"
+    role="group"
+    aria-label="Business area"
     style={{
       display: 'inline-flex', gap: 4, padding: 4,
       background: S.surfaceLow, borderRadius: 12,
@@ -32,8 +34,7 @@ export const GroupToggle: FC<{ group: PoolGroup; onSelect: (g: PoolGroup) => voi
       return (
         <button type="button"
           key={g.id}
-          role="tab"
-          aria-selected={active}
+          aria-pressed={active}
           onClick={() => onSelect(g.id)}
           style={{
             padding: '9px 22px', borderRadius: 9, border: 'none',
@@ -51,14 +52,13 @@ export const GroupToggle: FC<{ group: PoolGroup; onSelect: (g: PoolGroup) => voi
 );
 
 export const KindPills: FC<{ kind: PoolViewKind; onSelect: (k: PoolViewKind) => void }> = ({ kind, onSelect }) => (
-  <div role="tablist" aria-label="View" style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+  <div role="group" aria-label="View" style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
     {KINDS.map(k => {
       const active = k.id === kind;
       return (
         <button type="button"
           key={k.id}
-          role="tab"
-          aria-selected={active}
+          aria-pressed={active}
           onClick={() => onSelect(k.id)}
           style={{
             padding: '7px 14px', borderRadius: 999,

@@ -4,7 +4,7 @@
  * (B public reporting, E defensible but unverified, G low-confidence guess).
  */
 import type { CSSProperties, FC } from 'react';
-import { S, HEADLINE_FONT, MONO_FONT } from '@/lib/theme';
+import { S, HEADLINE_FONT, FIGURES } from '@/lib/theme';
 import { CATEGORY_NAMES, categoryFullName, fmtPct } from '@/lib/format';
 import {
   BLOCK_SPLIT, CATEGORY_MIX, ESTIMATE_MARGINALS, ESTIMATE_VERSION, GRADE_LEGEND, MARGIN_INDEX,
@@ -16,8 +16,9 @@ import { CELL_TH, TableScroller } from './parts';
 // Every number comes from the generated record (lib/cellWeightProvenance.ts);
 // none is repeated here.
 
+// B takes the expansion ink: the lighter green falls short of 4.5:1 on its container.
 const GRADE_COLOR: Record<Grade, { bg: string; fg: string }> = {
-  B: { bg: S.successContainer, fg: S.success },
+  B: { bg: S.successContainer, fg: S.expansionInk },
   E: { bg: S.amberContainer, fg: S.onAmberContainer },
   G: { bg: S.errorContainer, fg: S.onErrorContainer },
 };
@@ -28,7 +29,7 @@ const InputGradeChip: FC<{ grade: Grade }> = ({ grade }) => (
     title={`${grade}: ${GRADE_LEGEND[grade]}`}
     style={{
       display: 'inline-block', minWidth: 10, textAlign: 'center',
-      fontFamily: MONO_FONT, fontSize: 10, fontWeight: 700,
+      ...FIGURES, fontSize: 11, fontWeight: 700,
       padding: '1px 7px', borderRadius: 999,
       backgroundColor: GRADE_COLOR[grade].bg, color: GRADE_COLOR[grade].fg,
     }}
@@ -49,7 +50,7 @@ const PROV_GROUP_ROW: CSSProperties = {
   fontSize: 11, borderTop: `1px solid ${S.cardBorder}`,
 };
 const PROV_NUM: CSSProperties = {
-  fontFamily: MONO_FONT, fontSize: 11.5, color: S.onSurface,
+  ...FIGURES, fontSize: 11.5, color: S.onSurface,
   padding: '5px 10px', textAlign: 'right', whiteSpace: 'nowrap',
   fontVariantNumeric: 'tabular-nums', borderTop: `1px solid ${S.cardBorder}`,
 };
@@ -177,6 +178,10 @@ export const CellWeightProvenance: FC = () => (
             </tbody>
           ))}
         </TableScroller>
+        <span style={PROV_TEXT}>
+          Share of block: the category's share of its block, before the margin index and the regional mix.
+          GP1 index: the category's GP1 gross margin relative to the HCB average (1.00 = average).
+        </span>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -212,7 +217,7 @@ export const CellWeightProvenance: FC = () => (
         number that matters most, because each category is rolled up on its own regional mix, so the region
         split is what moves the category results. The heaviest categories are {PROV_TOP_CATEGORIES}.
       </div>
-      <div style={{ fontFamily: MONO_FONT, fontSize: 10, color: S.mutedText }}>
+      <div style={{ ...FIGURES, fontSize: 11, color: S.mutedText }}>
         estimate version {ESTIMATE_VERSION}
       </div>
     </div>

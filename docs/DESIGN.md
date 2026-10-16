@@ -9,7 +9,7 @@ text, and numbers that carry the hierarchy while the chrome stays quiet.
 
 | File | Holds |
 |---|---|
-| `lib/theme.ts` | `S`, the colour tokens of surfaces, text, borders, status and overlays, and the shift pair; `SHADOW`, one shadow per kind of surface; `INK_RGB`, `PRIMARY_RGB`, `EXPANSION_RGB` and `CONTRACTION_RGB` for tints with their own alpha; the three font stacks (`HEADLINE_FONT`, `BODY_FONT`, `MONO_FONT`) |
+| `lib/theme.ts` | `S`, the colour tokens of surfaces, text, borders, status and overlays, and the shift pair; `SHADOW`, one shadow per kind of surface; `INK_RGB`, `PRIMARY_RGB`, `EXPANSION_RGB` and `CONTRACTION_RGB` for tints with their own alpha; the two font stacks (`HEADLINE_FONT`, `BODY_FONT`) and `FIGURES`, the body face with tabular numerals for every figure |
 | `lib/format.ts` | the shift colours as the views use them (`EXPANSION`, `CONTRACTION`, `EXPANSION_SOFT`, `shiftColor`, which falls back to `mutedText` for a flat shift), built on the theme's pair; the matrix heat ramp; the force colours (`FORCE_COLORS`) and the category colours (`CATEGORIES`) |
 | `tailwind.config.ts` | Tailwind's colours and shadows, read from `lib/theme.ts` under kebab-case names: `bg-theme-primary`, `text-theme-on-surface-variant`, `shadow-door` |
 | `app/globals.css` | the base layer: reset, focus ring, selection, scrollbar, input focus, Recharts grid lines, reduced motion and the frame of Clerk's forms; its colours come from the same tokens through Tailwind's `theme()` |
@@ -43,13 +43,13 @@ an icon, a title and optional help).
 | `primary` | `#005db5` | the active tab, primary actions, links |
 | `onSurface` | `#00345e` | headlines and body text (the deep navy of the brand) |
 | `onSurfaceVariant` | `#26619d` | secondary text, inactive tabs |
-| `mutedText` | `#64748b` | captions, helper text, beta labels |
+| `mutedText` | `#56657a` | captions, helper text, beta labels; keeps 4.5:1 on every surface up to `surfaceHighest` |
 | `onPrimary` | `#ffffff` | text and icons on a filled primary, dark or coloured surface |
 | `cardBorder` | `rgba(0, 52, 94, 0.10)` | card and divider borders |
 | `scrim` | `rgba(0, 52, 94, 0.35)` | the backdrop behind a dialog or drawer |
 | `error` | `#9f403d` | errors |
 | `amber` | `#b45309` | warnings, estimate grades |
-| `expert`, `delta` | `#6b4fc4`, `#b07d2b` | on the Drivers page, the expert aggregate and the chip with its delta to the baseline |
+| `expert`, `delta` | `#6b4fc4`, `#7a5200` | on the Drivers page, the expert aggregate and the chip with its delta to the baseline |
 
 Shadows are tinted, never black: navy (`rgba(0, 52, 94, ...)`) under
 surfaces, the primary blue under a primary button (`primaryButton`) and a card
@@ -89,13 +89,17 @@ used for interface chrome.
 | Headlines and large figures | Manrope, 700 to 800 |
 | Navigation tabs | Manrope, 600 |
 | Body text and controls | Inter |
-| Figures in tables and formulas | JetBrains Mono, or Inter with tabular numerals |
+| Figures in tables, bands, codes and formulas | Inter with tabular numerals (`FIGURES` in `lib/theme.ts`) |
 
 The fonts are self-hosted at build time, so the page makes no request to a
 font service. Body text is 13 to 14 px, labels and table text 11 to 12 px,
-and small uppercase overlines use wide letter spacing. The smallest
-annotations (grade legends, counters) go down to 9 px and never carry a
-value a reader needs.
+and small uppercase overlines use wide letter spacing. Tracked capitals are
+for labels of a few words; a sentence, however small, is set in sentence
+case. The smallest annotations (grade legends, counters) go down to 10.5 px
+and never carry a value a reader needs. Any text on a tinted surface
+(`surfaceLow` and darker) uses `onSurfaceVariant` or `mutedText`, both of
+which keep 4.5:1 there; a palette colour (a force, a category, a source
+tier) is never used as text on its own.
 
 ## Numbers
 
@@ -128,8 +132,23 @@ value a reader needs.
   10 px track with 7 px segments. Inputs and small nested elements: 8 to
   10 px.
 - Top navigation: the wordmark and the production tabs on the left; the beta
-  tab, settings and the user on the right. The active tab is primary blue with
-  an underline; beta tabs use the muted scale.
+  tab, help, settings and the user on the right. The active tab is primary
+  blue with an underline; beta tabs use the muted scale. Below `lg` (1024 px)
+  the tabs sit behind a menu button. Help holds the welcome, the feedback
+  address and the keyboard shortcuts.
+- The address bar carries the view and its parameters (lens, year, filter,
+  drill-down, driver, journey, tile, Explorer view), so any view can be
+  linked; "Copy link" sits where a reader would share (the drill-down, the
+  driver panel). Back closes a drill-down or returns to the previous view.
+- Export sits in the toolbar of what it exports: CSV carries the formatted
+  figures (one decimal, the sign) with the band and estimate notes in its
+  header rows; PNG captures the card without its controls. Printing drops the
+  chrome (`@media print` in `globals.css`, `data-print-hide` on controls) and
+  prints an open dialog on its own.
+- Every layout holds at 1024 px (a laptop with a sidebar), 820 px (a tablet
+  in portrait) and 390 px (a phone): rows that cannot fit become cards,
+  rails that cannot shrink scroll sideways inside a visible edge, and no
+  text is made smaller than it is on a wide screen to fit.
 - Tables: a `surfaceLow` header row with small uppercase labels, sortable
   headers with a direction icon.
 - Provenance and grades are chips with text (`components/dashboard/Chip.tsx`),
@@ -143,9 +162,17 @@ value a reader needs.
 
 - Interactive elements are real buttons or links, reachable by keyboard,
   with the focus ring from `globals.css`.
-- Time-path cells of the matrix carry an accessible label with the median and
-  the band.
-- Ratings are radio groups; the scoring mode toggle is a tab list.
+- Time-path cells of the matrix carry the median and the band as visually
+  hidden text, read in table navigation.
+- A fact is never only in a `title`: the baselines, the expert names, the
+  source grades, the Explorer's derivations and the help texts all have a
+  visible or keyboard-reachable form (an info toggle, a disclosure, a
+  popover); the `title` stays as a bonus for the mouse.
+- Ratings are radio groups with one tab stop each (the arrow keys move and
+  select, Home and End jump to the ends); the scoring mode toggle is a tab
+  list. Targets are at least 24 px, info buttons included.
+- Status that changes (a save, a count, a copied link) is announced with
+  `role="status"`; an error with `role="alert"`.
 - Motion respects `prefers-reduced-motion`: the CSS animations and
   transitions through `globals.css`, the framer-motion animations through
   `MotionConfig` in the dashboard page.

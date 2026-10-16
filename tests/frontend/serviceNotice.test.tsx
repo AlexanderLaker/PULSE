@@ -31,6 +31,21 @@ describe('the service notice', () => {
     expect(screen.getByRole('status').textContent).toContain(SERVICE_NOTICES[failure]);
   });
 
+  it('tells every reader that PRISM has no data yet, and folds the Vercel instruction away for the administrator', () => {
+    STORE.current = makeStore({ databaseFailure: 'no_database' });
+    render(<ServiceNotice />);
+    expect(screen.getByRole('status').textContent).toContain('PRISM has no data to show yet');
+    expect(SERVICE_NOTICES.no_database).not.toMatch(/Vercel|DATABASE_URL/);
+    const details = screen.getByText('For the administrator').closest('details')!;
+    expect(details.open).toBe(false);
+    expect(details.textContent).toContain('Set DATABASE_URL in the Vercel project settings');
+    cleanup();
+
+    STORE.current = makeStore({ databaseFailure: 'db_error' });
+    render(<ServiceNotice />);
+    expect(screen.queryByText('For the administrator')).toBeNull();
+  });
+
   it('is absent while the database works', () => {
     STORE.current = makeStore();
     const { container } = render(<ServiceNotice />);

@@ -7,7 +7,7 @@
 import { useState, type FC } from 'react';
 import { ChevronDown, Info } from 'lucide-react';
 import { BASE_YEAR, FORCES, YEARS, fmtDateUtc, fmtPct } from '@/lib/format';
-import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
+import { S, HEADLINE_FONT, BODY_FONT, FIGURES } from '@/lib/theme';
 import { UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import type { ForceName, ModelConfig, SimulationResult } from '@/types';
 import { RunDetails } from './RunDetails';
@@ -123,7 +123,7 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
                 {forces.map(([f, v]) => (
                   <span key={f} className="inline-flex items-baseline gap-1.5">
                     <span style={{ fontSize: 11.5, color: S.onSurfaceVariant }}>{f}</span>
-                    <span style={{ fontSize: 11.5, fontWeight: 600, color: S.onSurface, fontFamily: MONO_FONT }}>{fmtPct(v, 1)}</span>
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: S.onSurface, ...FIGURES }}>{fmtPct(v, 1)}</span>
                   </span>
                 ))}
               </div>
@@ -140,7 +140,7 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
               What a probability score means <span style={{ fontWeight: 400, color: S.mutedText }}>(1&ndash;5 &rarr; Beta prior)</span>
             </div>
             <div style={{ overflowX: 'auto' }}>
-              <table className="text-[11.5px]" style={{ borderCollapse: 'collapse', fontFamily: MONO_FONT, minWidth: 300 }}>
+              <table className="text-[11.5px]" style={{ borderCollapse: 'collapse', ...FIGURES, minWidth: 300 }}>
                 <thead>
                   <tr style={{ color: S.mutedText }}>
                     {['Score', 'Beta(α,β)', 'Mean', 'P10', 'P90'].map((h) => (
@@ -186,7 +186,7 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
             Every cell comes from the Monte Carlo engine
             {run ? (
               <>
-                {' '}(<code style={{ fontFamily: MONO_FONT }}>{run.engine_name}</code>,{' '}
+                {' '}(<code style={{ ...FIGURES }}>{run.engine_name}</code>,{' '}
                 {run.iterations.toLocaleString('en-US')} iterations &times; {run.chains} chains, Gaussian-copula
                 dependencies, {run.driver_count} drivers)
               </>

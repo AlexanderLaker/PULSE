@@ -278,15 +278,31 @@ its own:
 | Entry gate | `HomeGate.tsx` | The four views and what each is for |
 | Drivers | `Drivers.tsx`, `drivers/` | The drivers with their scores, sources and PRISM Analysis; Expert Rating, where every viewer and admin can propose scores; for admins the editor and Review & Endorse, which sets the expert aggregate against the baseline and endorses the chosen values as an ordinary edit. `Drivers.tsx` is the table; `drivers/` holds the row, the three panels, the PRISM Analysis card and the scales and cards they share |
 | Consumer Journey | `ConsumerJourney.tsx`, `journey/` | Strategist hypotheses: consumer moments per journey stage with the drivers behind them; admins edit the tiles. `journey/` holds the tile parts, the tile dialog, its why-chain and the tile editor |
-| Profit Pool Shift Analysis | `ShiftAnalysis.tsx`, `shift/` | The Shift Matrix through the four lenses, the portfolio band and the drill-down per category (`shift/CategoryDetailPanel.tsx`). The page attributes the run to the drivers once, at the score means: the drill-down ranks its drivers with it and the Time Path's Expansion and Contraction filters split the median with it. `shift/` also holds the matrix model, the toolbar, the state without a run and the "About this model" footer |
+| Profit Pool Shift Analysis | `ShiftAnalysis.tsx`, `shift/` | The Shift Matrix through the four lenses, the portfolio band and the drill-down per category (`shift/CategoryDetailPanel.tsx`). The page attributes the run to the drivers once, at the score means: the drill-down ranks its drivers with it and the Time path's Expansion and Contraction filters split the median with it. `shift/` also holds the matrix model, the toolbar, the state without a run and the "About this model" footer |
 | Profit Pool Explorer (beta) | `ProfitPoolExplorer.tsx`, `explorer/` | Sourced profit pool views of the Hair and Laundry & Home Care industries |
 | Settings | `SettingsModal.tsx`, `settings/` | Profile, password and sessions (from Clerk); the model configuration, read-only: the code's parameters and the cell weights the served run used; for admins the user list, where they approve pending users and change or take away roles |
 
-`Chip.tsx` and `SectionCard.tsx` are the pieces several views share: one look
-for a label and one for a boxed section. The shell around the views is
-`WelcomeModal.tsx` (the orientation shown once per sign-in),
-`ServiceNotice.tsx` (the banner while the database cannot be used),
-`ErrorBoundary.tsx` and `LoadingSkeleton.tsx`.
+`Chip.tsx`, `SectionCard.tsx` and `FeedbackLink.tsx` are the pieces several
+views share: one look for a label, one for a boxed section, and the PRISM
+team named as a link when `NEXT_PUBLIC_PRISM_FEEDBACK_URL` is set. The shell
+around the views is `WelcomeModal.tsx` (the orientation, shown once per user
+in a browser and again from the Help menu), `ServiceNotice.tsx` (the banner
+while the database cannot be used), `ErrorBoundary.tsx` and
+`LoadingSkeleton.tsx`.
+
+The address bar carries the active view and its parameters (`lib/viewUrl.ts`
+parses and formats them; `hooks/useViewUrl.tsx` keeps them in step with the
+browser's history): `/dashboard?view=shift&lens=force&year=2031` opens that
+lens, `&category=` a drill-down, `?view=drivers&driver=` an expanded driver.
+A change of view or an opened drill-down pushes a history entry, so Back
+closes or returns; a lens, year or filter replaces the current one. A
+returning user who opens the bare address lands on the view they left
+(remembered per user in the browser); the wordmark always returns to the
+gate. The matrix, the drill-down and the driver list export what they show as
+CSV (`lib/exportCsv.ts`, the formatted figures with their signs and one
+decimal, the band and estimate notes in the header rows) and as PNG
+(`lib/exportImage.ts`), and `app/globals.css` has a print stylesheet that
+drops the chrome.
 
 Shared logic lives in `lib/`: `apiClient.ts` (every request the dashboard
 makes), `apiError.ts` (one readable line from an error answer, for the client

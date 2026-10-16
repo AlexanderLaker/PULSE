@@ -6,7 +6,8 @@
 
 import { Component, type CSSProperties, type ErrorInfo, type ReactNode } from 'react';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
-import { S, BODY_FONT, MONO_FONT } from '@/lib/theme';
+import FeedbackLink from '@/components/dashboard/FeedbackLink';
+import { S, BODY_FONT, HEADLINE_FONT, FIGURES } from '@/lib/theme';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -18,11 +19,12 @@ interface ErrorBoundaryState {
   errorInfo: ErrorInfo | null;
 }
 
+// A pane's height, not the page's: the navigation above stays in reach.
 const CONTAINER: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  minHeight: '100vh',
+  minHeight: '60vh',
   backgroundColor: S.surface,
   fontFamily: BODY_FONT,
   padding: 24,
@@ -48,8 +50,10 @@ const ICON_BOX: CSSProperties = {
 };
 
 const HEADING: CSSProperties = {
+  fontFamily: HEADLINE_FONT,
   fontSize: 24,
-  fontWeight: 600,
+  fontWeight: 800,
+  letterSpacing: '-0.01em',
   color: S.onBg,
   margin: 0,
 };
@@ -72,14 +76,14 @@ const DETAILS_BOX: CSSProperties = {
 
 const ERROR_MESSAGE: CSSProperties = {
   fontSize: 12,
-  fontFamily: MONO_FONT,
+  ...FIGURES,
   color: S.contraction,
   margin: '0 0 8px 0',
   wordBreak: 'break-word',
 };
 
 const STACK: CSSProperties = {
-  fontSize: 10,
+  fontSize: 11,
   overflow: 'auto',
   color: S.mutedText,
   margin: 0,
@@ -127,10 +131,10 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             <AlertTriangle size={32} color={S.contraction} />
           </div>
 
-          <h1 style={HEADING}>Something went wrong</h1>
+          <h2 style={HEADING}>Something went wrong</h2>
 
           <p style={DESCRIPTION}>
-            The page hit an unexpected error. Try again; if it happens again, tell the PRISM team what you were doing.
+            The page hit an unexpected error. Try again; if it happens again, tell <FeedbackLink /> what you were doing.
           </p>
 
           {process.env.NODE_ENV === 'development' && this.state.error && (
@@ -149,7 +153,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = S.primaryDim; }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = S.primary; }}
           >
-            <RotateCcw size={16} />
+            <RotateCcw size={16} aria-hidden />
             Try again
           </button>
         </div>
