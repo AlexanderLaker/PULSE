@@ -13,16 +13,22 @@ README.md; the documents in `docs/` explain everything below in full.
   dashboard: 3 chains x 50,000 iterations, master seed 42, stored as a row of
   `simulation_runs` in Neon PostgreSQL, plus a QA workbook in `runs/`.
 - The API (`prism/api`, Vercel function `api/index.py`) serves the newest run,
-  the drivers, the read-only model configuration and the Consumer Journey
-  content. It never simulates and never imports the engine; its runtime has
-  no numpy or scipy.
+  the drivers, the read-only model configuration, the Consumer Journey and the
+  Profit Pool Explorer content. The content is hand-authored JSON
+  (`data/content/`), generated into `prism/journey_content.py` and
+  `prism/explorer_content.py` by `scripts/build_content.py`; it is
+  confidential and reaches the browser through the API only, never in the
+  dashboard's code. The API never simulates and never imports the engine; its
+  runtime has no numpy or scipy.
 - The dashboard (`app/`, `components/dashboard/`) authenticates with Clerk.
   Roles live in `user_roles`; a user without a row is pending and sees only
   the waiting page until an admin approves them (`proxy.ts` checks before
   the dashboard renders, `app/dashboard/page.tsx` again). Reads use a viewer
   cookie scoped to `/api/v1`; admin writes go through the dashboard's server
   routes, which forward them with a five-minute admin token
-  (`lib/adminWrite.ts`).
+  (`lib/adminWrite.ts`). On PostgreSQL the API looks the token's user up in
+  `user_roles` on every request (`prism/api/auth.py`): no row is a 403 with
+  the code `no_role`, and the stored role never upgrades a token.
 - The numbers are relative shifts, ceteris paribus (no management response),
   presented as structured judgment, never as a validated forecast.
 
@@ -42,7 +48,8 @@ README.md; the documents in `docs/` explain everything below in full.
   regenerate pins to make a test pass.
 - **Generated files are never edited by hand**: `prism/seed_drivers.py`,
   `prism/analysis_texts.py`, `prism/overlap_correction.py`,
-  `prism/cell_weight_estimate.py`, `data/driverCodeMap.ts`,
+  `prism/cell_weight_estimate.py`, `prism/journey_content.py`,
+  `prism/explorer_content.py`, `data/driverCodeMap.ts`,
   `data/parameters/*.json`, `lib/cellWeightProvenance.ts`,
   `data/drivers/driver_attribution.json` and
   `tests/frontend/fixtures/driverAttribution.fixture.json`. Change the input
@@ -79,9 +86,10 @@ README.md; the documents in `docs/` explain everything below in full.
   the driver request shapes (`prism/api/schemas.py` and `types/drivers.ts`),
   the estimate's label, the earliest peak year and the token secret's
   minimum length (`prism/config.py`, `prism/api/auth.py` and
-  `lib/cellWeights.ts`, `lib/format.ts`, `lib/prismJwt.ts`) and the Consumer
-  Journey tile shape (`prism/journey.py` and `data/consumerJourney.ts`) exist
-  twice and are tested against each other; change both or neither.
+  `lib/cellWeights.ts`, `lib/format.ts`, `lib/prismJwt.ts`), the Consumer
+  Journey tile shape (`prism/journey.py` and `data/consumerJourney.ts`) and
+  the Explorer's view shape (`prism/explorer.py` and `lib/profitPoolData.ts`)
+  exist twice and are tested against each other; change both or neither.
 - **Shift Matrix arithmetic** lives in `lib/shiftMatrix.ts`;
   `scripts/check_single_source.sh` (part of `npm run lint`) fails on a copy.
 - **Design tokens.** Colours, shadows and fonts come from `lib/theme.ts` (the
@@ -136,7 +144,7 @@ README.md; the documents in `docs/` explain everything below in full.
 | `npm run dev` | the dashboard |
 | `npm run verify` | types, lint, both test suites |
 | `python3 -m pytest -n auto` | the Python suite |
-| `python3 scripts/generate_seed.py --check` | one of the four generator checks (docs/OPERATIONS.md lists them) |
+| `python3 scripts/generate_seed.py --check` | one of the five generator checks (docs/OPERATIONS.md lists them) |
 | `python3 scripts/run_production.py` | the production run (database in `.env`) |
 
 With `PRISM_TEST_POSTGRES_URL` set, the migration and the database layer are
@@ -156,6 +164,7 @@ also tested on PostgreSQL. The Python suite never touches the database in
 | `prism/api/` | the API: routers, auth, the stored-run contract (`runs.py`) |
 | `scripts/` | production run, generators, `promote_admin.py`, handover packaging |
 | `data/drivers/` | the driver base and the PRISM Analysis sources |
+| `data/content/` | the Consumer Journey and Profit Pool Explorer content, the input of `scripts/build_content.py` |
 | `components/dashboard/` | the views: each page in one file, its parts in a folder of its own (`drivers/`, `shift/`, `journey/`, `explorer/`, `settings/`), and the pieces several views share |
 | `lib/`, `hooks/`, `types/` | shared dashboard logic and the API client; the store and the behaviour every overlay shares; the types |
 | `docs/` | ARCHITECTURE, MODEL, DRIVERS, DRIVER_ANALYSIS, OPERATIONS, DESIGN, EXPLORER, `adr/` |

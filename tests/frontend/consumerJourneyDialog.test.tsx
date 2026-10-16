@@ -1,16 +1,22 @@
 // @vitest-environment jsdom
 /**
  * The Consumer Journey page: the rail, the tile dialog with its Why-chain, the
- * link to the Drivers page and the stage context, the stored content that
- * replaces the bundled tiles, and the admin save with its version check.
+ * link to the Drivers page and the stage context, the content the API serves
+ * (the base content or a saved version, with the stage contexts, and nothing
+ * of it before the API has answered or when it cannot be reached), and the
+ * admin save with its version check.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, within, waitFor } from '@testing-library/react';
 import type { PrismStore } from '@/hooks/usePrism';
-import { HAIR_CTX, HAIR_JOURNEY, LHC_CTX, LHC_JOURNEY, type JourneyContent, type JourneyTile } from '@/data/consumerJourney';
-import { ApiError } from '@/lib/apiClient';
-import { DRIVER_CODE_MAP } from '@/data/driverCodeMap';
+import type { JourneyContent, JourneyContexts, JourneyTile } from '@/data/consumerJourney';
+import { ApiError, type StoredJourney } from '@/lib/apiClient';
+import journey from '@/data/content/consumer_journey.json';
 import { makeDriver, makeStore } from './fixtures/prism';
+
+/** The base content as the API serves it: the hand-authored JSON. */
+const BASE = journey as unknown as { tiles: JourneyContent; contexts: JourneyContexts };
+const SERVED_BASE: StoredJourney = { version: 0, source: 'base', content: BASE.tiles, contexts: BASE.contexts };
 
 const STORE = vi.hoisted(() => ({ current: null as PrismStore | null }));
 const API = vi.hoisted(() => ({
@@ -41,17 +47,20 @@ const T01 = makeDriver({
 
 beforeEach(() => {
   STORE.current = makeStore({ drivers: [T01] });
-  API.getJourneyContent.mockReset().mockResolvedValue({ version: 0, content: null });
+  API.getJourneyContent.mockReset().mockResolvedValue(SERVED_BASE);
   API.saveJourneyContent.mockReset().mockResolvedValue({ status: 'saved', version: 1, tiles: 300 });
 });
 
 afterEach(() => cleanup());
 
-/** Opens a tile once the saved journey has answered (the rail waits for it). */
+/** Opens a tile once the journey has answered (the rail waits for it). */
 async function openTile(name = TILE) {
   fireEvent.click(await screen.findByText(name));
   return within(screen.getByRole('dialog'));
 }
+
+/** The notice the board shows instead of its content when the API cannot be reached. */
+const UNAVAILABLE = /The journey could not be loaded from the PRISM service, so there are no tiles to show; the tiles and the stage contexts appear once it answers\./;
 
 describe('ConsumerJourney: rail and tile dialog', () => {
   it('strips trailing parentheticals from tile names in the rail', async () => {
@@ -140,16 +149,38 @@ describe('ConsumerJourney: rail and tile dialog', () => {
     expect(screen.queryByText(TILE)).toBeNull();   // a tech tile
   });
 
-  it('shows the authored context of the tile\'s stage', async () => {
+  it('shows the authored context of the tile\'s stage, as the API served it', async () => {
     render(<ConsumerJourney />);
     const dialog = await openTile();
-    expect(dialog.getByText(/^Stage context: /)).toBeTruthy();
+    expect(dialog.getByText('Stage context: Sorting')).toBeTruthy();
     expect(dialog.getByText('Henkel brands')).toBeTruthy();
+    expect(dialog.getByText(BASE.contexts.lhc.sorting!.henkelBrands)).toBeTruthy();
+    expect(dialog.getByText(BASE.contexts.lhc.sorting!.opportunity)).toBeTruthy();
+  });
+
+  it('shows the context the payload carries, not a copy of its own', async () => {
+    API.getJourneyContent.mockResolvedValue({
+      ...SERVED_BASE,
+      contexts: {
+        lhc: { sorting: { henkelBrands: 'Served brands', competitors: 'Served competitors', opportunity: 'Served opportunity' } },
+        hair: {},
+      },
+    });
+    render(<ConsumerJourney />);
+    const dialog = await openTile();
+    expect(dialog.getByText('Served brands')).toBeTruthy();
+    expect(dialog.getByText('Served competitors')).toBeTruthy();
+    expect(dialog.queryByText(BASE.contexts.lhc.sorting!.henkelBrands)).toBeNull();
+    // a stage the payload has no context for shows no context block
+    fireEvent.click(dialog.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    const later = await openTile('Detergent sheets & pods');
+    expect(later.queryByText(/^Stage context: /)).toBeNull();
   });
 
   it('keys every stage context by its stage id, one for each stage', () => {
-    for (const [journey, contexts] of [[LHC_JOURNEY, LHC_CTX], [HAIR_JOURNEY, HAIR_CTX]] as const) {
-      expect(Object.keys(contexts).sort()).toEqual(journey.map((stage) => stage.id).sort());
+    for (const key of ['lhc', 'hair'] as const) {
+      expect(Object.keys(BASE.contexts[key]).sort()).toEqual(BASE.tiles[key].map((stage) => stage.id).sort());
     }
   });
 
@@ -160,12 +191,28 @@ describe('ConsumerJourney: rail and tile dialog', () => {
     expect(onNavigateToDriver).toHaveBeenCalledWith('AI and automation productivity (live row)');
   });
 
-  it('shows the code map entry until the drivers arrive', async () => {
+  it('shows the code and the force only until the drivers arrive, and counts no direction', async () => {
     STORE.current = makeStore({ drivers: [] });
     render(<ConsumerJourney />);
     const dialog = await openTile();
-    expect(dialog.getByText(DRIVER_CODE_MAP['T-01'].name)).toBeTruthy();
-    expect(dialog.getByText(/\(the drivers have not loaded yet\)/)).toBeTruthy();
+    expect(dialog.getByText('T-01')).toBeTruthy();
+    expect(dialog.getAllByText('Technology').length).toBeGreaterThan(0);   // the force chip
+    expect(dialog.getByText('The drivers have not loaded yet: the name, direction and description follow.')).toBeTruthy();
+    expect(dialog.getByText('The tailwind and headwind count follows once the drivers have loaded.')).toBeTruthy();
+    // neither the live name nor the driver base's name or first sentence: the bundle has no such text
+    expect(dialog.queryByText(/live row/)).toBeNull();
+    expect(dialog.queryByText(/in innovation, marketing and manufacturing/)).toBeNull();
+    expect(dialog.queryByText(/tailwind for this moment/)).toBeNull();
+    expect(dialog.queryByText(/1 tailwind/)).toBeNull();
+    expect(dialog.getByText(/Dominant force/).textContent).toContain('Technology');
+  });
+
+  it('searches the Drivers page by code while the driver\'s name is not known', async () => {
+    STORE.current = makeStore({ drivers: [] });
+    const onNavigateToDriver = vi.fn();
+    render(<ConsumerJourney onNavigateToDriver={onNavigateToDriver} />);
+    fireEvent.click((await openTile()).getByText('View in Drivers'));
+    expect(onNavigateToDriver).toHaveBeenCalledWith('T-01');
   });
 
   it('closes on Escape', async () => {
@@ -196,26 +243,38 @@ describe('ConsumerJourney: rail and tile dialog', () => {
   });
 });
 
-describe('ConsumerJourney: stored content and the admin save', () => {
-  it('replaces the bundled tiles with the stored content', async () => {
-    const tile: JourneyTile = {
-      id: 'lhc.sorting.exp.stored',
-      name: 'Stored tile',
-      type: 'tech',
-      driverCodes: ['T-01'],
-      driverNote: 'T-01 AI and automation productivity',
-      intensity: 2,
-      provenance: { date: '2026-10', grade: 'verified' },
-      analysis: null,
-    };
-    const stored: JourneyContent = {
-      lhc: [{ id: 'sorting', label: 'Sorting', benefiting: [tile], negativelyImpacted: [] }],
-      hair: [],
-    };
-    API.getJourneyContent.mockResolvedValue({ version: 7, content: stored });
+describe('ConsumerJourney: the served content and the admin save', () => {
+  /** A saved version as the API serves it: one tile, with the base contexts. */
+  const STORED_TILE: JourneyTile = {
+    id: 'lhc.sorting.exp.stored',
+    name: 'Stored tile',
+    type: 'tech',
+    driverCodes: ['T-01'],
+    driverNote: 'T-01 AI and automation productivity',
+    intensity: 2,
+    provenance: { date: '2026-10', grade: 'verified' },
+    analysis: null,
+  };
+  const SERVED_STORED: StoredJourney = {
+    version: 7,
+    source: 'stored',
+    content: { lhc: [{ id: 'sorting', label: 'Sorting', benefiting: [STORED_TILE], negativelyImpacted: [] }], hair: [] },
+    contexts: BASE.contexts,
+  };
+
+  it('shows the tiles the API serves: the base content, or the saved version', async () => {
+    const { unmount } = render(<ConsumerJourney />);
+    expect(await screen.findByText(TILE)).toBeTruthy();
+    expect(screen.queryByText('Stored tile')).toBeNull();
+    unmount();
+
+    API.getJourneyContent.mockResolvedValue(SERVED_STORED);
     render(<ConsumerJourney />);
     expect(await screen.findByText('Stored tile')).toBeTruthy();
     expect(screen.queryByText(TILE)).toBeNull();
+    // the stage context still comes with the payload
+    const dialog = await openTile('Stored tile');
+    expect(dialog.getByText(BASE.contexts.lhc.sorting!.henkelBrands)).toBeTruthy();
   });
 
   it('keeps the editing controls from a viewer', () => {
@@ -223,7 +282,7 @@ describe('ConsumerJourney: stored content and the admin save', () => {
     expect(screen.queryByRole('button', { name: 'Edit board' })).toBeNull();
   });
 
-  /** The editing controls, once the stored content has answered. */
+  /** The editing controls, once the journey has answered. */
   async function startEditing() {
     const edit = screen.getByRole('button', { name: 'Edit board' });
     await waitFor(() => expect((edit as HTMLButtonElement).disabled).toBe(false));
@@ -240,7 +299,7 @@ describe('ConsumerJourney: stored content and the admin save', () => {
     expect(Object.keys(sent).sort()).toEqual(['hair', 'lhc']);
     expect(sent.lhc.length).toBeGreaterThan(0);
     expect(sent.hair.length).toBeGreaterThan(0);
-    expect(baseVersion).toBe(0);   // the bundled content
+    expect(baseVersion).toBe(0);   // the base content
     // the next save starts from the version this one created
     fireEvent.click(screen.getByRole('button', { name: 'Save for everyone' }));
     await waitFor(() => expect(API.saveJourneyContent).toHaveBeenCalledTimes(2));
@@ -306,14 +365,9 @@ describe('ConsumerJourney: stored content and the admin save', () => {
     expect(API.saveJourneyContent.mock.calls[1]![1]).toBe(4);
   });
 
-  it('shows the shipped texts when the saved version cannot be loaded after a refused save', async () => {
-    const tile: JourneyTile = {
-      id: 'lhc.sorting.exp.stored', name: 'Stored tile', type: 'tech', driverCodes: [], driverNote: '',
-      intensity: 2, provenance: { date: '2026-10', grade: 'verified' }, analysis: null,
-    };
+  it('shows the notice and no tiles when the journey cannot be loaded again after a refused save', async () => {
     API.getJourneyContent
-      .mockResolvedValueOnce({ version: 7, content: { lhc: [{ id: 'sorting', label: 'Sorting', benefiting: [tile],
-        negativelyImpacted: [] }], hair: [] } })
+      .mockResolvedValueOnce(SERVED_STORED)
       .mockRejectedValueOnce(new ApiError(500, 'database down'));
     API.saveJourneyContent.mockRejectedValue(new ApiError(409, 'saved by someone else'));
     render(<ConsumerJourney isAdmin />);
@@ -321,40 +375,60 @@ describe('ConsumerJourney: stored content and the admin save', () => {
     await startEditing();
     fireEvent.click(screen.getByRole('button', { name: 'Save for everyone' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Load the saved version' }));
-    expect(await screen.findByText(/these are the texts shipped with PRISM/)).toBeTruthy();
+    expect(await screen.findByText(UNAVAILABLE)).toBeTruthy();
     expect(screen.queryByText('Stored tile')).toBeNull();
-    expect(screen.getByText(TILE)).toBeTruthy();
+    expect(screen.queryByText(TILE)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save for everyone' })).toBeNull();
   });
 
-  it('turns saving off while the saved journey cannot be loaded', async () => {
+  it('with the API down, shows an admin the notice and nothing of the board, editing controls included', async () => {
     API.getJourneyContent.mockRejectedValue(new ApiError(500, 'database down'));
     render(<ConsumerJourney isAdmin />);
-    await startEditing();
-    expect(await screen.findByText(/saving is off so it cannot be overwritten/)).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Save for everyone' }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getAllByRole('button', { name: 'Try again' }).length).toBeGreaterThan(0);
+    expect(await screen.findByText(UNAVAILABLE)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Edit board' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save for everyone' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Laundry' })).toBeNull();
+    expect(screen.queryByText(TILE)).toBeNull();
+    expect(screen.queryByText(/Stage \d/)).toBeNull();
+    // the page still says what the view is
+    expect(screen.getByText('Where Profit Pools Shift Along the Journey')).toBeTruthy();
+    expect(screen.getByText('Strategist hypotheses, not findings.')).toBeTruthy();
   });
 
-  it('shows nothing from the bundled copy while the saved journey loads', async () => {
-    let answer: (stored: { version: number; content: null }) => void = () => {};
+  it('shows nothing of the content while the journey loads', async () => {
+    let answer: (served: StoredJourney) => void = () => {};
     API.getJourneyContent.mockReturnValue(new Promise((resolve) => { answer = resolve; }));
     render(<ConsumerJourney />);
-    expect(screen.getByRole('status').textContent).toBe('Loading the saved journey…');
+    expect(screen.getByRole('status').textContent).toBe('Loading the journey…');
     expect(screen.queryByText(TILE)).toBeNull();
-    answer({ version: 0, content: null });
+    expect(screen.queryByText(/Stage \d/)).toBeNull();
+    answer(SERVED_BASE);
     expect(await screen.findByText(TILE)).toBeTruthy();
     expect(screen.queryByRole('status')).toBeNull();
   });
 
-  it('tells a viewer when the saved journey could not be loaded, and loads it again on request', async () => {
+  it('with the API down, shows a viewer the notice and no tiles, and loads the journey again on request', async () => {
     API.getJourneyContent.mockRejectedValueOnce(new ApiError(500, 'database down'));
     render(<ConsumerJourney />);
-    expect(await screen.findByText(/these are the texts shipped with PRISM; an admin may have changed them/))
-      .toBeTruthy();
-    expect(screen.getByText(TILE)).toBeTruthy();
+    expect(await screen.findByText(UNAVAILABLE)).toBeTruthy();
+    expect(screen.queryByText(TILE)).toBeNull();
+    expect(screen.queryAllByRole('button').map((b) => b.textContent)).toEqual(['Try again']);
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     await waitFor(() => expect(API.getJourneyContent).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(screen.queryByText(/texts shipped with PRISM/)).toBeNull());
+    expect(await screen.findByText(TILE)).toBeTruthy();
+    expect(screen.queryByText(UNAVAILABLE)).toBeNull();
+  });
+
+  it('with the API up, shows the served tiles of both journeys and their stage contexts', async () => {
+    render(
+      <ViewUrlProvider initial={{ view: 'consumer-journey', params: { journey: 'hair' } }}>
+        <ConsumerJourney />
+      </ViewUrlProvider>,
+    );
+    const hairTile = BASE.tiles.hair[0]!.benefiting[0]!;
+    const dialog = await openTile(hairTile.name.replace(/\s*\([^()]*\)\s*$/, ''));
+    expect(dialog.getByText(BASE.contexts.hair[BASE.tiles.hair[0]!.id]!.henkelBrands)).toBeTruthy();
   });
 });
 
@@ -443,12 +517,26 @@ describe('ConsumerJourney: the address', () => {
     expect(screen.queryByText(TILE)).toBeNull();
   });
 
-  it('opens the tile the address names once the saved journey has arrived', async () => {
+  it('opens the tile the address names once the journey has arrived', async () => {
     render(
       <ViewUrlProvider initial={{ view: 'consumer-journey', params: { journey: 'lhc', tile: AI_TILE_ID } }}>
         <ConsumerJourney />
       </ViewUrlProvider>,
     );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading', { level: 2 }).textContent).toBe(TILE);
+  });
+
+  it('keeps the tile the address names for a load that succeeds after one that failed', async () => {
+    API.getJourneyContent.mockRejectedValueOnce(new ApiError(500, 'database down'));
+    render(
+      <ViewUrlProvider initial={{ view: 'consumer-journey', params: { journey: 'lhc', tile: AI_TILE_ID } }}>
+        <ConsumerJourney />
+      </ViewUrlProvider>,
+    );
+    expect(await screen.findByText(UNAVAILABLE)).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('heading', { level: 2 }).textContent).toBe(TILE);
   });

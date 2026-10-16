@@ -5,9 +5,19 @@ Hair and the Laundry & Home Care industries and how each pool is developing.
 It is separate from the simulation: nothing in it feeds the Shift Matrix, and
 it is the one view built on amounts of money (elsewhere a figure in euros
 appears only as quoted evidence in a text: a driver's description or sources,
-or a Consumer Journey tile). Its data and arithmetic are
-`lib/profitPoolData.ts`; `tests/frontend/profitPoolData.test.ts` checks
-them.
+or a Consumer Journey tile). Its figures are confidential and live in
+`data/content/profit_pools.json`, which `scripts/build_content.py` validates
+(`prism/explorer.py`: every view of the dashboard once, unique row ids,
+revenue shares in (0, 1] that add up to 1 within 0.02 per view, GP1 margins
+in (0, 1), every source with an http(s) link, a label, a grade and, where
+given, a value basis from the allowed set) and writes to
+`prism/explorer_content.py`; the API serves them to a signed-in user with a
+role (`GET /api/v1/explorer`), and the view fetches them when it opens,
+showing a skeleton until then and an unavailable notice with "Try again"
+when the call fails. Nothing of them is in the dashboard's code. The
+arithmetic is `lib/profitPoolData.ts`, which runs on the fetched views;
+`tests/frontend/profitPoolData.test.ts` checks it on the views of the JSON,
+and `tests/test_content.py` the validator and the generated module.
 
 ## The views
 
@@ -91,7 +101,8 @@ estimate, with its full derivation in the source label and in the hover of its
 source chip; the view's construction note gives the method, and its key
 insights the error band (about 10 to 15 percent, insecticides about 25
 percent). Once the sizes are checked against Passport internally, the anchors
-in `lib/profitPoolData.ts` are updated and their grades change to reported.
+in `data/content/profit_pools.json` are updated, their grades change to
+reported and `python3 scripts/build_content.py` regenerates the module.
 
 How the Passport rows relate to PRISM's categories is stated in each view's
 construction note: laundry detergents cover Fabric Clean and Fabric Care

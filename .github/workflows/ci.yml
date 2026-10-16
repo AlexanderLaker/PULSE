@@ -89,6 +89,7 @@ jobs:
       - run: python scripts/build_cell_weights.py --check
       - run: python scripts/compute_overlap_correction.py --check
       - run: python scripts/build_driver_analysis.py --check
+      - run: python scripts/build_content.py --check
 
   # Started by hand (Actions, ci, Run workflow): the production run at its full
   # size, checked against the reference run of the PRISM Analysis record.

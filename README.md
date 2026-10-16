@@ -111,8 +111,8 @@ development machine) shows how to make yourself the first.
 | `app/` | Next.js pages and the dashboard's server routes (roles, admin writes, the viewer cookie, the Clerk webhook) |
 | `components/dashboard/` | The views and their shared pieces |
 | `hooks/`, `types/` | The data store, the behaviour every overlay shares (Escape, the scroll lock, focus), and the types that mirror the API's JSON |
-| `lib/` | Shared logic: the API client, formatting, the Shift Matrix arithmetic, cell weights, the per-driver attribution, the Profit Pool Explorer's data, tokens, auth helpers |
-| `data/` | Dashboard content (the Consumer Journey, the generated driver code map), the driver base and the PRISM Analysis templates (`drivers/`), and the generated records of the overlap correction, the cell-weight estimate and the attribution (`parameters/`, `drivers/driver_attribution.json`) |
+| `lib/` | Shared logic: the API client, formatting, the Shift Matrix arithmetic, cell weights, the per-driver attribution, the Profit Pool Explorer's arithmetic, tokens, auth helpers, the Content Security Policy |
+| `data/` | The content the API serves (`content/`: the Consumer Journey's tiles and stage contexts, the Explorer's views), the Consumer Journey's types, the generated driver code map, the driver base and the PRISM Analysis templates (`drivers/`), and the generated records of the overlap correction, the cell-weight estimate and the attribution (`parameters/`, `drivers/driver_attribution.json`) |
 | `prism/` | The Python package: the engine (`engine.py`), the model configuration, the driver base, persistence, the QA workbook and the API (`api/`) |
 | `api/index.py` | The Vercel entry point of the API |
 | `scripts/` | The production run, the generators and maintenance tools |
@@ -131,10 +131,11 @@ development machine) shows how to make yourself the first.
 | `ruff check .` | The Python lint |
 | `python3 scripts/run_production.py` | The production run against the database in `.env` |
 
-Four generators keep committed files in step with their inputs; each takes
-`--check` to verify them, and CI runs all four (docs/OPERATIONS.md):
+Five generators keep committed files in step with their inputs; each takes
+`--check` to verify them, and CI runs all five (docs/OPERATIONS.md):
 `scripts/generate_seed.py`, `scripts/build_cell_weights.py`,
-`scripts/compute_overlap_correction.py` and `scripts/build_driver_analysis.py`.
+`scripts/compute_overlap_correction.py`, `scripts/build_driver_analysis.py`
+and `scripts/build_content.py`.
 
 ## Configuration
 
@@ -155,6 +156,7 @@ effect with the next deployment.
 | `ADMIN_BOOTSTRAP_EMAIL` | dashboard (only while setting up the first admin) | The one address `/api/admin/bootstrap` can make the first admin |
 | `NEXT_PUBLIC_PRISM_FEEDBACK_URL` | dashboard (optional, also at build time) | Where the Welcome dialog, the error states and the Help menu send feedback: a `mailto:` address or a link (a Teams channel, a form). Unset, they name the PRISM team without a link |
 | `PRISM_API_ORIGIN` | dashboard (optional) | The origin the admin routes call the API on; without it, the host the request came in on. On Vercel set it for Production only, so a preview deployment never writes to the production API |
+| `PRISM_CSP_REPORT_ONLY` | dashboard (optional) | `1` sends the Content Security Policy as report-only, for a first deployment that watches the browser console before enforcing; unset, the policy is enforced |
 | `PRISM_LOCAL_API_URL` | local dashboard | Where the dev server sends `/api/v1` (default `http://127.0.0.1:8000`) |
 | `PRISM_DB_PATH` | API, scripts | The SQLite file used when neither database URL is set (default `data/prism.db`); the production run uses it only with `--allow-sqlite` |
 | `PRISM_API_DOCS` | local API | `1` serves the API's interactive documentation (`/docs`, `/redoc`, `/openapi.json`); unset, as on every deployment, it serves none, and on Vercel never |

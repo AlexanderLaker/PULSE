@@ -1,4 +1,5 @@
-"""The API: routes, authentication, the served run, the drivers editor, proposals, config and journey."""
+"""The API: routes, authentication and the role re-check, the served run, the drivers editor, proposals,
+config, journey and explorer."""
 import base64
 import copy
 import hashlib
@@ -96,6 +97,7 @@ class TestRoutes:
             ("GET", "/api/v1/drivers"), ("PUT", "/api/v1/drivers/{driver_id}"),
             ("GET", "/api/v1/drivers/{driver_id}/proposals"), ("PUT", "/api/v1/drivers/{driver_id}/proposals"),
             ("GET", "/api/v1/config"), ("GET", "/api/v1/journey"), ("PUT", "/api/v1/journey"),
+            ("GET", "/api/v1/explorer"),
         }
 
     def test_the_interactive_documentation_is_served_only_when_asked_for(self, monkeypatch, tmp_path):
@@ -136,7 +138,8 @@ class TestRoutes:
             "client = TestClient(create_app())\n"
             "headers = {'Authorization': 'Bearer ' + os.environ['TEST_TOKEN']}\n"
             "for path in ['/api/v1/health', '/api/v1/diagnostics', '/api/v1/drivers', '/api/v1/simulation',\n"
-            "             '/api/v1/config', '/api/v1/drivers/consumer_r01/proposals']:\n"
+            "             '/api/v1/config', '/api/v1/drivers/consumer_r01/proposals', '/api/v1/journey',\n"
+            "             '/api/v1/explorer']:\n"
             "    assert client.get(path, headers=headers).status_code == 200, path\n"
             "body = {'revision': 1, 'probability': 3}\n"
             "assert client.put('/api/v1/drivers/consumer_r01', headers=headers, json=body).status_code == 200\n"
@@ -161,7 +164,7 @@ class TestRoutes:
 
 
 class TestAuthentication:
-    READS = ["/api/v1/drivers", "/api/v1/simulation", "/api/v1/config", "/api/v1/journey",
+    READS = ["/api/v1/drivers", "/api/v1/simulation", "/api/v1/config", "/api/v1/journey", "/api/v1/explorer",
              "/api/v1/drivers/consumer_r01/proposals"]
 
     def test_reads_need_a_token(self, api):
@@ -185,14 +188,141 @@ class TestAuthentication:
         assert api.get("/api/v1/drivers", headers=bearer(secret="short")).status_code == 401
 
     def test_a_viewer_cannot_write(self, api):
+        """A 403 body carries the reason as `detail` and a `code` the dashboard reads."""
         edit = {"revision": 1, "probability": 2}
-        assert api.put("/api/v1/drivers/consumer_r01", json=edit, headers=bearer()).status_code == 403
+        response = api.put("/api/v1/drivers/consumer_r01", json=edit, headers=bearer())
+        assert response.status_code == 403
+        assert response.json() == {"detail": "Admin access is required.", "code": "not_admin"}
         save = {"base_version": 0, "content": {"lhc": [], "hair": []}}
         assert api.put("/api/v1/journey", json=save, headers=bearer()).status_code == 403
 
     def test_health_and_diagnostics_are_anonymous(self, api):
         assert api.get("/api/v1/health").status_code == 200
         assert api.get("/api/v1/diagnostics").status_code == 200
+
+
+class TestRoleRecheck:
+    """On PostgreSQL every authenticated request looks the token's `sub` up in user_roles; a token alone no
+    longer reads once the role is gone. The suite runs on SQLite, where the check is off, so both paths run
+    here with the switch set and the lookup monkeypatched."""
+
+    @pytest.fixture
+    def roles(self, api, monkeypatch):
+        """The check switched on, with the stored roles in a dict the test fills; the lookups are recorded."""
+        import prism.database as dbm
+        from prism.api import auth
+        stored, looked_up = {}, []
+
+        def load_user_role(clerk_user_id):
+            looked_up.append(clerk_user_id)
+            return stored.get(clerk_user_id)
+        monkeypatch.setattr(auth, "CHECK_STORED_ROLE", True)
+        monkeypatch.setattr(dbm, "load_user_role", load_user_role)
+        return types.SimpleNamespace(stored=stored, looked_up=looked_up)
+
+    def test_the_switch_follows_the_backend(self):
+        """On SQLite (the suite, development) there is no user_roles table, so the check is off; on
+        PostgreSQL it is on, and on Vercel it is on whatever the database setting, so a deployment that
+        lost its database URL answers 503 rather than reading for an unchecked token."""
+        import prism.database as dbm
+        from prism.api import auth
+        assert dbm.USE_POSTGRES is False and not dbm.on_vercel() and auth.CHECK_STORED_ROLE is False
+        source = Path(auth.__file__).read_text(encoding="utf-8")
+        assert "CHECK_STORED_ROLE = database.USE_POSTGRES or database.on_vercel()" in source
+
+    def test_on_sqlite_the_stored_role_is_not_looked_up(self, api, monkeypatch):
+        import prism.database as dbm
+
+        def never(clerk_user_id):
+            raise AssertionError("the role was looked up on SQLite")
+        monkeypatch.setattr(dbm, "load_user_role", never)
+        assert api.get("/api/v1/config", headers=bearer()).status_code == 200
+        assert api.put("/api/v1/journey", headers=bearer("admin"),
+                       json={"base_version": 0, "content": {"lhc": [], "hair": []}}).status_code == 200
+
+    def test_a_user_without_a_role_is_refused_on_every_authenticated_route(self, api, roles):
+        """No row (pending, or set back to pending): 403 with the code the dashboard leaves on, by the cookie
+        and by a bearer token alike; the lookup is by the token's sub."""
+        refused = {"detail": "Your access to PRISM has been removed or not yet granted.", "code": "no_role"}
+        for path in TestAuthentication.READS:
+            response = api.get(path, headers=bearer(sub="user-gone"))
+            assert response.status_code == 403 and response.json() == refused, path
+        api.cookies.set("prism-token", token(sub="user-gone"))
+        response = api.get("/api/v1/drivers")
+        assert response.status_code == 403 and response.json() == refused
+        api.cookies.clear()
+        for path, body in (("/api/v1/drivers/consumer_r01", {"revision": 1, "probability": 2}),
+                           ("/api/v1/journey", {"base_version": 0, "content": {"lhc": [], "hair": []}}),
+                           ("/api/v1/drivers/consumer_r01/proposals", {"probability": 2})):
+            response = api.put(path, json=body, headers=bearer("admin", sub="user-gone"))
+            assert response.status_code == 403 and response.json() == refused, path
+        assert set(roles.looked_up) == {"user-gone"}
+
+    def test_a_stored_role_lets_the_token_through(self, api, roles):
+        roles.stored.update({"viewer-1": "viewer", "admin-1": "admin"})
+        assert api.get("/api/v1/config", headers=bearer(sub="viewer-1")).status_code == 200
+        assert api.get("/api/v1/explorer", headers=bearer(sub="admin-1")).status_code == 200
+        response = api.put("/api/v1/drivers/consumer_r01", json={"revision": 1, "probability": 2},
+                           headers=bearer("admin", sub="admin-1"))
+        assert response.status_code == 200
+        assert roles.looked_up == ["viewer-1", "admin-1", "admin-1"]
+
+    def test_an_admin_token_of_a_demoted_user_is_refused(self, api, roles):
+        """The stored role is viewer now: the five-minute admin token no longer writes, nor reads."""
+        roles.stored["demoted"] = "viewer"
+        refused = {"detail": "Admin access is required.", "code": "not_admin"}
+        response = api.put("/api/v1/drivers/consumer_r01", json={"revision": 1, "probability": 2},
+                           headers=bearer("admin", sub="demoted"))
+        assert response.status_code == 403 and response.json() == refused
+        response = api.get("/api/v1/drivers", headers=bearer("admin", sub="demoted"))
+        assert response.status_code == 403 and response.json() == refused
+        # the same user's viewer cookie still reads
+        assert api.get("/api/v1/drivers", headers=bearer("viewer", sub="demoted")).status_code == 200
+
+    def test_the_stored_role_never_upgrades_a_token(self, api, roles):
+        """An admin's viewer cookie stays a viewer: it reads, and an admin write under it is refused."""
+        roles.stored["admin-1"] = "admin"
+        assert api.get("/api/v1/drivers", headers=bearer("viewer", sub="admin-1")).status_code == 200
+        response = api.put("/api/v1/drivers/consumer_r01", json={"revision": 1, "probability": 2},
+                           headers=bearer("viewer", sub="admin-1"))
+        assert response.status_code == 403 and response.json()["code"] == "not_admin"
+        # and the identity the audit log and the proposals get is the token's
+        response = api.put("/api/v1/drivers/consumer_r01/proposals", json={"probability": 2},
+                           headers=bearer("viewer", sub="admin-1", name="Ana"))
+        assert response.status_code == 200
+        proposals = api.get("/api/v1/drivers/consumer_r01/proposals", headers=bearer("viewer", sub="admin-1")).json()
+        assert [(s["user_id"], s["name"]) for s in proposals["scorers"]] == [("admin-1", "Ana")]
+
+    def test_a_token_without_a_subject_has_no_role(self, api, roles):
+        """The dashboard signs every token with the user's Clerk id; one without is refused unlooked-up."""
+        roles.stored[""] = "admin"
+        for sub in (None, ""):
+            response = api.get("/api/v1/config", headers={"Authorization": f"Bearer {token(sub=sub)}"})
+            assert response.status_code == 403 and response.json()["code"] == "no_role"
+        assert roles.looked_up == []
+
+    def test_health_and_diagnostics_stay_anonymous(self, api, roles):
+        assert api.get("/api/v1/health").status_code == 200
+        assert api.get("/api/v1/diagnostics").status_code == 200
+        assert roles.looked_up == []
+
+    def test_a_database_out_of_reach_during_the_lookup_is_a_503(self, api, monkeypatch):
+        """As for the data routes: the 503 that names nothing about the database, never a 403 or a 500."""
+        import prism.database as dbm
+        from prism.api import auth
+        monkeypatch.setattr(auth, "CHECK_STORED_ROLE", True)
+
+        def unreachable(clerk_user_id):
+            raise dbm.DatabaseUnavailableError("Failed to connect to the database after 3 attempts")
+        monkeypatch.setattr(dbm, "load_user_role", unreachable)
+        response = api.get("/api/v1/config", headers=bearer())
+        assert response.status_code == 503
+        assert response.json() == {"detail": "The database cannot be reached right now; try again in a moment."}
+
+    def test_an_invalid_or_missing_token_is_answered_before_the_lookup(self, api, roles):
+        assert api.get("/api/v1/config").status_code == 401
+        assert api.get("/api/v1/config", headers={"Authorization": "Bearer not-a-token"}).status_code == 401
+        assert roles.looked_up == []
 
 
 class TestHealthAndDiagnostics:
@@ -800,17 +930,26 @@ class TestJourney:
     CONTENT = {"lhc": [{"id": "sorting", "label": "Sorting", "benefiting": [JOURNEY_TILE], "negativelyImpacted": []}],
                "hair": []}
 
-    def test_the_bundled_content_applies_until_an_admin_saves(self, api):
-        assert api.get("/api/v1/journey", headers=bearer()).json() == {"version": 0, "content": None}
+    def test_the_base_content_applies_until_an_admin_saves(self, api):
+        """Version 0 and the generated base map, with the stage contexts: the dashboard shows nothing of
+        the content before this answer, and the first save names base_version 0."""
+        from prism.journey_content import CONTEXTS, TILES
+        body = api.get("/api/v1/journey", headers=bearer()).json()
+        assert body == {"version": 0, "source": "base", "content": TILES, "contexts": CONTEXTS}
+        assert body["content"] == bundled_journey()
+        assert set(body["contexts"]) == {"lhc", "hair"}
+        assert set(body["contexts"]["lhc"]) == {stage["id"] for stage in body["content"]["lhc"]}
+        assert set(body["contexts"]["lhc"]["sorting"]) == {"henkelBrands", "competitors", "opportunity"}
 
     def test_save_and_read(self, api):
+        from prism.journey_content import CONTEXTS
         response = api.put("/api/v1/journey", headers=bearer("admin"),
                            json={"base_version": 0, "content": self.CONTENT})
         assert response.status_code == 200
         saved = response.json()
         assert saved["status"] == "saved" and saved["tiles"] == 1 and saved["version"] >= 1
-        assert api.get("/api/v1/journey", headers=bearer()).json() == {"version": saved["version"],
-                                                                       "content": self.CONTENT}
+        assert api.get("/api/v1/journey", headers=bearer()).json() == {
+            "version": saved["version"], "source": "stored", "content": self.CONTENT, "contexts": CONTEXTS}
 
     def test_a_save_from_an_older_version_is_refused(self, api):
         """Two admins open the journey: the first save lands, the second is refused and writes nothing."""
@@ -859,14 +998,42 @@ class TestJourney:
         assert response.status_code == 422
         assert reason in response.json()["detail"]
 
-    def test_the_bundled_content_can_be_saved(self, api):
-        """The content the dashboard ships is the shape the API stores: an admin's first save is the
-        bundled content with the edit."""
+    def test_the_base_content_can_be_saved(self, api):
+        """The base content is the shape the API stores: an admin's first save is the base content with
+        the edit."""
         content = bundled_journey()
         response = api.put("/api/v1/journey", headers=bearer("admin"), json={"base_version": 0, "content": content})
         assert response.status_code == 200 and response.json()["tiles"] == 300
-        assert api.get("/api/v1/journey", headers=bearer()).json()["content"] == content
+        body = api.get("/api/v1/journey", headers=bearer()).json()
+        assert body["source"] == "stored" and body["content"] == content and body["version"] >= 1
 
     def test_the_body_needs_the_base_version(self, api):
         assert api.put("/api/v1/journey", headers=bearer("admin"), json={"content": self.CONTENT}).status_code == 422
         assert api.put("/api/v1/journey", headers=bearer("admin"), json=self.CONTENT).status_code == 422
+
+
+class TestExplorer:
+    def test_the_views_are_served_to_a_role(self, api):
+        from prism.explorer_content import VIEWS
+        body = api.get("/api/v1/explorer", headers=bearer()).json()
+        assert body == {"views": VIEWS}
+        assert [v["id"] for v in body["views"]] == ["hair_value_chain", "laundry_value_chain", "hair_categories",
+                                                    "hair_core_adjacent", "home_care_categories",
+                                                    "laundry_core_adjacent"]
+        assert api.get("/api/v1/explorer", headers=bearer("admin")).status_code == 200
+
+    def test_the_views_are_the_content_file(self, api):
+        from support import POOLS_CONTENT
+        views = json.loads(POOLS_CONTENT.read_text(encoding="utf-8"))["views"]
+        assert api.get("/api/v1/explorer", headers=bearer()).json()["views"] == views
+
+    def test_the_views_need_no_database(self, api, monkeypatch):
+        """The content ships with the code: a database out of reach does not take the Explorer down."""
+        import prism.database as dbm
+        monkeypatch.setattr(dbm, "_connect", lambda: (_ for _ in ()).throw(RuntimeError("no route to host")))
+        monkeypatch.setattr(dbm.time, "sleep", lambda s: None)
+        state.reset()
+        assert api.get("/api/v1/explorer", headers=bearer()).status_code == 200
+
+    def test_the_views_are_read_only(self, api):
+        assert api.put("/api/v1/explorer", headers=bearer("admin"), json={}).status_code == 405

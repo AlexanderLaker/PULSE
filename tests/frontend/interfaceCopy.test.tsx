@@ -9,9 +9,11 @@
  *      content may use the word in its ordinary sense (a fashion trend), so
  *      data/ is not swept.
  *   2. No em dash in any dashboard source, content, copy or comment.
- *   3. British spelling in every readable string of the interface code and in
- *      the journey content and driver code map (tests/spelling.json lists the
- *      American forms and the names that keep their own spelling).
+ *   3. British spelling in every readable string of the interface code, the
+ *      driver code map and the authored content the API serves
+ *      (data/content/*.json: the journey and the Explorer's views;
+ *      tests/spelling.json lists the American forms and the names that keep
+ *      their own spelling).
  *   4. Render checks on the entry gate and the Drivers page: the labels are
  *      there and no readable text or accessible attribute says trend.
  *   5. The journey content describes the model as it is: it names the drivers
@@ -29,6 +31,9 @@ import { makeDriver, makeStore } from './fixtures/prism';
 const REPO = path.resolve(__dirname, '..', '..');
 const SOURCE_DIRS = ['app', 'components', 'hooks', 'lib', 'types', 'data', 'tests/frontend'];
 const COPY_DIRS = ['app', 'components', 'hooks', 'lib'];
+/** The authored content the API serves: not in the bundle, read by a person all the same. */
+const JOURNEY_CONTENT = path.join(REPO, 'data', 'content', 'consumer_journey.json');
+const EXPLORER_CONTENT = path.join(REPO, 'data', 'content', 'profit_pools.json');
 const WORD = /\btrends?\b/i;
 const EM_DASH = String.fromCharCode(0x2014);
 
@@ -51,10 +56,11 @@ function sourceFiles(dirs: string[]): string[] {
 interface Readable { where: string; text: string }
 
 /** Every string literal, template chunk and JSX text of a file, except module
- *  paths, object keys and the class names and styles of JSX elements. */
+ *  paths, object keys and the class names and styles of JSX elements. A JSON
+ *  file yields its string values the same way (its keys are object keys). */
 function readableStrings(file: string, src = fs.readFileSync(file, 'utf8')): Readable[] {
-  const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true,
-    file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const kind = file.endsWith('.json') ? ts.ScriptKind.JSON : file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+  const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, kind);
   const out: Readable[] = [];
   const visit = (node: ts.Node) => {
     let text: string | null = null;
@@ -131,17 +137,26 @@ describe('the driver vocabulary', () => {
 });
 
 describe('British spelling', () => {
-  it('no readable string of the interface, the journey content or the driver code map spells the American way', () => {
+  it('no readable string of the interface, the driver code map or the content the API serves spells the American way', () => {
     const files = [
       ...sourceFiles(COPY_DIRS).filter((f) => !f.endsWith('.css')),
-      path.join(REPO, 'data', 'consumerJourney.ts'),
       path.join(REPO, 'data', 'driverCodeMap.ts'),
+      JOURNEY_CONTENT,
+      EXPLORER_CONTENT,
     ];
     const hits = files.flatMap((f) => readableStrings(f).flatMap((r) => {
       const forms = americanForms(r.text);
       return forms.length ? [`${r.where} ${forms.join(', ')}`] : [];
     }));
     expect(hits).toEqual([]);
+  });
+
+  it('the sweep reads the strings of a JSON file, its keys left out', () => {
+    const strings = readableStrings(JOURNEY_CONTENT);
+    expect(strings.length).toBeGreaterThan(1000);
+    expect(strings.some((r) => r.text === 'AI stain/fabric recognition apps')).toBe(true);
+    expect(strings.some((r) => r.text === 'henkelBrands' || r.text === 'driverCodes')).toBe(false);
+    expect(readableStrings(EXPLORER_CONTENT).some((r) => r.text.startsWith('Hair Care: '))).toBe(true);
   });
 
   it('the check finds American forms in copy and spares names, links, identifiers and styles', () => {
@@ -180,7 +195,7 @@ describe('the journey content', () => {
   const narratesHistoryOrNamesAuthor = (text: string): boolean => HISTORY_OR_AUTHOR.some((rx) => rx.test(text));
 
   it('never narrates history or names an author', () => {
-    const hits = readableStrings(path.join(REPO, 'data', 'consumerJourney.ts'))
+    const hits = readableStrings(JOURNEY_CONTENT)
       .filter((r) => narratesHistoryOrNamesAuthor(r.text))
       .map((r) => `${r.where} ${JSON.stringify(r.text.slice(0, 100))}`);
     expect(hits).toEqual([]);

@@ -16,7 +16,7 @@ export async function PUT(req: Request) {
   return forwardAdminWrite(req, '/api/v1/journey', (body) => {
     const content = body.content as Record<string, unknown> | undefined;
     if (!Number.isInteger(body.base_version) || (body.base_version as number) < 0) {
-      return 'base_version must be the stored version the edit started from (0 for the bundled content)';
+      return 'base_version must be the stored version the edit started from (0 for the base content)';
     }
     return content && Array.isArray(content.lhc) && Array.isArray(content.hair)
       ? null

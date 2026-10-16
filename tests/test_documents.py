@@ -460,12 +460,61 @@ def test_the_shadows_and_the_heat_ramp():
     assert_quotes("docs/DESIGN.md", "the tint stops where the cell text would drop below 5:1 contrast")
 
 
+# ── the generators and the content ─────────────────────────────────────────
+
+def test_the_generator_checks():
+    """Every generator under scripts/ has --check; docs/OPERATIONS.md lists each in its table and both it and
+    CLAUDE.md count them."""
+    generators = sorted(path.name for path in (REPO / "scripts").glob("*.py")
+                        if '"--check"' in path.read_text(encoding="utf-8"))
+    assert "build_content.py" in generators and len(generators) >= 5
+    rows = re.findall(r"^\| `python3 scripts/(\w+\.py) --check` \|", source("docs/OPERATIONS.md"), re.M)
+    assert sorted(rows) == generators
+    assert_quotes("docs/OPERATIONS.md", f"and the {WORDS[len(generators)]} generator checks")
+    assert_quotes("CLAUDE.md", f"one of the {WORDS[len(generators)]} generator checks")
+    assert_quotes("README.md", f"{WORDS[len(generators)].capitalize()} generators keep committed files",
+                  f"CI runs all {WORDS[len(generators)]}")
+    ci = source(".github/workflows/ci.yml")
+    for generator in generators:
+        assert f"python scripts/{generator} --check" in ci
+    assert_quotes("CLAUDE.md", "`prism/journey_content.py`, `prism/explorer_content.py`")
+
+
+def test_the_explorer_rules():
+    """docs/EXPLORER.md: the share tolerance of a view, and the grades and value bases as prism/explorer.py
+    holds them."""
+    from prism.explorer import DENOMINATIONS, GRADES, SHARE_TOLERANCE
+    assert_quotes("docs/EXPLORER.md", f"add up to 1 within {SHARE_TOLERANCE:g} per view")
+    assert re.findall(r"^- \*\*(\w+)\*\*:", source("docs/EXPLORER.md"), re.M) == list(GRADES)
+    bases = re.search(r"\(`denomination`\): (.*?)\. ", doc("docs/EXPLORER.md")).group(1)
+    assert re.findall(r"`([^`]+)`", bases) == list(DENOMINATIONS)
+
+
 # ── the security and session settings ───────────────────────────────────────
 
+def test_the_api_routes_and_the_refusal_codes():
+    """docs/ARCHITECTURE.md's API table has one row per route of the application, and the two codes a 403
+    carries are the ones prism/api/auth.py raises; ADR 0012 names them too."""
+    from prism.api.app import create_app
+    from prism.api.auth import NO_ROLE, NOT_ADMIN
+    def parameters_unnamed(route: str) -> str:
+        return re.sub(r"\{\w+\}", "{}", route)   # the table writes {id} where the code says {driver_id}
+    routes = {parameters_unnamed(f"{method.upper()} {path}")
+              for path, operations in create_app().openapi()["paths"].items() for method in operations}
+    rows = re.findall(r"^\| `((?:GET|PUT|POST|PATCH|DELETE) /api/v1/[^`]*)` \|", source("docs/ARCHITECTURE.md"), re.M)
+    assert sorted(parameters_unnamed(r) for r in rows) == sorted(routes)
+    codes = [NO_ROLE[1], NOT_ADMIN[1]]
+    assert codes == ["no_role", "not_admin"]
+    assert_quotes("docs/ARCHITECTURE.md", f"`{codes[0]}` when the user has no stored role",
+                  f"`{codes[1]}` when an admin role is claimed or required")
+    assert_quotes("docs/adr/0012-identity-roles-tokens.md", f"(403, code `{codes[0]}`)", f"refused (`{codes[1]}`)")
+    assert_quotes("CLAUDE.md", f"a 403 with the code `{codes[0]}`")
+
+
 def test_the_security_and_session_settings():
-    """The token secret's minimum length, the lifetimes of the two tokens (the viewer cookie's also bounds
-    how long a user whose role was taken away keeps reading), and how long signing out waits for the
-    expert's saves."""
+    """The token secret's minimum length, the lifetimes of the two tokens (the viewer cookie's bounds how
+    long a user whose role was taken away keeps reading where the API cannot re-check the role), and how
+    long signing out waits for the expert's saves."""
     from prism.api.auth import MIN_SECRET_LENGTH as n
     assert_quotes("README.md", f"at least {n} characters, the same value on both sides", f"(at least {n} characters)")
     assert_quotes("docs/ARCHITECTURE.md", f"missing or shorter than {n} characters")

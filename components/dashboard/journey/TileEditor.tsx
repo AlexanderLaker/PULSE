@@ -3,11 +3,14 @@
  * driver note, linked driver codes and Strategist Read. The edits go into the
  * board's draft; the board saves the whole tile map. The editor tells the
  * board whether its draft differs from the tile, so a close can ask first.
+ * The code list names each driver from the live drivers; until they have
+ * loaded, or for a code the service has no driver for, the code stands alone.
  */
 import { useEffect, useId, useMemo, useState, type CSSProperties, type FC } from 'react';
 import { Check, Plus, Trash2 } from 'lucide-react';
 import type { JourneyTile } from '@/data/consumerJourney';
 import { DRIVER_CODE_MAP } from '@/data/driverCodeMap';
+import type { Driver } from '@/types';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { currentMonth, formatMonth, INTENSITY_LABELS, type TileEdits } from './shared';
 
@@ -28,12 +31,14 @@ export const draftDiffers = (initial: JourneyTile, edits: TileEdits): boolean =>
 
 export const TileEditor: FC<{
   initial: JourneyTile;
+  /** The live drivers by id, for the names in the code list. */
+  driversById: Map<string, Driver>;
   onSave: (edits: TileEdits) => void;
   onCancel: () => void;
   onRemove: () => void;
   /** Told whenever the draft starts or stops differing from the tile. */
   onDirtyChange?: (dirty: boolean) => void;
-}> = ({ initial, onSave, onCancel, onRemove, onDirtyChange }) => {
+}> = ({ initial, driversById, onSave, onCancel, onRemove, onDirtyChange }) => {
   const [edits, setEdits] = useState<TileEdits>({
     name: initial.name,
     intensity: initial.intensity,
@@ -48,7 +53,16 @@ export const TileEditor: FC<{
   useEffect(() => () => { onDirtyChange?.(false); }, [onDirtyChange]);
   const nameMissing = edits.name.trim() === '';
 
-  const allCodes = useMemo(() => Object.keys(DRIVER_CODE_MAP).sort((a, b) => a.localeCompare(b)), []);
+  // Every code of the map, labelled with its driver's name once the drivers have loaded.
+  const codeOptions = useMemo(
+    () => Object.entries(DRIVER_CODE_MAP)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([code, { driverId }]) => {
+        const name = driversById.get(driverId)?.name;
+        return { code, label: name ? `${code}: ${name}` : code };
+      }),
+    [driversById],
+  );
   const id = useId();
   const labelStyle: CSSProperties = {
     fontSize: 11, fontWeight: 700, color: S.onSurfaceVariant, display: 'block',
@@ -115,8 +129,8 @@ export const TileEditor: FC<{
               style={{ ...inputStyle, backgroundColor: S.surfaceLow }}
             >
               <option value="">Select driver…</option>
-              {allCodes.map(c => (
-                <option key={c} value={c}>{c}: {DRIVER_CODE_MAP[c].name}</option>
+              {codeOptions.map(o => (
+                <option key={o.code} value={o.code}>{o.label}</option>
               ))}
             </select>
             {edits.driverCodes.length > 1 && (

@@ -25,7 +25,8 @@ simulation.
  │ PRISM API (prism/api)         │   │ Dashboard server routes  │
  │ Vercel Python function        │◀──│ (app/api): roles, admin  │
  │ /api/v1: the run, drivers,    │   │ writes, viewer cookie,   │
- │ configuration, journey        │   │ Clerk webhook            │
+ │ configuration, journey,       │   │ Clerk webhook            │
+ │ explorer; the role re-check   │   │                          │
  └───────────────▲───────────────┘   └────────────▲─────────────┘
                  │ reads (viewer cookie)          │
                  └──────────── Browser ───────────┘
@@ -94,7 +95,8 @@ to it (`next.config.js`). The function installs only `api/requirements.txt`
 (FastAPI, pydantic, psycopg2): it has no numpy or scipy and never imports the
 engine. A route open to a role takes any valid token, the viewer cookie the
 dashboard gives a user with a role or an admin token; an admin route takes
-an admin token only.
+an admin token only. On PostgreSQL every authenticated request also looks
+the token's user up in `user_roles` (Authentication and roles, below).
 
 | Route | Access | Answer |
 |---|---|---|
@@ -106,12 +108,16 @@ an admin token only.
 | `PUT /api/v1/drivers/{id}/proposals` | a role | Merges the fields sent into the caller's own proposal (a field sent as null is cleared); never changes the driver |
 | `GET /api/v1/simulation` | a role | The latest run: the bundle above, with `run_meta` in place of `meta` (the run's id, date and iterations per chain, and from `meta` the seeds, chain count, model version, engine, numerics backend, driver count and overlap-correction source), and `inputs_since_run`, the drivers changed, added or removed since the run; 404 when there is none to serve |
 | `GET /api/v1/config` | a role | The model configuration the production run uses, read-only |
-| `GET /api/v1/journey` | a role | `{version, content}`: the newest stored Consumer Journey tile map, or version 0 and no content while the dashboard's bundled content applies |
-| `PUT /api/v1/journey` | admin | Stores a new version of the whole tile map, edited from the version the request names (409 when another save came in between); a map the dashboard could not render, or one citing a code that is not a driver, is refused (`prism/journey.py`) |
+| `GET /api/v1/journey` | a role | `{version, source, content, contexts}`: the newest stored Consumer Journey tile map (`source` "stored"), or version 0 and the base map from `prism/journey_content.py` (`source` "base") while nothing is stored; `contexts` is always the module's stage contexts (the HCB brands, the competitors and the opportunity per stage), which are not edited |
+| `PUT /api/v1/journey` | admin | Stores a new version of the whole tile map, edited from the version the request names (409 when another save came in between; the first save names version 0); a map the dashboard could not render, or one citing a code that is not a driver, is refused (`prism/journey.py`) |
+| `GET /api/v1/explorer` | a role | `{views}`: the Profit Pool Explorer's views from `prism/explorer_content.py`, read-only and read from no database (docs/EXPLORER.md) |
 
 A body the API cannot accept is answered 422 with the reason, which the
 dashboard shows as it comes (its own server routes answer 400 to a body they
-refuse before forwarding it). A write made on an outdated revision or version
+refuse before forwarding it). A 403 carries the reason as `detail` and a
+`code` the dashboard reads: `no_role` when the user has no stored role any
+more, `not_admin` when an admin role is claimed or required and the user
+does not hold it. A write made on an outdated revision or version
 is answered 409, and the editor says in its own words that someone saved in
 between and how to get the current version. A write that gets no answer from
 the API (a timeout, a lost connection, a 502 or 504 from the gateway or from
@@ -188,12 +194,18 @@ approval, or that it could not be checked while the database or Clerk does
 not answer, and sends a user who has a role by now on to the dashboard. The
 checks fail closed: while the role cannot be read nobody opens the
 dashboard, and one already open keeps what it has loaded. The dashboard's
-scripts are static files, as in any Next.js application, and carry the
-content built into them, such as the Consumer Journey's tiles and the
-Explorer's figures; Vercel serves them to anyone who has their addresses.
-The gate keeps those addresses from a user without a role, but it does not
-make the files private, and a user whose role is taken away keeps any
-addresses they already had.
+scripts are static files, as in any Next.js application, and Vercel serves
+them to anyone who has their addresses; the gate keeps those addresses from
+a user without a role, but it does not make the files private. The scripts
+therefore carry code only: types, constants and arithmetic. The confidential
+content, the Consumer Journey's tiles and stage contexts and the Explorer's
+figures, lives in `data/content/`, is generated into `prism/` and reaches
+the browser through `GET /api/v1/journey` and `GET /api/v1/explorer`, which
+answer a user with a role and nobody else; the driver code map
+(`data/driverCodeMap.ts`) holds a driver id and a force per code and no
+text. Until the API has answered, the Consumer Journey and the Explorer show
+nothing of the content, and when the call fails they show an unavailable
+notice with "Try again".
 
 The API never sees a Clerk session. It verifies HS256 tokens signed with
 `PRISM_JWT_SECRET`, which the dashboard's server routes issue for a user with
@@ -207,9 +219,20 @@ a role (`lib/prismJwt.ts`, verified in `prism/api/auth.py`):
   401 (the token expired), the client asks for a new cookie once and repeats
   the request (`lib/apiClient.ts`); when the new cookie is refused because the
   user's role was taken away, the page goes to `/dashboard`, which sends them
-  to the waiting page. The API checks the token, not the role, so a user
-  whose role is taken away loses access within 30 minutes, when their token
-  expires; the waiting page expires the cookie in that browser at once. The
+  to the waiting page. The API checks the role as well as the token: on
+  PostgreSQL, where the dashboard keeps `user_roles`, every authenticated
+  request looks the token's `sub` up there (`load_user_role` in
+  `prism/database.py`, one indexed read), and a user without a row is
+  answered 403 with the code `no_role`, on which the page goes to
+  `/dashboard` and the waiting page. A user whose role is taken away
+  therefore loses access within 30 minutes at the latest, when their token
+  expires and cannot be renewed, and in practice at their next request; the
+  waiting page expires the cookie in that browser at once. On SQLite
+  (development and the test suite) there is no role table and the check is
+  skipped. The stored role never upgrades a token: an admin's viewer cookie
+  stays a viewer, and a token that claims admin for a user whose stored role
+  is viewer is refused with `not_admin`. A database that cannot be reached
+  during the lookup is a 503, as for the data routes. The
   cookie is not tied to the Clerk session either, so the dashboard expires it
   (`DELETE /api/prism-cookie`) before signing out and when the session ends,
   and in place of a cookie it cannot renew. Signing out first sends the
@@ -221,7 +244,8 @@ a role (`lib/prismJwt.ts`, verified in `prism/api/auth.py`):
   `user_roles`, then forwards the request to the API (on `PRISM_API_ORIGIN`
   when that is set, else on the origin the request came in on) with a
   five-minute admin token that carries the user's identity
-  (`lib/adminWrite.ts`). The API writes that identity to the audit log.
+  (`lib/adminWrite.ts`). The API checks the stored role again and writes
+  that identity to the audit log.
 
 Both tokens carry the user's Clerk id, email, role and, when Clerk has one,
 their full name, which the proposals list shows next to each expert's scores
@@ -318,11 +342,18 @@ design tokens, which Tailwind reads too); the server side has `db.ts`,
 `prismJwt.ts` and `adminWrite.ts`. The types in `types/` mirror the API's
 JSON.
 
-The Consumer Journey content ships with the dashboard
-(`data/consumerJourney.ts`, which also defines its shape); once an admin saves
-an edit, the newest stored version replaces the bundled tiles. The Profit Pool
-Explorer's data is `lib/profitPoolData.ts` (docs/EXPLORER.md). Neither feeds
-the simulation.
+The Consumer Journey content and the Profit Pool Explorer's views are
+hand-authored JSON in `data/content/` (`consumer_journey.json`: the base tile
+map and the stage contexts; `profit_pools.json`: the views), which
+`scripts/build_content.py` validates (`prism/journey.py`, `prism/explorer.py`)
+and writes to `prism/journey_content.py` and `prism/explorer_content.py`,
+generated modules the API serves (`GET /api/v1/journey`,
+`GET /api/v1/explorer`). The dashboard keeps the types and the arithmetic
+only (`data/consumerJourney.ts`, `lib/profitPoolData.ts`) and fetches the
+content when the view opens; nothing under `app/`, `components/`, `hooks/` or
+`lib/` imports `data/content`. Once an admin saves an edit, the newest stored
+version takes the base tile map's place; the contexts and the views are not
+edited. Neither feeds the simulation.
 
 ## The database
 
@@ -365,11 +396,37 @@ Vercel builds the Next.js app (`next build`) and the Python function from the
 same repository; pushing to `main` deploys to production. `.vercelignore`
 keeps the tests, scripts, migrations, documentation, the driver base and the
 generated records (`data/drivers/`, `data/parameters/`) out of the
-deployment. `vercel.json` sets security headers on every response, the
-API's included: no page may be framed (`frame-ancestors 'none'`,
-`X-Frame-Options: DENY`), no response is sniffed for another content type,
-the referrer leaves the site as its origin only, the camera, microphone and
-location are switched off, and search engines are asked not to index. The
+deployment (and `data/content/`, whose JSON only the generator reads).
+`vercel.json` sets security headers on every response, the API's included:
+no page may be framed (`X-Frame-Options: DENY`), no response is sniffed for
+another content type, the referrer leaves the site as its origin only, the
+camera, microphone and location are switched off, and search engines are
+asked not to index.
+
+`proxy.ts` adds a Content Security Policy to every response it passes
+through (`lib/csp.ts`): a fresh nonce per request; scripts allowed by that
+nonce and `'strict-dynamic'`, so Next.js's and Clerk's scripts run and
+nothing else does; inline styles; images from the site, `data:` and `blob:`
+(the PNG export) and img.clerk.com (the avatars in Settings); fonts from the
+build; connections and frames limited to the Clerk frontend API (decoded
+from `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`), Clerk's telemetry and
+Cloudflare's bot check; no plugins, no other base URL, forms to the site
+only, no framing (`frame-ancestors 'none'`, so `vercel.json` carries no
+policy of its own, which could replace the proxy's). Next.js reads the nonce
+from the request's `content-security-policy` header, so the proxy forwards
+the policy on the request as well, with the nonce as `x-nonce`; a redirect
+and the 401 carry no policy. `PRISM_CSP_REPORT_ONLY=1` sends it as
+`Content-Security-Policy-Report-Only`, for a first deployment that watches
+the browser console before enforcing. In production, for a Clerk host
+`clerk.example.com` and a nonce `abc`, the header is:
+
+```
+default-src 'self'; script-src 'self' 'nonce-abc' 'strict-dynamic' https: 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://img.clerk.com; font-src 'self'; connect-src 'self' https://clerk.example.com https://clerk-telemetry.com https://*.clerk-telemetry.com; frame-src 'self' https://challenges.cloudflare.com https://clerk.example.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+```
+
+Development adds `'unsafe-eval'` to `script-src` and `ws: wss:` to
+`connect-src` for Next.js's development server
+(`tests/frontend/csp.test.ts` holds both strings against the builder). The
 API serves its interactive documentation (`/docs`, `/redoc`,
 `/openapi.json`) only where `PRISM_API_DOCS=1` asks for it, on a development
 machine, and never on Vercel. The production run, the generators and the

@@ -12,7 +12,7 @@ from prism import seed_drivers
 from prism.config import CATEGORIES, REGIONS, VALID_DIFFUSION_CURVES, VC_STAGES, display_code
 from prism.driver_base import InvalidBaseError, base_drivers, validate
 from prism.drivers import SCORE_FIELDS
-from support import load_module
+from support import JOURNEY_CONTENT, bundled_journey, load_module
 
 REPO = Path(__file__).resolve().parent.parent
 BASE = REPO / "data" / "drivers" / "driver_base.json"
@@ -191,6 +191,8 @@ class TestBaseValidation:
 
 class TestCodeMap:
     def test_one_code_per_driver(self):
+        """The map ships in the dashboard's public bundle, so it carries the driver id and the force of
+        each code and nothing else: no name, direction or text (those come from the drivers API)."""
         live = _codemap()
         drivers = {d.id: d for d in seed_drivers.DRIVERS}
         assert len(live) == 51 and {v["driverId"] for v in live.values()} == set(drivers)
@@ -198,16 +200,9 @@ class TestCodeMap:
             d = drivers[info["driverId"]]
             letter, number = code.split("-")
             assert letter == LETTER[d.force] and d.id.endswith(f"_r{number}"), code
-            assert (info["name"], info["force"], info["direction"]) == (d.name, d.force, d.direction)
-            # a whole first sentence, not a fragment cut at an initialism
-            assert len(info["firstSentence"]) >= 40, (code, info["firstSentence"])
-
-    def test_an_initialism_does_not_end_the_first_sentence(self):
-        gen = _generator()
-        sentence = gen.first_sentence("P.L. 119-21 expanded the rules. States pay more.")
-        assert sentence == "P.L. 119-21 expanded the rules."
-        assert gen.first_sentence("Demand in the U.S. falls by 3%. Prices hold.") == "Demand in the U.S. falls by 3%."
-        assert gen.first_sentence("One sentence only") == "One sentence only"
+            assert info == {"driverId": d.id, "force": d.force}, code
+        source = CODEMAP.read_text(encoding="utf-8")
+        assert not any(d.name in source or d.description[:60] in source for d in drivers.values())
 
     def test_display_codes_come_from_the_id_and_the_force(self):
         assert display_code("consumer_r01", "Consumer") == "C-01"
@@ -218,10 +213,12 @@ class TestCodeMap:
         assert {display_code(d.id, d.force) for d in seed_drivers.DRIVERS} == set(_codemap())
 
     def test_the_journey_cites_live_drivers_only(self):
+        """Every code a tile cites, and every code the content mentions anywhere (a driver note, a read, a
+        context), is a driver of the base."""
         live = _codemap()
-        src = (REPO / "data" / "consumerJourney.ts").read_text(encoding="utf-8")
-        cited = {code for block in re.findall(r'"driverCodes":\s*\[([^\]]*)\]', src, re.S)
-                 for code in re.findall(r'"([A-Z]-\d\d)"', block)}
+        cited = {code for journey in bundled_journey().values() for stage in journey
+                 for side in ("benefiting", "negativelyImpacted") for tile in stage[side]
+                 for code in tile["driverCodes"]}
         assert cited and cited <= set(live), sorted(cited - set(live))
-        mentioned = set(re.findall(r"\b([CKTGEX]-\d\d)\b", src))
-        assert mentioned <= set(live), sorted(mentioned - set(live))
+        mentioned = set(re.findall(r"\b([CKTGEX]-\d\d)\b", JOURNEY_CONTENT.read_text(encoding="utf-8")))
+        assert cited <= mentioned <= set(live), sorted(mentioned - set(live))

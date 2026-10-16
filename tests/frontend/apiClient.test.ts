@@ -3,13 +3,15 @@
  * thirty minutes, so a /api/v1 request answered 401 asks /api/prism-cookie for a
  * new one and is sent once more; the dashboard's own routes are never retried,
  * and a second 401 is the answer. A user whose role was taken away is refused
- * a new cookie (403), and the page leaves for /dashboard, whose check on the
- * server shows the waiting page. A write that got no answer from the API has
- * an unknown outcome.
+ * a new cookie (403), or a /api/v1 read with the code no_role, and the page
+ * leaves for /dashboard, whose check on the server shows the waiting page. A
+ * write that got no answer from the API has an unknown outcome. The journey
+ * and the Explorer's views are read from the API in the shapes it serves.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-  ApiError, getDrivers, getJourneyContent, revokeUserRole, saveJourneyContent, setUserRole, updateDriver,
+  ApiError, getDrivers, getExplorerViews, getJourneyContent, revokeUserRole, saveJourneyContent, setUserRole,
+  updateDriver,
 } from '@/lib/apiClient';
 
 const json = (status: number, body: unknown) =>
@@ -123,13 +125,49 @@ describe('the viewer cookie', () => {
 });
 
 describe('the journey content', () => {
-  it('reads the stored version and saves with the version it started from', async () => {
-    answer(json(200, { version: 7, content: null }), json(200, { status: 'saved', version: 8, tiles: 0 }));
-    await expect(getJourneyContent()).resolves.toEqual({ version: 7, content: null });
+  it('reads the journey as the API serves it and saves with the version it started from', async () => {
+    const contexts = { lhc: { sorting: { henkelBrands: 'Persil', competitors: 'Ariel', opportunity: 'Advice' } }, hair: {} };
+    const served = { version: 7, source: 'stored', content: { lhc: [], hair: [] }, contexts };
+    answer(json(200, served), json(200, { status: 'saved', version: 8, tiles: 0 }));
+    await expect(getJourneyContent()).resolves.toEqual(served);
+    expect(calls[0]).toBe('/api/v1/journey');
     await saveJourneyContent({ lhc: [], hair: [] }, 7);
     const save = vi.mocked(fetch).mock.calls[1]!;
     expect(save[0]).toBe('/api/journey');
     expect(JSON.parse(String((save[1] as RequestInit).body))).toEqual({ base_version: 7, content: { lhc: [], hair: [] } });
+  });
+});
+
+describe('the Explorer views', () => {
+  it('are read from /api/v1/explorer as the API serves them', async () => {
+    const views = [{ id: 'hair_value_chain', title: 'Hair', items: [] }];
+    answer(json(200, { views }));
+    await expect(getExplorerViews()).resolves.toEqual({ views });
+    expect(calls).toEqual(['/api/v1/explorer']);
+  });
+});
+
+describe('a read refused for want of a role', () => {
+  it('leaves for /dashboard when a /api/v1 read is answered 403 with the code no_role, and not otherwise', async () => {
+    const replace = vi.fn();
+    vi.stubGlobal('window', { location: { replace } });
+    answer(json(403, { detail: 'Your access to PRISM has been removed or not yet granted.', code: 'no_role' }));
+    const refusal = await getDrivers().catch((e: unknown) => e) as ApiError;
+    expect(refusal.status).toBe(403);
+    expect(refusal.code).toBe('no_role');
+    expect(refusal.message).toBe('Your access to PRISM has been removed or not yet granted.');
+    expect(replace).toHaveBeenCalledWith('/dashboard');
+    expect(calls).toEqual(['/api/v1/drivers']);   // no cookie renewal for a 403
+
+    // another 403 (an admin write refused to a viewer) keeps the page where it is
+    replace.mockClear();
+    answer(json(403, { detail: 'Admin access is required.', code: 'not_admin' }));
+    await expect(getJourneyContent()).rejects.toThrow('Admin access is required.');
+    expect(replace).not.toHaveBeenCalled();
+    // and a dashboard route's 403 is its caller's to show, whatever its code
+    answer(json(403, { error: 'Admins only', code: 'no_role' }));
+    await expect(setUserRole('user 1', 'admin', 'viewer')).rejects.toThrow('Admins only');
+    expect(replace).not.toHaveBeenCalled();
   });
 });
 

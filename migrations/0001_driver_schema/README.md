@@ -349,11 +349,11 @@ them. The new text becomes the `text` of the entry in `descriptions.json`
 and the SHA-256 of the text it replaces joins the entry's `previous_sha256`.
 `tests/test_migration.py` checks that every entry ends on the text the code
 ships: a description on the driver base's, a journey text on
-`data/consumerJourney.ts`. It also checks, against the SHA-256 prefixes in
+`data/content/consumer_journey.json`. It also checks, against the SHA-256 prefixes in
 `shipped_journey_sha256.json`, that every journey text shipped since release
 2.11.0 (by its deployment and the two of 2.12.0) is either the current text
 or carried there by an entry, so a text changed without an entry fails the
-suite. The migration carries nothing else from the bundled content, so the
+suite. The migration carries nothing else from the base content, so the
 same test fails on any other change to a tile or a stage (a field, a tile
 added or removed, a new order): such a change waits until this migration is
 retired, and reaches a database through the Journey editor.

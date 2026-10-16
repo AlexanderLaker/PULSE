@@ -16,22 +16,31 @@
  *
  * Every indicator runs over the same horizon, FY2025 → 2030.
  *
+ * The views are not in the bundle: the Explorer fetches them from the API on
+ * its first open (GET /api/v1/explorer, which a signed-in user with a role
+ * may read; the figures live in data/content/profit_pools.json) and runs the
+ * arithmetic of lib/profitPoolData.ts on what arrived. Until they arrive the
+ * pane keeps the skeleton it opened with; when the API cannot be reached it
+ * shows a notice with "Try again" and no chart.
+ *
  * The address carries the group, the kind of view and the open pool
- * (hooks/useViewUrl.tsx): a link opens the same chart and drawer, and Back
- * closes the drawer.
+ * (hooks/useViewUrl.tsx): a link opens the same chart and drawer once the
+ * views have arrived, and Back closes the drawer.
  */
 
 'use client';
 
-import { useCallback, useMemo, useState, type FC } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FC } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Info, Lightbulb } from 'lucide-react';
 import {
-  PROFIT_POOL_VIEWS, POOL_CAGR_THRESHOLDS, POOL_HORIZON_LABEL, viewPoolSummary, toPoolRating,
-  type PoolItem, type PoolViewKind, type PoolGroup,
+  POOL_CAGR_THRESHOLDS, POOL_HORIZON_LABEL, viewPoolSummary, toPoolRating,
+  type PoolItem, type PoolView, type PoolViewKind, type PoolGroup,
 } from '@/lib/profitPoolData';
+import { getExplorerViews } from '@/lib/apiClient';
 import { useViewParams } from '@/hooks/useViewUrl';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
+import { PaneSkeleton } from './LoadingSkeleton';
 import { arrowColorFor, ArrowLegend, ArrowsHTML, fmtEurBn } from './explorer/arrows';
 import { GradeChip } from './explorer/sources';
 import { HoverTip, PoolChart } from './explorer/PoolChart';
@@ -44,8 +53,39 @@ const groupOf = (param: string | undefined): PoolGroup => (param === 'Hair' ? 'H
 const kindOf = (param: string | undefined): PoolViewKind =>
   (param === 'Categories' || param === 'CoreAdjacent' ? param : 'ValueChain');
 
+/** The views as the API answered: on their way, arrived, or not to be had. */
+type ViewsState =
+  | { status: 'loading' }
+  | { status: 'ready'; views: PoolView[] }
+  | { status: 'unavailable' };
+
 const ProfitPoolExplorer: FC = () => {
   const [params, setParams] = useViewParams('profit-pool-explorer');
+
+  // The views, fetched when the pane first opens and again on "Try again".
+  // Nothing of them is shown before the answer; an answer without views is
+  // treated as no answer.
+  const [viewsState, setViewsState] = useState<ViewsState>({ status: 'loading' });
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    getExplorerViews()
+      .then(({ views }) => {
+        if (cancelled) return;
+        setViewsState(views.length ? { status: 'ready', views } : { status: 'unavailable' });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setViewsState({ status: 'unavailable' });
+      });
+    return () => { cancelled = true; };
+  }, [loadAttempt]);
+  const loadViews = useCallback(() => {
+    setViewsState({ status: 'loading' });
+    setLoadAttempt((n) => n + 1);
+  }, []);
+  const views = viewsState.status === 'ready' ? viewsState.views : null;
+
   const [group, setGroupState] = useState<PoolGroup>(() => groupOf(params.group));
   const [kind, setKindState] = useState<PoolViewKind>(() => kindOf(params.kind));
   const [hover, setHover] = useState<{ item: PoolItem; x: number; y: number } | null>(null);
@@ -94,22 +134,27 @@ const ProfitPoolExplorer: FC = () => {
     setNoticeOpen(false);
   }, []);
 
+  // The view the controls (or the address) name, once the views have arrived.
   const view = useMemo(
-    () =>
-      PROFIT_POOL_VIEWS.find(s => s.group === group && s.kind === kind)
-      ?? PROFIT_POOL_VIEWS[0],
-    [group, kind],
+    () => (views ? views.find(s => s.group === group && s.kind === kind) ?? views[0] ?? null : null),
+    [views, group, kind],
   );
 
   const selectedItem = useMemo(
-    () => view.items.find(it => it.id === selectedId) ?? null,
+    () => view?.items.find(it => it.id === selectedId) ?? null,
     [view, selectedId],
   );
 
-  const summary = useMemo(() => viewPoolSummary(view), [view]);
-  const viewPoolRating = toPoolRating(summary.weightedPoolCagr);
+  const summary = useMemo(() => (view ? viewPoolSummary(view) : null), [view]);
 
   const closePanel = useCallback(() => setSelectedId(null), [setSelectedId]);
+
+  // Until the views arrive the pane keeps the skeleton the first visit opened
+  // with (app/dashboard/DashboardApp.tsx shows the same one while the code
+  // loads), so the reader sees one skeleton from the click to the chart.
+  if (viewsState.status === 'loading') return <PaneSkeleton />;
+
+  const viewPoolRating = summary ? toPoolRating(summary.weightedPoolCagr) : null;
 
   return (
     <main
@@ -173,6 +218,22 @@ const ProfitPoolExplorer: FC = () => {
         </div>
       </div>
 
+      {/* The views could not be loaded: the notice stands in for the controls,
+          the chart and everything built on the views. */}
+      {!view || !summary || !viewPoolRating ? (
+        <div role="status" className="flex items-center justify-between gap-3 flex-wrap rounded-xl px-4 py-3"
+          style={{ backgroundColor: S.amberContainer, color: S.onAmberContainer }}>
+          <p className="text-[12.5px]" style={{ lineHeight: 1.55, margin: 0 }}>
+            The profit pool views could not be loaded from the PRISM service, so there is no chart to show; the
+            chart and its sources appear once it answers.
+          </p>
+          <button type="button" onClick={loadViews} className="px-3 py-1.5 rounded-full text-[12px] font-bold"
+            style={{ backgroundColor: S.surface, color: S.primary, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}>
+            Try again
+          </button>
+        </div>
+      ) : (
+      <>
       {/* Hierarchical navigation */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 20 }} data-print-hide>
         <GroupToggle group={group} onSelect={setGroup} />
@@ -348,8 +409,10 @@ const ProfitPoolExplorer: FC = () => {
           <DetailPanel view={view} item={selectedItem} onClose={closePanel} />
         )}
       </AnimatePresence>
+      </>
+      )}
 
-      {/* Beta notice, shown on the first visit */}
+      {/* Beta notice, shown on the first visit; "About this data" reopens it */}
       <ExplorerBetaNotice open={noticeOpen} onAck={ackNotice} onClose={closeNotice} />
     </main>
   );

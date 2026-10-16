@@ -154,8 +154,9 @@ hand:
 
 - `prism/seed_drivers.py`: the drivers a new database is seeded with, each
   with its baseline, the scores the Edited chip compares against;
-- `data/driverCodeMap.ts`: display code to driver id, with each driver's
-  name, force, direction and the first sentence of its description.
+- `data/driverCodeMap.ts`: display code to driver id and force, and nothing
+  else of the driver: the map ships in the dashboard's public code, so the
+  names, directions and descriptions come from the drivers the API serves.
 
 `generate_seed.py --check` fails when either differs from what the base
 produces; CI runs it. Each driver's PRISM Analysis text is built from the

@@ -13,7 +13,10 @@ driver types (types/drivers.ts) name the fields of the scores and of the two
 request bodies the API accepts (prism/api/schemas.py). The estimate's label,
 the earliest peak year and the token secret's minimum length are decided on
 both sides. Likewise the journey tile map the dashboard renders and saves
-(data/consumerJourney.ts) must be the shape the API stores (prism/journey.py).
+(data/consumerJourney.ts) must be the shape the API stores (prism/journey.py),
+and the Explorer's view ids, kinds, grades and denominations
+(lib/profitPoolData.ts) the ones the content generator checks
+(prism/explorer.py).
 """
 import re
 from pathlib import Path
@@ -21,14 +24,17 @@ from pathlib import Path
 from prism.config import (BASE_YEAR, CATEGORIES, DEFAULT_PATH_YEARS, FORCES, REGIONS, VALID_DIFFUSION_CURVES,
                           VC_STAGES, first_peak_year)
 from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, SOURCE_FIELD_LIMITS, SOURCE_TIERS, SOURCE_URL_PATTERN
-from prism.journey import (INTENSITIES, JOURNEYS, OPTIONAL_TILE_KEYS, POOL_IMPACT_GRADES, POOL_IMPACT_KEYS,
-                           PROVENANCE_GRADES, PROVENANCE_KEYS, STAGE_KEYS, TILE_KEYS, TILE_TYPES)
+from prism.explorer import (DENOMINATIONS, GRADES, GROUPS, ITEM_KEYS, KINDS, OPTIONAL_ITEM_KEYS, OPTIONAL_SOURCE_KEYS,
+                            SOURCE_KEYS, VIEW_IDS, VIEW_KEYS)
+from prism.journey import (CONTEXT_KEYS, INTENSITIES, JOURNEYS, OPTIONAL_TILE_KEYS, POOL_IMPACT_GRADES,
+                           POOL_IMPACT_KEYS, PROVENANCE_GRADES, PROVENANCE_KEYS, STAGE_KEYS, TILE_KEYS, TILE_TYPES)
 from prism.readings import CATEGORY_SHORT, CURVE_NAMES
 
 REPO = Path(__file__).resolve().parents[1]
 FORMAT = (REPO / "lib" / "format.ts").read_text(encoding="utf-8")
 VALUE_CHAIN = (REPO / "lib" / "valueChain.ts").read_text(encoding="utf-8")
 JOURNEY = (REPO / "data" / "consumerJourney.ts").read_text(encoding="utf-8")
+POOLS = (REPO / "lib" / "profitPoolData.ts").read_text(encoding="utf-8")
 TYPES = (REPO / "types" / "index.ts").read_text(encoding="utf-8")
 DRIVER_PARTS = (REPO / "components" / "dashboard" / "drivers" / "shared.ts").read_text(encoding="utf-8")
 
@@ -121,18 +127,19 @@ def test_source_rules():
 
 def union(source: str, name: str) -> tuple:
     """The quoted members of one union type, in order."""
-    match = re.search(rf"export type {name} = ([^;]+);", source)
+    match = re.search(rf"export type {name} =\s*([^;]+);", source)
     assert match, name
     return tuple(re.findall(r"'([^']+)'", match.group(1)))
 
 
 def fields(source: str, interface: str, optional: bool | None = None) -> tuple:
     """The field names of one interface, in order: all of them, or only the
-    optional (True) or the required ones (False)."""
+    optional (True) or the required ones (False). The fields of a nested
+    object type (indented further) are not the interface's own."""
     match = re.search(rf"export interface {interface} \{{(.*?)\n\}}", source, re.S)
     assert match, interface
     body = re.sub(r"/\*.*?\*/", "", match.group(1), flags=re.S)
-    return tuple(name for name, mark in re.findall(r"^\s*(\w+)(\??):", body, re.M)
+    return tuple(name for name, mark in re.findall(r"^ {2}(\w+)(\??):", body, re.M)
                  if optional is None or (mark == "?") == optional)
 
 
@@ -159,3 +166,20 @@ def test_journey_tile_shape():
     assert union(JOURNEY, "PoolImpactGrade") == POOL_IMPACT_GRADES
     intensity = re.search(r"^\s*intensity: ([\d |]+);", JOURNEY, re.M).group(1)
     assert tuple(int(n) for n in intensity.split("|")) == INTENSITIES
+    assert fields(JOURNEY, "StageContext") == CONTEXT_KEYS
+
+
+def test_explorer_view_shape():
+    """The views the content generator accepts (prism/explorer.py) are the ones the Explorer renders
+    (lib/profitPoolData.ts): the view ids, the groups and kinds, the grades and value bases of a source,
+    and the fields of a view, a row and a source."""
+    assert union(POOLS, "PoolViewId") == VIEW_IDS
+    assert union(FORMAT, "CategoryGroup") == GROUPS
+    assert union(POOLS, "PoolViewKind") == KINDS
+    assert union(POOLS, "EvidenceGrade") == GRADES
+    assert union(POOLS, "Denomination") == DENOMINATIONS
+    assert fields(POOLS, "PoolView") == VIEW_KEYS
+    assert fields(POOLS, "PoolItem", optional=False) == ITEM_KEYS
+    assert fields(POOLS, "PoolItem", optional=True) == OPTIONAL_ITEM_KEYS
+    assert fields(POOLS, "SourceRef", optional=False) == SOURCE_KEYS
+    assert fields(POOLS, "SourceRef", optional=True) == OPTIONAL_SOURCE_KEYS
