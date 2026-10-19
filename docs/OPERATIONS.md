@@ -330,7 +330,9 @@ any of them only to deployments made after it, so redeploy after every change
 well, a preview deployment's admin writes would go to the production API. A
 database that still needs migration 0001 (the API answers 503 and names it)
 is moved in the order that migration's runbook gives, the deploy first
-(`migrations/0001_driver_schema/README.md`).
+(`migrations/0001_driver_schema/README.md`). Migration 0002 runs the other
+way round, before its release is merged, so the dashboard stays available
+(`migrations/0002_c05_rescore/README.md`).
 
 After a deploy:
 

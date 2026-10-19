@@ -270,4 +270,5 @@ reaches an existing database only by SQL (raising the driver's revision by
 one, so the service reloads it) or by a migration. Adding or removing
 drivers, or making changed scores the new baseline of an existing database,
 is a database migration too: a new folder under `migrations/`, built like
-`0001_driver_schema`.
+`0001_driver_schema`; `0002_c05_rescore` makes the scores of one driver its
+baseline in this way.

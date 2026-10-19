@@ -42,7 +42,7 @@ else:
 #: The migrations under migrations/, in order. The schema below contains the
 #: result of all of them; init_db records them on a new database, and every
 #: migration records itself in schema_migrations when it has run.
-SCHEMA_MIGRATIONS = ("0001_driver_schema",)
+SCHEMA_MIGRATIONS = ("0001_driver_schema", "0002_c05_rescore")
 #: The PostgreSQL advisory lock init_db holds while it creates the schema (the
 #: bytes of "prism" as a number), so that instances starting on a new database
 #: at the same moment create it one after the other.

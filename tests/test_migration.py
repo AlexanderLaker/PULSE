@@ -548,11 +548,18 @@ class TestMigration:
         # the tables the migration creates carry the same constraints, word for word
         for table in CREATED_TABLES:
             assert create_statement(previous, table) == create_statement(fresh, table), table
-        # the API's start-up check passes and leaves the schema as it is
+        # the API's start-up check names the next migration and leaves the schema as it is; after it,
+        # the check passes
         monkeypatch.setenv("PRISM_DB_PATH", str(previous))
-        dbm.init_db()
+        with pytest.raises(dbm.MigrationPendingError, match="0002_c05_rescore"):
+            dbm.init_db()
         assert sqlite_schema(previous) == migrated
         assert query(previous, "SELECT version FROM schema_migrations") == [{"version": "0001_driver_schema"}]
+        next_migration = load_module("migrations/0002_c05_rescore/migrate.py", "migrate_0002")
+        monkeypatch.setattr(next_migration, "ARCHIVE_DIR", tmp_path / "archive-0002")
+        assert next_migration.main(["--sqlite", str(previous)]) == 0
+        dbm.init_db()
+        assert sqlite_schema(previous) == migrated
 
     def test_stored_runs_follow_the_new_names(self, migration, previous):
         assert migration.main(["--sqlite", str(previous)]) == 0

@@ -182,3 +182,4 @@ POSTGRES_URL=... DATABASE_URL=... python3 scripts/run_production.py
 | [docs/EXPLORER.md](docs/EXPLORER.md) | The data behind the Profit Pool Explorer |
 | [docs/adr/](docs/adr/README.md) | The design decisions and why they were taken |
 | [migrations/0001_driver_schema/README.md](migrations/0001_driver_schema/README.md) | The one-time migration of a database to the driver schema, and its runbook |
+| [migrations/0002_c05_rescore/README.md](migrations/0002_c05_rescore/README.md) | The one-time migration of an existing database to the rescored C-05, and its runbook |

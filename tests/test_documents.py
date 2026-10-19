@@ -574,3 +574,10 @@ def test_the_database_connection_limits(monkeypatch):
     # 503 before that.
     client = int(re.search(r"REQUEST_TIMEOUT_MS = (\d+)_000", source("lib/apiClient.ts")).group(1))
     assert elapsed < client
+
+
+def test_the_c05_migration_runbook_quotes_the_current_c05():
+    current = json.loads((REPO / "migrations" / "0002_c05_rescore" / "c05.json").read_text(encoding="utf-8"))["current"]
+    assert_quotes("migrations/0002_c05_rescore/README.md", f"GP1 {current['gp1_pct_affected'] * 100:.0f}%",
+                  f"uncertainty {current['uncertainty']}", f"confidence {current['confidence']}",
+                  f"the {len(current['sources'])} sources")

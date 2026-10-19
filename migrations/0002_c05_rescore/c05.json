@@ -1,0 +1,171 @@
+{
+  "about": "Migration 0002: C-05 (consumer_r05) as release 2.12.0 shipped it (previous) and as the driver base holds it from release 2.13.0 (current). The previous description is known by the SHA-256 of every text shipped for it since release 2.11.0. tests/test_migration_0002.py checks that current equals the driver base.",
+  "driver_id": "consumer_r05",
+  "previous": {
+    "force": "Consumer",
+    "name": "Ageing consumers: grey-coverage colour demand, gentle and scalp care for ageing hair (net of grey acceptance)",
+    "direction": "Expansion",
+    "probability": 4,
+    "start_year": 2025,
+    "peak_year": 2035,
+    "diffusion_curve": "linear",
+    "gp1_pct_affected": 0.08,
+    "uncertainty": 2,
+    "vc_epicentre": "Consumer",
+    "confidence": "High",
+    "category_exposure": {
+      "Hair: Color": 5,
+      "Hair: Care": 3,
+      "Hair: Styling": 1,
+      "Hair: Body": 2,
+      "LHC: FCN": 1,
+      "LHC: FCA": 1,
+      "LHC: FFI": 1,
+      "LHC: LAD": 1,
+      "LHC: HDW": 1,
+      "LHC: ADW": 1,
+      "LHC: HSC": 1,
+      "LHC: TOI": 1,
+      "LHC: IC": 0
+    },
+    "regional_exposure": {
+      "Europe": 5,
+      "North America": 4,
+      "Asia": 4,
+      "High Growth": 2
+    },
+    "sources": [
+      {
+        "title": "Eurostat: Population structure and ageing",
+        "url": "https://ec.europa.eu/eurostat/statistics-explained/index.php?title=Population_structure_and_ageing",
+        "tier": "S",
+        "published": "Feb 2026"
+      },
+      {
+        "title": "Destatis: 17.3 million people live alone",
+        "url": "https://www.destatis.de/DE/Presse/Pressemitteilungen/2026/06/PD26_N041_12.html",
+        "tier": "S",
+        "published": "Jun 2026"
+      },
+      {
+        "title": "Henkel H1 2026 results release",
+        "url": "https://www.henkel.com/press-and-media/press-releases-and-kits/2026-08-06-henkel-delivers-strong-sales-and-earnings-performance-in-the-first-half-and-upgrades-top-line-guidance-for-2026-2217762",
+        "tier": "A",
+        "published": "Aug 2026"
+      },
+      {
+        "title": "Circana: Life imitates brands, how dupe demand is evolving",
+        "url": "https://www.circana.com/post/life-imitates-brands-how-dupe-demand-is-evolving",
+        "tier": "A",
+        "published": "Aug 2026"
+      },
+      {
+        "title": "Kline via Happi: US professional salon hair care 2024",
+        "url": "https://www.happi.com/library/professional-salon-hair-care-us-market-development/",
+        "tier": "B",
+        "published": "Jun 2025"
+      }
+    ],
+    "description_sha256": [
+      "df455f35d693ca5c2efb8c27a0dc4b8be2d2fe8646d24774bbf1f70ca607d07a",
+      "0f0330f72d67466e1af7787c2b346d0203c6fe9adad9e73334deb7031b9e1985"
+    ]
+  },
+  "current": {
+    "force": "Consumer",
+    "name": "Ageing consumers, Europe-led to 2035: older people living alone more often lift per-head demand for laundry, hand dishwash and home cleaning (the hair headwind of ageing is not modelled here)",
+    "direction": "Expansion",
+    "probability": 4,
+    "start_year": 2025,
+    "peak_year": 2035,
+    "diffusion_curve": "linear",
+    "gp1_pct_affected": 0.03,
+    "uncertainty": 4,
+    "vc_epicentre": "Consumer",
+    "confidence": "Medium",
+    "category_exposure": {
+      "Hair: Color": 0,
+      "Hair: Care": 0,
+      "Hair: Styling": 0,
+      "Hair: Body": 0,
+      "LHC: FCN": 2,
+      "LHC: FCA": 1,
+      "LHC: FFI": 1,
+      "LHC: LAD": 1,
+      "LHC: HDW": 2,
+      "LHC: ADW": 0,
+      "LHC: HSC": 1,
+      "LHC: TOI": 1,
+      "LHC: IC": 0
+    },
+    "regional_exposure": {
+      "Europe": 4,
+      "North America": 2,
+      "Asia": 3,
+      "High Growth": 1
+    },
+    "sources": [
+      {
+        "title": "Eurostat: EUROPOP2025 population projections, demographic balances and indicators",
+        "url": "https://ec.europa.eu/eurostat/databrowser/view/proj_25ndbi/default/table?lang=en",
+        "tier": "S",
+        "published": "Jun 2026"
+      },
+      {
+        "title": "Destatis: 17.3 million people live alone",
+        "url": "https://www.destatis.de/DE/Presse/Pressemitteilungen/2026/06/PD26_N041_12.html",
+        "tier": "S",
+        "published": "Jun 2026"
+      },
+      {
+        "title": "US BLS: Consumer Expenditure Surveys, one-person consumer units by age of reference person, 2023-2024",
+        "url": "https://www.bls.gov/cex/tables/cross-tab/mean/cu-size-by-age-1-person-2023-2024.xlsx",
+        "tier": "S",
+        "published": "Dec 2025"
+      },
+      {
+        "title": "Eurostat: Time spent in the main activity by sex and age group, HETUS 2020 wave",
+        "url": "https://ec.europa.eu/eurostat/databrowser/view/tus_20age/default/table?lang=en",
+        "tier": "S",
+        "published": "Jul 2026"
+      },
+      {
+        "title": "US BLS: Consumer Expenditure Surveys, two-person consumer units by age of reference person, 2023-2024",
+        "url": "https://www.bls.gov/cex/tables/cross-tab/mean/cu-size-by-age-2-persons-2023-2024.xlsx",
+        "tier": "S",
+        "published": "Dec 2025"
+      },
+      {
+        "title": "Destatis: Ausstattung privater Haushalte mit ausgewählten Gebrauchsgütern, LWR 2022",
+        "url": "https://www.statistischebibliothek.de/mir/servlets/MCRFileNodeServlet/DEHeft_derivate_00074958/2150200227004.pdf",
+        "tier": "S",
+        "published": "Dec 2022"
+      },
+      {
+        "title": "US Census Bureau: 2023 National Population Projections, summary tables",
+        "url": "https://www.census.gov/data/tables/2023/demo/popproj/2023-summary-tables.html",
+        "tier": "S",
+        "published": "Nov 2023"
+      },
+      {
+        "title": "UN DESA: World Population Prospects 2024",
+        "url": "https://population.un.org/wpp/",
+        "tier": "S",
+        "published": "Jul 2024"
+      },
+      {
+        "title": "YouGov: Hair Debates, US survey crosstabs",
+        "url": "https://docs.cdn.yougov.com/fq67is7zko/crosstabs_Hair%20Debates.pdf",
+        "tier": "B",
+        "published": "May 2023"
+      },
+      {
+        "title": "Mintel: Germany Hair Colourants Market Report 2025",
+        "url": "https://store.mintel.com/report/germany-hair-colourants-market-report",
+        "tier": "A",
+        "published": "Mar 2025"
+      }
+    ],
+    "description": "The population aged 65 or over rises from 21.9% in 2025 to 25.7% in 2035 in the EU, nearly half of the rise in the over-80s (6.2% to 7.9%, EUROPOP2025), from 18.7% to 21.6% in the US, where the growth is in the over-75s (Census), and from 14.9% to 22.8% in China (UN WPP 2024). Older people more often live alone (34.4% of Germans aged 65 or over and 55.8% of those aged 85 or over, Destatis 2026), and older singles buy more home care per head: a US single person spends USD 139 a year on laundry and cleaning products at 55 to 64, USD 144 at 65 to 74 and USD 127 at 75 or over, against USD 101 to 107 at 25 to 54, on a far lower income, while two-person households at 65 or over (USD 194) sit inside the range of younger ones (USD 153 to 208, BLS 2023-24). In Germany daily dishwashing time rises from 8 minutes at 35 to 44 to 18 at 75 and over and textile care from 8 to 16 minutes at 65 to 74, while cleaning time stays flat (HETUS 2020 wave); part of the dishwashing gap is lower dishwasher ownership, 66% of households whose main earner is 80 or over against 82% at 35 to 44 (Destatis LWR 2022). Hair loses: colouring is lower after 65 (19% of US over-65s currently dye their hair against 23% at 45 to 64 and 30% at 30 to 44, YouGov 2023), Mintel flags the ageing population as a threat to German colourants, and a US single person aged 65 or over spends USD 510 a year on personal care products and services against USD 652 to 817 at 25 to 54 (BLS 2023-24). PRISM gives a driver one direction, so C-05 carries the home-care gain only and the hair headwind of ageing is not modelled. Net: a small expansion in laundry and hand dishwash, mainly in Europe."
+  }
+}

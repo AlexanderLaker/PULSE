@@ -128,11 +128,9 @@ import hashlib
 import json
 import os
 import re
-import sqlite3
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlparse
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
@@ -141,12 +139,13 @@ sys.path.insert(0, str(REPO))
 import prism.env_loader  # noqa: E402,F401  (loads .env; shell variables win)
 from prism.config import (BASE_YEAR, CATEGORIES, DEFAULT_PATH_YEARS, REGIONS,  # noqa: E402
                           VALID_DIFFUSION_CURVES, VC_STAGES)
-from prism.database import describe_error, postgres_connect_options, schema  # noqa: E402
+from prism.database import describe_error, schema  # noqa: E402
 from prism.drivers import (CONFIDENCE_LEVELS, SCORE_FIELDS, SOURCE_TIERS,  # noqa: E402
                            SOURCE_URL_PATTERN, Driver, simulation_problems)
 from prism.input_drift import FINGERPRINT_KEYS  # noqa: E402
 from prism.journey import (DRIVER_CODES, JOURNEYS, OPTIONAL_TILE_KEYS, POOL_IMPACT_KEYS,  # noqa: E402
                            PROVENANCE_KEYS, SIDES, STAGE_KEYS, TILE_KEYS, content_problem, unknown_keys)
+from prism.migration import Database  # noqa: E402
 from prism.numbers import finite_number, whole_in_range  # noqa: E402
 
 MIGRATION = "0001_driver_schema"
@@ -340,73 +339,6 @@ def complete_fingerprint(results: dict, start_years: dict) -> bool:
                     entry[key] = on_taxonomy
                     changed = True
     return changed
-
-
-class Database:
-    """The connection and the few dialect differences the migration needs."""
-
-    def __init__(self, sqlite_file=None):
-        url = None if sqlite_file else (os.environ.get("POSTGRES_URL") or os.environ.get("DATABASE_URL"))
-        self.postgres = bool(url)
-        if self.postgres:
-            # Here, not at the top: a SQLite target needs no PostgreSQL driver
-            # (prism/database.py imports it only for PostgreSQL too).
-            import psycopg2
-            import psycopg2.extras
-            self.conn = psycopg2.connect(url, **postgres_connect_options(url))
-            self.conn.autocommit = False
-            self.conn.cursor_factory = psycopg2.extras.RealDictCursor
-            self.label = f"postgres-{urlparse(url).hostname}"
-            self.where = f"PostgreSQL at {urlparse(url).hostname}"
-        else:
-            path = Path(sqlite_file or os.environ.get("PRISM_DB_PATH") or REPO / "data" / "prism.db")
-            if not path.exists():
-                raise FileNotFoundError(f"no SQLite database at {path}")
-            self.conn = sqlite3.connect(str(path), isolation_level=None)
-            self.conn.row_factory = sqlite3.Row
-            # Foreign keys are checked once, at the end (foreign_key_check), rather
-            # than per statement, which the rebuild of simulation_runs needs.
-            self.conn.execute("PRAGMA foreign_keys = OFF")
-            self.label = f"sqlite-{path.stem}"
-            self.where = f"SQLite at {path}"
-        self.cur = self.conn.cursor()
-        self.p = "%s" if self.postgres else "?"
-
-    def begin(self):
-        if not self.postgres:
-            # IMMEDIATE takes the write lock now, so no other connection can
-            # write between the archive and the commit.
-            self.cur.execute("BEGIN IMMEDIATE")
-
-    def commit(self):
-        self.conn.commit() if self.postgres else self.cur.execute("COMMIT")
-
-    def rollback(self):
-        try:
-            self.conn.rollback() if self.postgres else self.cur.execute("ROLLBACK")
-        except Exception:  # noqa: BLE001 (nothing to roll back)
-            pass
-
-    def execute(self, sql: str, params=()):
-        self.cur.execute(sql, params)
-        return self.cur
-
-    def rows(self, sql: str, params=()) -> list:
-        self.cur.execute(sql, params)
-        return [dict(r) for r in self.cur.fetchall()]
-
-    def tables(self) -> set:
-        if self.postgres:
-            return {r["name"] for r in self.rows(
-                "SELECT table_name AS name FROM information_schema.tables WHERE table_schema = current_schema()")}
-        return {r["name"] for r in self.rows("SELECT name FROM sqlite_master WHERE type = 'table'")}
-
-    def columns(self, table: str) -> list:
-        if self.postgres:
-            return [r["name"] for r in self.rows(
-                "SELECT column_name AS name FROM information_schema.columns "
-                "WHERE table_schema = current_schema() AND table_name = %s ORDER BY ordinal_position", (table,))]
-        return [r["name"] for r in self.rows(f"PRAGMA table_info({table})")]
 
 
 def jsonable(value):
