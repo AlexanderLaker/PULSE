@@ -11,6 +11,7 @@ import type { PrismStore } from '@/hooks/usePrism';
 import { CATEGORY_NAMES, FORCES, REGIONS, YEARS } from '@/lib/format';
 import { ESTIMATED_CELL_WEIGHTS, ESTIMATE_SOURCE } from '@/lib/cellWeightProvenance';
 import { VC_STAGES } from '@/lib/valueChain';
+import driverBase from '@/data/drivers/driver_base.json';
 
 /** A distribution around a median. */
 export function distribution(median: number, spread = 0.01): PercentileDistribution {
@@ -37,6 +38,29 @@ const ANALYSIS = [
 export function categoryMap(cells: Record<string, number> = {}): Record<string, number> {
   return { ...Object.fromEntries(CATEGORY_NAMES.map((c) => [c, 0])), ...cells };
 }
+
+/** The names the driver base gives a driver id, as the API serves them; none for an id it does not know. */
+export function baseNames(id: string): Pick<Driver, 'short_name' | 'long_name' | 'descriptor' | 'boundary'> {
+  const entry = (driverBase.drivers as Array<{
+    id: string; short_name: string; long_name: string; descriptor: string; boundary?: string;
+  }>).find((d) => d.id === id);
+  return {
+    short_name: entry?.short_name ?? '',
+    long_name: entry?.long_name ?? '',
+    descriptor: entry?.descriptor ?? '',
+    boundary: entry?.boundary ?? '',
+  };
+}
+
+/** Each code's driver in the base with its names, for tests that find a driver by what the page shows. */
+export const BASE_BY_CODE: Record<string, {
+  driverId: string; name: string; shortName: string; longName: string; descriptor: string; boundary: string;
+}> = Object.fromEntries((driverBase.drivers as Array<{
+  id: string; code: string; name: string; short_name: string; long_name: string; descriptor: string; boundary?: string;
+}>).map((d) => [d.code, {
+  driverId: d.id, name: d.name, shortName: d.short_name, longName: d.long_name, descriptor: d.descriptor,
+  boundary: d.boundary ?? '',
+}]));
 
 export function makeDriver(overrides: Partial<Driver> = {}): Driver {
   const scores: DriverScores = {
@@ -65,6 +89,8 @@ export function makeDriver(overrides: Partial<Driver> = {}): Driver {
     scores_edited: false,
     revision: 1,
     proposal_summary: { count: 0, probability: null, gp1_pct_affected: null, my: null },
+    // The names of the driver the id is, unless the test gives its own.
+    ...baseNames(overrides.id ?? 'consumer_r01'),
     ...overrides,
   };
 }

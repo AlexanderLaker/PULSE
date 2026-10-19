@@ -26,9 +26,17 @@ class InvalidBaseError(ValueError):
 
 
 #: The fields every entry of the base carries (it may carry more, such as its theme).
-ENTRY_FIELDS = ("id", "code", "force", "name", "description", "direction", "probability", "start_year",
-                "peak_year", "gp1_pct_affected", "diffusion_curve", "uncertainty", "confidence",
-                "category_exposure", "regional_exposure", "vc_epicentre", "sources")
+ENTRY_FIELDS = ("id", "code", "force", "name", "short_name", "long_name", "descriptor", "description",
+                "direction", "probability", "start_year", "peak_year", "gp1_pct_affected", "diffusion_curve",
+                "uncertainty", "confidence", "category_exposure", "regional_exposure", "vc_epicentre", "sources")
+
+#: The most characters each of a driver's display texts may hold (docs/DRIVERS.md, Names): the short
+#: name people quote, the long name that explains it, the one-line descriptor and the optional
+#: boundary sentence. ``name`` is the driver's technical scope and has no limit here.
+NAME_LIMITS = {"short_name": 28, "long_name": 55, "descriptor": 100, "boundary": 240}
+#: How a boundary sentence opens; the codes it cites in brackets are other drivers of the base.
+BOUNDARY_OPENING = "Counted in other drivers: "
+CODE_PATTERN = r"\b[CKTGEX]-\d{2}\b"
 
 
 def validate(entries: list, numbering: dict) -> None:
@@ -38,7 +46,10 @@ def validate(entries: list, numbering: dict) -> None:
     (prism.drivers.simulation_problems); on top of those an entry must follow
     the id and code pattern, lie inside the horizon, carry a known confidence
     and have sources the API would accept back from the editor, each with a
-    title and an http(s) link, at least one of them of tier S, A or B.
+    title and an http(s) link, at least one of them of tier S, A or B. Its
+    names must fit the dashboard (_name_problems): a short name, a long name
+    and a descriptor within NAME_LIMITS, the two names unique in the base, and
+    an optional boundary sentence that cites other drivers of the base only.
 
     ``numbering`` records, per force, the highest number given (``highest``)
     and the numbers of drivers that left the base (``retired``). Stored runs,
@@ -73,6 +84,7 @@ def validate(entries: list, numbering: dict) -> None:
             problems.append(f"{tag}: no source of tier {'/'.join(REQUIRED_SOURCE_TIERS)}")
         for s in d["sources"]:
             problems += [f"{tag}: source {s.get('title') or s.get('url')!r}: {p}" for p in _source_problems(s)]
+    problems += _name_problems(complete)
     problems += _numbering_problems(complete, numbering)
     problems += simulation_problems([_entry_driver(d) for d in complete])
     if problems:
@@ -108,6 +120,49 @@ def _numbering_problems(entries: list, numbering: dict) -> list:
         for n in sorted(given - live[force] - set(retired)):
             problems.append(f"{force} number {n} is neither a driver's nor retired: a driver that leaves moves its "
                             f"number to the retired list")
+    return problems
+
+
+def _name_problems(entries: list) -> list:
+    """What keeps the entries' names from being shown (see validate).
+
+    The short name is the name people quote and the long name the line that
+    explains it under the short name, so neither ends in a full stop; the
+    descriptor and the boundary sentence are sentences and do. A boundary
+    sentence says which neighbouring effects other drivers carry, citing each
+    by its code in brackets.
+    """
+    problems = []
+    codes = {d["code"] for d in entries}
+    for field in ("short_name", "long_name"):
+        seen = collections.Counter(str(d[field]).strip().lower() for d in entries)
+        problems += [f"two drivers have the {field.replace('_', ' ')} {n!r}" for n, k in seen.items() if n and k > 1]
+    for d in entries:
+        tag = d["code"]
+        present = [f for f in NAME_LIMITS if f in d]
+        for field in present:
+            text, label = d[field], field.replace("_", " ")
+            if not isinstance(text, str) or not text.strip():
+                problems.append(f"{tag}: no {label}")
+                continue
+            if text != text.strip() or "  " in text:
+                problems.append(f"{tag}: {label} {text!r} has spaces at its ends or doubled")
+            if len(text) > NAME_LIMITS[field]:
+                problems.append(f"{tag}: {label} longer than {NAME_LIMITS[field]} characters")
+            sentence = field in ("descriptor", "boundary")
+            if text.endswith(".") != sentence:
+                problems.append(f"{tag}: {label} {'does not end' if sentence else 'ends'} with a full stop")
+        boundary = d.get("boundary")
+        if isinstance(boundary, str) and boundary.strip():
+            cited = re.findall(r"\((" + CODE_PATTERN + r")\)", boundary)
+            if not boundary.startswith(BOUNDARY_OPENING):
+                problems.append(f"{tag}: boundary sentence does not open with {BOUNDARY_OPENING.strip()!r}")
+            if not cited or len(cited) != len(re.findall(CODE_PATTERN, boundary)):
+                problems.append(f"{tag}: boundary sentence must cite each other driver by its code in brackets")
+            problems += [f"{tag}: boundary sentence cites {c}, which is not a driver of the base"
+                         for c in cited if c not in codes]
+            if tag in cited:
+                problems.append(f"{tag}: boundary sentence cites the driver itself")
     return problems
 
 

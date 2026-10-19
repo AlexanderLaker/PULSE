@@ -10,6 +10,7 @@ import { TrendingUp, TrendingDown, ExternalLink } from 'lucide-react';
 import type { JourneyTile, PoolImpactGrade, StageContext, TileType } from '@/data/consumerJourney';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT, FIGURES } from '@/lib/theme';
 import Chip from '@/components/dashboard/Chip';
+import { driverNames } from '@/lib/driverNames';
 import {
   type CitedDriver, displayTileName, forceColor, gradeBarOpacity, gradeTint, impactWords, type Side,
   sideWord, TYPE_STYLES,
@@ -213,10 +214,10 @@ export const TilePill: FC<{
 
 /**
  * A driver behind the moment: its code and force from the code map and, once
- * the drivers have loaded, the live driver's name, direction chip, what that
- * direction means for this moment and its description; until then the code
- * and the force only. A link opens the Drivers page searched for the driver
- * (its name, or its code while the name is not known).
+ * the drivers have loaded, the live driver's short name with its long name
+ * below, the direction chip, what that direction means for this moment and
+ * its description; until then the code and the force only. A link opens the
+ * driver on the Drivers page by its code.
  */
 export const DriverForceCard: FC<{
   driver: CitedDriver;
@@ -225,6 +226,7 @@ export const DriverForceCard: FC<{
 }> = ({ driver: { code, force, live }, driversLoaded, onNavigateToDriver }) => {
   const c = forceColor(force);
   const isExp = live?.direction === 'Expansion';
+  const names = live ? driverNames(live) : null;
   const sourceCount = live?.sources.length ?? 0;
 
   return (
@@ -238,8 +240,8 @@ export const DriverForceCard: FC<{
         >
           {code}
         </span>
-        {live && (
-          <span style={{ fontSize: 12, fontWeight: 700, color: S.onSurface, fontFamily: HEADLINE_FONT, lineHeight: 1.3, flex: 1, minWidth: 0 }}>{live.name}</span>
+        {names && (
+          <span style={{ fontSize: 12, fontWeight: 700, color: S.onSurface, fontFamily: HEADLINE_FONT, lineHeight: 1.3, flex: 1, minWidth: 0 }}>{names.shortName}</span>
         )}
         <span
           className="inline-flex items-center gap-1.5 rounded-full font-bold"
@@ -249,6 +251,9 @@ export const DriverForceCard: FC<{
           {force}
         </span>
       </div>
+      {names?.longName && (
+        <div style={{ fontSize: 12, color: S.onSurfaceVariant, lineHeight: 1.4, marginTop: 3 }}>{names.longName}</div>
+      )}
       {live ? (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 9, flexWrap: 'wrap' }}>
@@ -273,7 +278,7 @@ export const DriverForceCard: FC<{
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 9, flexWrap: 'wrap' }}>
         <button type="button"
-          onClick={() => onNavigateToDriver?.(live?.name ?? code)}
+          onClick={() => onNavigateToDriver?.(code)}
           className="inline-flex items-center gap-1.5"
           style={{
             fontSize: 11, fontWeight: 700, color: S.primary, background: 'none',

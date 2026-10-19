@@ -87,7 +87,10 @@ describe('ConsumerJourney: rail and tile dialog', () => {
     expect(dialog.getByText('Why this moment is expanding')).toBeTruthy();
     expect(dialog.getByText('Drivers behind this moment')).toBeTruthy();
     expect(dialog.getByText('Net effect')).toBeTruthy();
-    expect(dialog.getByText('AI and automation productivity (live row)')).toBeTruthy();
+    // the live driver's short name, with its long name below
+    expect(dialog.getByText(T01.short_name)).toBeTruthy();
+    expect(dialog.getByText(T01.long_name)).toBeTruthy();
+    expect(dialog.queryByText(T01.name)).toBeNull();   // the technical scope is not the card's name
     expect(dialog.getByText('AI reads the garment and prescribes the SKU.')).toBeTruthy();
     expect(dialog.getAllByText(/Tailwind/).length).toBeGreaterThan(0);
 
@@ -184,11 +187,11 @@ describe('ConsumerJourney: rail and tile dialog', () => {
     }
   });
 
-  it('links a driver card to the Drivers page with the live driver name', async () => {
+  it('opens the cited driver on the Drivers page by its code', async () => {
     const onNavigateToDriver = vi.fn();
     render(<ConsumerJourney onNavigateToDriver={onNavigateToDriver} />);
     fireEvent.click((await openTile()).getByText('View in Drivers'));
-    expect(onNavigateToDriver).toHaveBeenCalledWith('AI and automation productivity (live row)');
+    expect(onNavigateToDriver).toHaveBeenCalledWith('T-01');
   });
 
   it('shows the code and the force only until the drivers arrive, and counts no direction', async () => {
@@ -199,8 +202,9 @@ describe('ConsumerJourney: rail and tile dialog', () => {
     expect(dialog.getAllByText('Technology').length).toBeGreaterThan(0);   // the force chip
     expect(dialog.getByText('The drivers have not loaded yet: the name, direction and description follow.')).toBeTruthy();
     expect(dialog.getByText('The tailwind and headwind count follows once the drivers have loaded.')).toBeTruthy();
-    // neither the live name nor the driver base's name or first sentence: the bundle has no such text
+    // neither the live name nor the driver base's names or first sentence: the bundle has no such text
     expect(dialog.queryByText(/live row/)).toBeNull();
+    expect(dialog.queryByText('AI & Automation Productivity')).toBeNull();
     expect(dialog.queryByText(/in innovation, marketing and manufacturing/)).toBeNull();
     expect(dialog.queryByText(/tailwind for this moment/)).toBeNull();
     expect(dialog.queryByText(/1 tailwind/)).toBeNull();

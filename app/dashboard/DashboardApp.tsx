@@ -33,6 +33,7 @@ import { FEEDBACK_URL } from '@/lib/feedback';
 import { type ViewId, type ViewUrlState } from '@/lib/viewUrl';
 import ShiftAnalysis from '@/components/dashboard/ShiftAnalysis';
 import Drivers, { type DriverSearch } from '@/components/dashboard/Drivers';
+import { drillThroughParams } from '@/lib/driverNames';
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
 import HomeGate from '@/components/dashboard/HomeGate';
 import ServiceNotice from '@/components/dashboard/ServiceNotice';
@@ -195,9 +196,11 @@ function DashboardShell({ role, visitedTabs, initialView }: {
     window.scrollTo({ top: 0, behavior: 'auto' });
   };
 
+  // A drill-through hands over a driver's code: the Drivers page shows that
+  // driver alone and opens it, as a typed code does (lib/driverNames.ts).
   const openDriver = (query: string) => {
     setDriversSearch((prev) => ({ query, seq: (prev?.seq ?? 0) + 1 }));
-    openView('drivers', { push: true, params: { q: query, driver: null } });
+    openView('drivers', { push: true, params: drillThroughParams(query) });
     if (userId) writeStorage(lastViewKey(userId), 'drivers');
     window.scrollTo({ top: 0, behavior: 'auto' });
   };

@@ -21,7 +21,8 @@ import * as path from 'path';
 import type { Driver, ForceName, ShiftPath } from '@/types';
 import type { PrismStore } from '@/hooks/usePrism';
 import type { AttributionResult } from '@/lib/driverAttribution';
-import { categoryMap, distribution, makeConfig, makeDriver, makeSimulation, makeStore } from './fixtures/prism';
+import { codeForDriverId } from '@/data/driverCodeMap';
+import { BASE_BY_CODE, categoryMap, distribution, makeConfig, makeDriver, makeSimulation, makeStore } from './fixtures/prism';
 
 const STORE = vi.hoisted(() => ({ store: null as unknown as PrismStore }));
 
@@ -58,7 +59,8 @@ const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'dri
 };
 const FCN = 'LHC: FCN';
 
-/** The fixture's drivers, each named by its id so a card's name is the driver's id. */
+/** The fixture's drivers, each named by its id: a card shows the short name the base gives a driver it
+ *  holds and the name of any other, so cardOrder can read every card back to its driver's id. */
 function fixtureDrivers(): Driver[] {
   return FIXTURE.inputs.drivers.map((d) => makeDriver({
     ...d,
@@ -97,11 +99,17 @@ function openFabricClean(container: HTMLElement): HTMLElement {
   return aside;
 }
 
+/** The driver id behind each short name of the base. */
+const ID_BY_SHORT_NAME: Record<string, string> = Object.fromEntries(
+  Object.values(BASE_BY_CODE).map((info) => [info.shortName, info.driverId]),
+);
+
 /** The driver cards in rank order, by driver id. */
 function cardOrder(aside: HTMLElement): string[] {
   return within(aside)
     .getAllByRole('button', { name: /Opens it on the Drivers page$/ })
-    .map((card) => /^\d+\. ([^:]+): /.exec(card.getAttribute('aria-label') ?? '')?.[1] ?? '');
+    .map((card) => /^\d+\. ([^:]+): /.exec(card.getAttribute('aria-label') ?? '')?.[1] ?? '')
+    .map((name) => ID_BY_SHORT_NAME[name] ?? name);
 }
 
 afterEach(() => cleanup());
@@ -131,8 +139,41 @@ describe('category drill-down: contributing drivers at the score means', () => {
     // The growth-market currency driver sits well below the large European headwinds.
     expect(order.indexOf('consumer_r36')).toBeGreaterThan(10);
 
+    // The top card opens its driver on the Drivers page by its code.
     fireEvent.click(within(aside).getAllByRole('button', { name: /Opens it on the Drivers page$/ })[0]);
-    expect(openDriver).toHaveBeenCalledWith('competitive_r15');
+    expect(openDriver).toHaveBeenCalledWith('X-15');
+  });
+
+  it('names a card by its short name, adds the long name on the five top-ranked, and shows both on focus', () => {
+    STORE.store = buildStore(true);
+    const { container } = render(<ShiftAnalysis onNavigateToDriver={vi.fn()} />);
+    const aside = openFabricClean(container);
+    const cards = within(aside).getAllByRole('button', { name: /Opens it on the Drivers page$/ });
+    const names = cardOrder(aside).map((id) => BASE_BY_CODE[codeForDriverId(id) as string]);
+    // A card's own lines, without the tooltip it keeps hidden until hover or focus.
+    const lines = (card: HTMLElement) => {
+      const copy = card.cloneNode(true) as HTMLElement;
+      copy.querySelectorAll('[role="tooltip"]').forEach((tip) => tip.remove());
+      return copy.textContent ?? '';
+    };
+    expect(cards.length).toBeGreaterThan(5);
+    cards.forEach((card, i) => {
+      expect(lines(card)).toContain(names[i].shortName);
+      expect(lines(card).includes(names[i].longName)).toBe(i < 5);
+    });
+
+    // A card names its description before it is focused, so a screen reader reads it on arrival;
+    // the tooltip shows only on hover or focus.
+    const tipId = cards[5].getAttribute('aria-describedby');
+    expect(tipId).toBeTruthy();
+    expect(document.getElementById(tipId as string)?.textContent).toBe(names[5].longName + names[5].descriptor);
+    expect(within(aside).queryByRole('tooltip')).toBeNull();
+    fireEvent.focus(cards[5]);
+    const tip = within(aside).getByRole('tooltip');
+    expect(tip.id).toBe(tipId);
+    expect(tip.textContent).toBe(names[5].longName + names[5].descriptor);
+    fireEvent.blur(cards[5]);
+    expect(within(aside).queryByRole('tooltip')).toBeNull();
   });
 
   it('shows ten drivers, then all of them on "Show all", and folds them again on "Show fewer"', () => {
@@ -158,7 +199,7 @@ describe('category drill-down: contributing drivers at the score means', () => {
     const first = within(aside).getAllByRole('button', { name: /Opens it on the Drivers page$/ })[0];
     // competitive_r15 is X-15 in the generated code map.
     expect(within(first).getByText('X-15')).toBeTruthy();
-    const name = within(first).getByTitle('competitive_r15') as HTMLElement;
+    const name = within(first).getByText(BASE_BY_CODE['X-15'].shortName) as HTMLElement;
     expect(name.style.whiteSpace).not.toBe('nowrap');
     expect(name.style.webkitLineClamp).toBe('2');
   });
@@ -205,9 +246,12 @@ describe('the drill-down header actions', () => {
       expect(lines).toContain('Year,Median,P10,P90');
       expect(lines.filter((l) => /^20\d\d,[+-]?\d+\.\d%,[+-]?\d+\.\d%,[+-]?\d+\.\d%$/.test(l))).toHaveLength(10);
       expect(lines).toContain('Force,Attribution 2035');
-      const rankHeader = lines.indexOf('Rank,Driver,Code,Force,Exposure,Share of movement,Contribution 2035');
+      const rankHeader = lines.indexOf('Rank,Driver,Long name,Technical scope,Code,Force,Exposure,Share of movement,Contribution 2035');
       expect(rankHeader).toBeGreaterThan(0);
-      expect(lines[rankHeader + 1]).toMatch(/^1,competitive_r15,X-15,Competitive,\d\/5,\d+%,-\d+\.\d%$/);
+      // the short name and the long name, never the technical scope
+      const x15 = BASE_BY_CODE['X-15'];
+      expect(lines[rankHeader + 1].startsWith(`1,${x15.shortName},${x15.longName},competitive_r15,X-15,Competitive,`)).toBe(true);
+      expect(lines[rankHeader + 1]).toMatch(/,\d\/5,\d+%,-\d+\.\d%$/);
       // Every exposed driver is in the file, not only the ten on screen.
       const exposed = FIXTURE.inputs.drivers.filter((d) => d.category_exposure[FCN] > 0).length;
       expect(lines.slice(rankHeader + 1).filter(Boolean)).toHaveLength(exposed);

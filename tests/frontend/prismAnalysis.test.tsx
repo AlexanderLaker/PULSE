@@ -61,7 +61,7 @@ const BASIS_PIN = `reconciled to a 2035 portfolio median of ${HEADLINE} percent`
 const FOOTNOTE = 'Attribution at the score means, reconciled to the portfolio median in the basis line; a reading authored on those figures.';
 
 const READING = TEXTS[CODE_TO_ID['C-01']];
-const ROW_NAME = /Private label structural penetration/;
+const ROW_NAME = /Private Label Share Gain/;
 
 afterEach(() => cleanup());
 

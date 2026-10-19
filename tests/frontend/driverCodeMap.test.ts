@@ -5,6 +5,8 @@
  * name, direction or text: the map ships in the public bundle, the drivers
  * come from the API). Every code the Consumer Journey content
  * (data/content/consumer_journey.json) cites or names is a live driver.
+ * Each driver's names in the base fit their place on the page, and a
+ * boundary sentence cites only other live drivers; the API serves the names.
  * tests/test_driver_base.py checks the same map against prism/seed_drivers.py.
  */
 import { describe, it, expect } from 'vitest';
@@ -56,6 +58,33 @@ describe('DRIVER_CODE_MAP', () => {
       expect(MAP_SOURCE.includes(d.description.slice(0, 40)), d.code).toBe(false);
     }
     expect(MAP_SOURCE).not.toMatch(/"(?:name|direction|firstSentence|description)":/);
+    // nor the names the API serves with the driver
+    for (const d of driverBase.drivers) {
+      expect(MAP_SOURCE.includes(d.short_name), d.code).toBe(false);
+      expect(MAP_SOURCE.includes(d.long_name), d.code).toBe(false);
+    }
+    expect(MAP_SOURCE).not.toMatch(/"(?:shortName|longName|descriptor|boundary)":/);
+  });
+
+  it("gives each driver of the base names within their place on the page", () => {
+    for (const d of driverBase.drivers as Array<{ code: string; short_name: string; long_name: string; descriptor: string; boundary?: string }>) {
+      expect(d.short_name.length, d.code).toBeLessThanOrEqual(28);
+      expect(d.long_name.length, d.code).toBeLessThanOrEqual(55);
+      expect(d.descriptor.length, d.code).toBeLessThanOrEqual(100);
+      expect((d.boundary ?? '').length, d.code).toBeLessThanOrEqual(240);
+    }
+    const shorts = driverBase.drivers.map((d) => d.short_name.toLowerCase());
+    expect(new Set(shorts).size).toBe(driverBase.drivers.length);
+  });
+
+  it('cites only other live drivers in a boundary sentence', () => {
+    const withBoundary = (driverBase.drivers as Array<{ code: string; boundary?: string }>).filter((d) => d.boundary);
+    expect(withBoundary.length).toBeGreaterThan(0);
+    for (const d of withBoundary) {
+      const cited = d.boundary!.match(/\b[CKTGEX]-\d\d\b/g) ?? [];
+      expect(cited.length, d.code).toBeGreaterThan(0);
+      expect(cited.filter((c) => !DRIVER_CODE_MAP[c] || c === d.code), d.code).toEqual([]);
+    }
   });
 
   it('finds the code of a driver id, and nothing for an unknown one', () => {

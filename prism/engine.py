@@ -114,7 +114,7 @@ class MonteCarloEngine:
     #: (docs/adr/0014-versioning-and-golden-pins.md). What the dashboard
     #: needs of a run is checked in prism/api/runs.py, which refuses to serve
     #: a run that lacks any of it.
-    MODEL_VERSION = "2.12.0"
+    MODEL_VERSION = "2.13.0"
     ENGINE_NAME = "beta_copula"
 
     def __init__(self, config: ModelConfig, seed: int = 42):

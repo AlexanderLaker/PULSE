@@ -237,10 +237,13 @@ def test_documents_spell_the_british_way(path):
 
 def test_the_drivers_texts_spell_the_british_way():
     from prism.analysis_texts import TEXTS
+    from prism.driver_names import NAMES
     from prism.seed_drivers import DRIVERS
     hits = [f"{d.id} {field}: {form}" for d in DRIVERS for field in ("name", "description")
             for form in american_forms(getattr(d, field))]
     hits += [f"{driver_id} analysis: {form}" for driver_id, text in TEXTS.items() for form in american_forms(text)]
+    hits += [f"{driver_id} {field}: {form}" for driver_id, names in NAMES.items()
+             for field, text in names.items() for form in american_forms(text)]
     assert hits == []
 
 
@@ -306,6 +309,26 @@ def test_the_dashboard_imports_none_of_the_content():
                  "const v = require('../../data/content/profit_pools.json');"):
         assert CONTENT_IMPORT.search(text), text   # the rule is live
     assert not CONTENT_IMPORT.search("import { getJourneyContent } from '@/lib/apiClient';")
+
+
+def test_the_dashboard_code_holds_no_driver_text():
+    """A driver's names, technical scope and description reach the browser through the API only
+    (GET /api/v1/drivers): written into a dashboard module, even in a comment, they would ship in its
+    code. The code map's ids and codes are not text. Tests and documents may quote them."""
+    base = json.loads((REPO / "data" / "drivers" / "driver_base.json").read_text(encoding="utf-8"))["drivers"]
+    texts = {d[k] for d in base for k in ("short_name", "long_name", "descriptor", "boundary", "name")
+             if d.get(k)}
+    texts |= {d["description"][:60] for d in base}
+    hits = []
+    for path in FILES:
+        rel = path.relative_to(REPO).as_posix()
+        if not (rel.startswith(("app/", "components/", "hooks/", "lib/", "data/", "types/")) or rel == "proxy.ts") \
+                or path.suffix not in {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}:
+            continue
+        source = path.read_text(encoding="utf-8")
+        hits += [f"{rel}: {t[:50]}" for t in texts if t in source]
+    assert hits == []
+    assert len(texts) > 200   # the rule is live: every driver's texts are searched
 
 
 #: Set by the platform, not by the operator: Vercel marks its deployments,

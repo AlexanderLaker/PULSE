@@ -22,6 +22,7 @@ import {
 import { BaselineRef, FIELD_HELP, FieldLabel, ProposalsUnavailable, SourceItem } from './cards';
 import { ANALYSIS_FOOTNOTE, PrismAnalysisReading } from './PrismAnalysis';
 import { useDriverProposals } from './useDriverProposals';
+import { DriverHeading } from './DriverHeading';
 
 
 /** A year field for the Expert Rating: the proposal takes the value only while
@@ -75,7 +76,9 @@ export const ExpertRatingPanel: FC<{
   driver: Driver;
   onMyChange: (driverId: string, my: DriverProposal) => void;
   nextUnrated?: NextUnrated;
-}> = ({ driver, onMyChange, nextUnrated }) => {
+  /** Opens another driver by its code (a code cited in the boundary sentence). */
+  onOpenCode?: (code: string) => void;
+}> = ({ driver, onMyChange, nextUnrated, onOpenCode }) => {
   const { data, loaded, failed, retry } = useDriverProposals(driver.id);
   const [draft, setDraft] = useState<DriverProposal>({});
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -168,7 +171,9 @@ export const ExpertRatingPanel: FC<{
   // from a blank draft would overwrite what the expert entered before.
   if (!hydrated) {
     return (
-      <div onClick={(e) => e.stopPropagation()} style={{ padding: '0 32px', backgroundColor: S.surface, borderTop: `1px solid ${S.cardBorder}` }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ padding: '24px 32px 0', backgroundColor: S.surface, borderTop: `1px solid ${S.cardBorder}` }}>
+        {/* The driver's names show while the proposal loads. */}
+        <DriverHeading driver={driver} onOpenCode={onOpenCode} />
         {failed
           ? <ProposalsUnavailable what="your proposal cannot be edited right now" onRetry={retry} />
           : <div role="status" style={{ padding: '26px 0', textAlign: 'center', fontSize: 14, color: S.onSurfaceVariant }}>Loading your proposal…</div>}
@@ -199,6 +204,8 @@ export const ExpertRatingPanel: FC<{
           )}
         </span>
       </div>
+
+      <DriverHeading driver={driver} onOpenCode={onOpenCode} />
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-5">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

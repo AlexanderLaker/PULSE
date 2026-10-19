@@ -16,9 +16,10 @@ import { Users, Store, Cpu, Landmark, Leaf, Swords, ChevronDown, Check } from 'l
 import type { LucideIcon } from 'lucide-react';
 import { EXPANSION_SOFT, FORCE_COLORS, NO_VALUE, fmtPct, fmtShift, shiftColor } from '@/lib/format';
 import { S, SHADOW, HEADLINE_FONT, FIGURES, BODY_FONT } from '@/lib/theme';
+import { driverNames } from '@/lib/driverNames';
 import Chip from '@/components/dashboard/Chip';
 import type { Driver, DriverProposal, DriverUpdate, ForceName } from '@/types';
-import { EXPERT_COLOR, REVIEWED_COLOR, driverCode, isRated, type ScoringMode } from './shared';
+import { EXPERT_COLOR, REVIEWED_COLOR, isRated, type ScoringMode } from './shared';
 import { ColorDots, DeltaChip } from './scales';
 import { Dash, EditedChip } from './cards';
 import { CopyLinkButton } from './CopyLink';
@@ -38,8 +39,9 @@ const FORCE_TILE: Record<ForceName, { Icon: LucideIcon; bg: string; fg: string }
 
 // Column templates per mode, from the xl breakpoint. The header and the rows
 // read the same template, so the columns align. Driver is the one flexible
-// column (min-width 0; the name wraps to two lines); Probability fits the
-// five dots and widens in Review for the expert mean and its delta. The last
+// column (min-width 0): the short name and its code over the long name, each
+// wrapping to two lines at most while collapsed; Probability fits the five
+// dots and widens in Review for the expert mean and its delta. The last
 // column is the Edited chip (list), the expert's own review status (rating)
 // or the number of proposals (review).
 export const ROW_GRID: Record<ScoringMode, string> = {
@@ -254,15 +256,18 @@ interface DriverRowProps {
   nextUnrated?: NextUnrated;
   /** Called once this row's panel has finished collapsing, when the rows below have moved up. */
   onPanelExit?: () => void;
+  /** Opens another driver by its code (a code cited in the boundary sentence). */
+  onOpenCode?: (code: string) => void;
 }
 
 export const DriverRow: FC<DriverRowProps> = ({
   driver, isLast, expanded, onToggle, mode, myProposal, onMyChange, isAdmin, updateDriver, onDirtyChange, nextUnrated,
-  onPanelExit,
+  onPanelExit, onOpenCode,
 }) => {
   const tile = FORCE_TILE[driver.force];
   const { Icon } = tile;
-  const code = driverCode(driver);
+  const names = driverNames(driver);
+  const code = names.code;
   const panelId = useId();
   const rowStyle = { '--row-grid': ROW_GRID[mode] } as React.CSSProperties;
 
@@ -288,7 +293,7 @@ export const DriverRow: FC<DriverRowProps> = ({
           cursor: 'pointer',
         }}
       >
-        {/* Driver identity: the force tile, the code, the name, the force */}
+        {/* Driver identity: the force tile, the short name and its code, the long name, the force */}
         <div role="cell" className="flex items-start gap-3 min-w-0">
           <div
             className="w-8 h-8 flex-shrink-0 rounded-lg flex items-center justify-center mt-0.5"
@@ -298,8 +303,9 @@ export const DriverRow: FC<DriverRowProps> = ({
           </div>
           <div className="min-w-0 flex-1">
             {/* On a phone the button wraps: the code and the chevron on the
-                first line, the name on its own lines below, so a short line
-                is not shared with the chip; from sm the code leads the name. */}
+                first line, the short name on its own lines below, so a short
+                line is not shared with the chip; from sm the code follows the
+                short name. */}
             <button
               type="button"
               aria-expanded={expanded}
@@ -310,12 +316,12 @@ export const DriverRow: FC<DriverRowProps> = ({
                 border: 'none', padding: 0, cursor: 'pointer', lineHeight: 1.3,
               }}
             >
+              {/* The short name people quote, then the code. While collapsed,
+                  two lines at most (three on a phone, where it has its own
+                  lines under the code); hovering the name shows the descriptor. */}
+              <span className={`min-w-0 basis-full order-3 sm:basis-auto sm:order-none ${expanded ? '' : 'line-clamp-3 sm:line-clamp-2'}`}
+                title={names.descriptor || names.shortName}>{names.shortName}</span>
               {code && <span className="mt-[2px] inline-flex shrink-0"><CodeChip code={code} /></span>}
-              {/* While collapsed, two lines at most (three on a phone, where
-                  the line is short), with the full name on hover; the whole
-                  name once the row is open. */}
-              <span className={`min-w-0 basis-full order-3 sm:basis-auto sm:flex-1 sm:order-none ${expanded ? '' : 'line-clamp-3 sm:line-clamp-2'}`}
-                title={driver.name}>{driver.name}</span>
               <ChevronDown
                 size={14}
                 aria-hidden
@@ -328,6 +334,13 @@ export const DriverRow: FC<DriverRowProps> = ({
                 }}
               />
             </button>
+            {/* The long name: the line that explains the short name. */}
+            {names.longName && (
+              <div className={expanded ? 'mt-0.5' : 'mt-0.5 line-clamp-2'} title={names.longName}
+                style={{ fontFamily: BODY_FONT, fontSize: 13, lineHeight: 1.4, color: S.onSurfaceVariant }}>
+                {names.longName}
+              </div>
+            )}
             <div className="flex items-center gap-1.5 mt-1" style={{ fontSize: 11, fontWeight: 600, color: S.onSurfaceVariant }}>
               <span aria-hidden style={{ width: 7, height: 7, borderRadius: 999, flexShrink: 0, backgroundColor: FORCE_COLORS[driver.force] }} />
               {driver.force}
@@ -387,11 +400,12 @@ export const DriverRow: FC<DriverRowProps> = ({
                 <span className="ml-auto"><CopyLinkButton /></span>
               </div>
               {mode === 'rating' ? (
-                <ExpertRatingPanel driver={driver} onMyChange={onMyChange} nextUnrated={nextUnrated} />
+                <ExpertRatingPanel driver={driver} onMyChange={onMyChange} nextUnrated={nextUnrated} onOpenCode={onOpenCode} />
               ) : mode === 'review' ? (
-                <ReviewPanel driver={driver} updateDriver={updateDriver} />
+                <ReviewPanel driver={driver} updateDriver={updateDriver} onOpenCode={onOpenCode} />
               ) : (
-                <DriverPanel driver={driver} isAdmin={isAdmin} updateDriver={updateDriver} onDirtyChange={onDirtyChange} />
+                <DriverPanel driver={driver} isAdmin={isAdmin} updateDriver={updateDriver} onDirtyChange={onDirtyChange}
+                  onOpenCode={onOpenCode} />
               )}
             </div>
           </motion.div>

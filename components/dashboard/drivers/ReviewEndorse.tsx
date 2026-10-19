@@ -18,6 +18,7 @@ import { curveLabel, DIFFUSION_LABELS, EXPERT_COLOR, REVIEWED_COLOR, uncLabel, v
 import { BaselineMark, ChangeChip, ColorDots, DeltaChip, DiffusionGlyph, EditableDots, ReadDots, useRovingRadio } from './scales';
 import { FIELD_HELP, FieldLabel, ProposalsUnavailable, Val } from './cards';
 import { useDriverProposals } from './useDriverProposals';
+import { DriverHeading } from './DriverHeading';
 
 
 // ── Mini 0–100% bar (the GP1 % comparison) ──
@@ -284,7 +285,12 @@ const EpicentreVotePanel: FC<{
 };
 
 // ── Review & Endorse panel (admins) ──
-export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update: DriverUpdate) => Promise<void> }> = ({ driver, updateDriver }) => {
+export const ReviewPanel: FC<{
+  driver: Driver;
+  updateDriver: (driverId: string, update: DriverUpdate) => Promise<void>;
+  /** Opens another driver by its code (a code cited in the boundary sentence). */
+  onOpenCode?: (code: string) => void;
+}> = ({ driver, updateDriver, onOpenCode }) => {
   const { data, loaded, failed, retry } = useDriverProposals(driver.id);
   const [src, setSrc] = useState<Record<string, EndorseSource>>({});
   const [man, setMan] = useState<Record<string, string>>({});
@@ -550,6 +556,8 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
           <span className="inline-flex items-center gap-1.5" style={{ color: EXPERT_COLOR }}><span style={{ width: 9, height: 9, borderRadius: 9, backgroundColor: EXPERT_COLOR }} /> Expert aggregate</span>
         </span>
       </div>
+
+      <DriverHeading driver={driver} onOpenCode={onOpenCode} />
 
       {/* Nothing can be endorsed before the proposals have loaded: the panel
           would offer the current values as every field's choice. */}

@@ -24,7 +24,8 @@ them drifts silently from its source.
 - What the code needs from a generated record reaches it through a Python
   module the same generator writes (`prism/overlap_correction.py` and
   `prism/cell_weight_estimate.py`, which `prism/config.py` reads, and
-  `prism/analysis_texts.py`, which the API serves) or from the record itself
+  `prism/analysis_texts.py` and `prism/driver_names.py`, which the API
+  serves) or from the record itself
   (the QA workbook prints the graded derivation of the cell-weight record),
   never through a copy made by hand.
 

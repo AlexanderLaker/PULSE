@@ -53,7 +53,7 @@ describe('every tab mounts on a complete store', () => {
 
   it('Drivers', () => {
     const { container } = render(<Drivers />);
-    expect(container.textContent).toContain('Private label structural penetration');
+    expect(container.textContent).toContain('Private Label Share Gain');
   });
 
   it('Consumer Journey', async () => {

@@ -49,7 +49,7 @@ from prism.config import (FORCES, CATEGORIES, POSITIVE_DEFINITE_FLOOR, build_dri
                           DEFAULT_FORCE_CORRELATIONS, DEFAULT_WITHIN_FORCE_RHO)
 from prism.driver_base import base_drivers  # noqa: E402
 
-VERSION = "overlap-correction-2026-09"
+VERSION = "overlap-correction-2026-10"
 OUT_JSON = REPO / "data" / "parameters" / "overlap_correction.json"
 OUT_PY = REPO / "prism" / "overlap_correction.py"
 

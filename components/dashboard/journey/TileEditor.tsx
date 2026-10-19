@@ -10,6 +10,7 @@ import { useEffect, useId, useMemo, useState, type CSSProperties, type FC } from
 import { Check, Plus, Trash2 } from 'lucide-react';
 import type { JourneyTile } from '@/data/consumerJourney';
 import { DRIVER_CODE_MAP } from '@/data/driverCodeMap';
+import { driverNames } from '@/lib/driverNames';
 import type { Driver } from '@/types';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { currentMonth, formatMonth, INTENSITY_LABELS, type TileEdits } from './shared';
@@ -53,13 +54,14 @@ export const TileEditor: FC<{
   useEffect(() => () => { onDirtyChange?.(false); }, [onDirtyChange]);
   const nameMissing = edits.name.trim() === '';
 
-  // Every code of the map, labelled with its driver's name once the drivers have loaded.
+  // Every code of the map, labelled with its code and its driver's short name
+  // ("C-01: <short name>") once the drivers have loaded, the code alone until then.
   const codeOptions = useMemo(
     () => Object.entries(DRIVER_CODE_MAP)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([code, { driverId }]) => {
-        const name = driversById.get(driverId)?.name;
-        return { code, label: name ? `${code}: ${name}` : code };
+        const driver = driversById.get(driverId);
+        return { code, label: driver ? `${code}: ${driverNames(driver).shortName}` : code };
       }),
     [driversById],
   );

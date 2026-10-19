@@ -328,7 +328,7 @@ class TestRoleRecheck:
 class TestHealthAndDiagnostics:
     def test_a_new_database_is_seeded(self, api):
         body = api.get("/api/v1/health").json()
-        assert body == {"status": "ok", "version": "2.12.0", "commit": None, "driver_count": 51,
+        assert body == {"status": "ok", "version": "2.13.0", "commit": None, "driver_count": 51,
                         "has_simulation": False, "simulation_reason": "no_rows", "latest_run_id": None}
 
     def test_health_names_the_deployed_commit(self, api, monkeypatch):
@@ -667,7 +667,8 @@ class TestDrivers:
         assert len(drivers) == 51 and [d["id"] for d in drivers] == sorted(d["id"] for d in drivers)
         first = drivers[0]
         assert set(first) == {
-            "id", "force", "name", "description", "direction", "probability", "start_year", "peak_year",
+            "id", "force", "name", "short_name", "long_name", "descriptor", "boundary",
+            "description", "direction", "probability", "start_year", "peak_year",
             "diffusion_curve", "gp1_pct_affected", "uncertainty", "confidence", "expected_effect",
             "category_exposure", "regional_exposure", "vc_epicentre", "analysis", "sources",
             "baseline", "scores_edited", "revision", "proposal_summary"}
@@ -677,8 +678,18 @@ class TestDrivers:
         from prism.analysis_texts import TEXTS
         assert first["analysis"] == TEXTS[first["id"]] and first["analysis"].startswith("Weight in the answer:")
 
+    def test_the_names_come_from_the_driver_base(self, api):
+        """Every driver carries the names the base gives it, as the generated module holds them."""
+        from prism.driver_base import load_base
+        base = {d["id"]: d for d in load_base()}
+        for d in api.get("/api/v1/drivers", headers=bearer()).json():
+            entry = base[d["id"]]
+            assert (d["name"], d["short_name"], d["long_name"], d["descriptor"], d["boundary"]) == (
+                entry["name"], entry["short_name"], entry["long_name"], entry["descriptor"],
+                entry.get("boundary", ""))
+
     def test_a_driver_the_base_does_not_know_has_no_analysis(self, api):
-        """The readings ship with the code, by driver id; nothing stores them."""
+        """The readings and the names ship with the code, by driver id; nothing stores them."""
         from prism.database import insert_drivers
         from prism.seed_drivers import get_seed_drivers
         api.get("/api/v1/drivers", headers=bearer())   # seeds the base
@@ -687,6 +698,10 @@ class TestDrivers:
         insert_drivers([extra])
         listed = {d["id"]: d for d in api.get("/api/v1/drivers", headers=bearer()).json()}
         assert listed["consumer_r99"]["analysis"] == "" and listed["consumer_r01"]["analysis"]
+        unknown = listed["consumer_r99"]
+        assert (unknown["short_name"], unknown["long_name"], unknown["descriptor"], unknown["boundary"]) == ("",) * 4
+        assert unknown["name"] == extra.name   # its technical scope still shows
+        assert listed["consumer_r01"]["short_name"] and listed["consumer_r01"]["boundary"]
 
     def test_an_admin_edit(self, api):
         from prism.database import get_db_connection
@@ -770,6 +785,8 @@ class TestDrivers:
         {"probability": 9}, {"uncertainty": 6}, {"uncertainty": None}, {"peak_year": None},
         {"gp1_pct_affected": 0}, {"direction": "Sideways"},
         {"diffusion_curve": "exponential"}, {"description": None}, {"analysis": "typed by hand"},
+        {"short_name": "Typed"}, {"long_name": "Typed by hand"}, {"descriptor": "Typed."},
+        {"boundary": "Counted in other drivers: nothing (C-02)."},
         {"name": "Renamed"}, {"force": "Customer"}, {"start_year": 2026}, {"peak_year": 2025},
         {"category_exposure": {"Hair: Care": "high"}}, {"category_exposure": {"Hair: Colour": 3}},
         {"regional_exposure": {"Latin America": 2}}, {"vc_epicentre": "Retail"}, {"vc_epicentre": None},

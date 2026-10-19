@@ -42,7 +42,16 @@ export interface DriverScores {
 export interface Driver extends DriverScores {
   id: string;
   force: ForceName;
+  /** The technical scope: the precise title the driver was reviewed under (docs/DRIVERS.md, Names). */
   name: string;
+  /** The name people quote; '' for a driver the driver base of this build does not know. */
+  short_name: string;
+  /** The line under the short name that says who or what acts and what changes. */
+  long_name: string;
+  /** One sentence on what the driver covers; it opens the driver's panel. */
+  descriptor: string;
+  /** Which neighbouring effects other drivers count, citing them by code; '' for most drivers. */
+  boundary: string;
   description: string;
   direction: Direction;
   /** The onset: no effect up to and including this year. */
