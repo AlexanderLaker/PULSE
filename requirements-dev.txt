@@ -14,8 +14,6 @@ certifi==2026.7.22
     #   httpx
 click==8.5.0
     # via uvicorn
-colorama==0.4.6 ; sys_platform == 'win32'
-    # via pytest
 et-xmlfile==2.0.0
     # via openpyxl
 execnet==2.1.2
@@ -68,7 +66,7 @@ pytest-xdist==3.8.0
     # via -r requirements-dev.in
 python-dotenv==1.2.4
     # via -r requirements-dev.in
-ruff==0.17.0
+ruff==0.17.1
     # via -r requirements-dev.in
 scipy==1.17.1
     # via -r requirements-dev.in
