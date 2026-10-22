@@ -7,6 +7,6 @@
 # Vercel installs. After a change here, regenerate it (docs/OPERATIONS.md,
 # "Dependencies"):
 #   uv pip compile api/requirements.in --python-version 3.12 -o api/requirements.txt
-fastapi>=0.110,<1
+fastapi>=0.149.0,<1
 pydantic>=2.6,<3
 psycopg2-binary>=2.9,<3

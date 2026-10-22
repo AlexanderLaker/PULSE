@@ -14,13 +14,11 @@ certifi==2026.7.22
     #   httpx
 click==8.5.0
     # via uvicorn
-colorama==0.4.6 ; sys_platform == 'win32'
-    # via pytest
 et-xmlfile==2.0.0
     # via openpyxl
 execnet==2.1.2
     # via pytest-xdist
-fastapi==0.143.0
+fastapi==0.149.0
     # via -r requirements-dev.in
 h11==0.16.0
     # via
